@@ -1,6 +1,22 @@
-# Course Platform
+# Bakerversity
 
-Next.js course platform with Clerk auth, Supabase, and Stripe payments.
+A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Supports rich lesson content with LaTeX math rendering, quizzes, instructor grading, and certificates.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend / API | Next.js 16 (App Router, TypeScript) |
+| Auth | Clerk |
+| Database | Supabase (Postgres) |
+| Storage | Supabase Storage |
+| Payments | Stripe (not yet wired up) |
+| Email | Resend (not yet wired up) |
+| Rich text editor | TipTap |
+| Math rendering | KaTeX |
+| Code highlighting | Lowlight |
 
 ---
 
@@ -12,62 +28,64 @@ Next.js course platform with Clerk auth, Supabase, and Stripe payments.
 npm install
 ```
 
-### 2. Set up environment variables
+### 2. Environment variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in `.env.local` with your keys (see each section below).
+Fill in `.env.local` with your keys. See each section below.
 
 ---
 
 ### 3. Clerk
 
-1. Go to [dashboard.clerk.com](https://dashboard.clerk.com) and create an application.
-2. Copy **Publishable key** and **Secret key** into `.env.local`.
-3. Set up a webhook:
-   - Clerk Dashboard → Webhooks → Add endpoint
-   - For local dev, use [ngrok](https://ngrok.com) or Clerk's built-in tunnel:
-     `npx clerk dev --tunnel` (beta) — or run `ngrok http 3000` and use the HTTPS URL
-   - Endpoint URL: `https://your-tunnel-url/api/webhooks/clerk`
-   - Subscribe to events: **user.created**, **user.updated**, **user.deleted**
-   - Copy the **Signing Secret** → `CLERK_WEBHOOK_SECRET` in `.env.local`
+1. Go to [dashboard.clerk.com](https://dashboard.clerk.com) → create an application
+2. Copy **Publishable key** and **Secret key** into `.env.local`
+3. Under **User & Authentication → SSO connections**, add Google with your own OAuth credentials
+4. Set up a webhook:
+   - **Developers → Webhooks → Add endpoint**
+   - URL: `https://your-domain.com/api/webhooks/clerk`
+   - Events: `user.created`, `user.updated`, `user.deleted`
+   - Copy the **Signing Secret** → `CLERK_WEBHOOK_SECRET`
+
+For local development, use ngrok to expose localhost:
+```bash
+ngrok http 3000
+```
+Use the ngrok HTTPS URL as your webhook endpoint. Add it to **Authorized JavaScript origins** in your Google Cloud OAuth client.
 
 ---
 
 ### 4. Supabase
 
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) → your project → Settings → API.
-2. Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-3. Copy **anon public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. Copy **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never expose to browser)
-
-The database schema should already be applied (you ran `schema.sql` in the SQL editor).
-
----
-
-### 5. Stripe
-
-1. Go to [dashboard.stripe.com](https://dashboard.stripe.com) → Developers → API Keys.
-2. Copy **Publishable key** and **Secret key** into `.env.local`.
-3. Set up a webhook (for local dev, use the Stripe CLI):
-   ```bash
-   npm install -g stripe
-   stripe login
-   stripe listen --forward-to localhost:3000/api/webhooks/stripe
-   ```
-   Copy the webhook signing secret it prints → `STRIPE_WEBHOOK_SECRET`
-4. For production: Stripe Dashboard → Developers → Webhooks → Add endpoint
-   - URL: `https://yourdomain.com/api/webhooks/stripe`
-   - Events: **payment_intent.succeeded**, **payment_intent.payment_failed**
+1. Create a project at [supabase.com](https://supabase.com)
+   - Uncheck **Automatically expose new tables** at creation
+   - Enable **Automatic RLS**
+2. Run `supabase/schema.sql` in the SQL editor (Dashboard → SQL Editor → paste the file contents → Run)
+3. Copy keys from **Settings → API**:
+   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
+   - anon/public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - service_role key → `SUPABASE_SERVICE_ROLE_KEY`
+4. Create a storage bucket named `lesson-images` (public) with these policies:
+   - `SELECT` for `public`
+   - `INSERT`, `DELETE` for `authenticated`
+5. Enable SSL: **Database → Settings → SSL Configuration**
 
 ---
 
-### 6. Resend
+### 5. Stripe (not yet active)
 
-1. Go to [resend.com](https://resend.com) → API Keys → Create API Key.
-2. Copy the key → `RESEND_API_KEY`
+1. [dashboard.stripe.com](https://dashboard.stripe.com) → Developers → API Keys
+2. Copy keys into `.env.local`
+3. For local webhooks: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+
+---
+
+### 6. Resend (not yet active)
+
+1. [resend.com](https://resend.com) → API Keys → Create
+2. Copy key → `RESEND_API_KEY`
 
 ---
 
@@ -81,15 +99,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Promoting yourself to instructor
+### 8. Promote yourself to instructor
 
-After signing up through the app, your account is created as a `student` by default.
-To promote yourself to `instructor`:
-
-1. Go to your Supabase dashboard → Table Editor → `users`
-2. Find your row (match by email)
-3. Edit the `role` column → set to `instructor`
-4. Save
+After signing up, go to Supabase → Table Editor → `users`, find your row, and set `role` to `instructor`.
 
 ---
 
@@ -98,30 +110,81 @@ To promote yourself to `instructor`:
 ```
 src/
 ├── app/
+│   ├── admin/
+│   │   ├── courses/
+│   │   │   ├── page.tsx                 # Instructor course list
+│   │   │   ├── new/page.tsx             # Create course
+│   │   │   └── [slug]/
+│   │   │       ├── page.tsx             # Course detail + lesson list
+│   │   │       └── lessons/
+│   │   │           ├── new/page.tsx     # Create lesson
+│   │   │           └── [lessonId]/      # Edit lesson + quiz editor
+│   │   └── grading/page.tsx             # Review student text responses
 │   ├── api/
+│   │   ├── admin/
+│   │   │   ├── courses/                 # Course + lesson CRUD
+│   │   │   ├── course-id-by-slug/       # Slug → UUID resolver
+│   │   │   ├── grading/                 # Fetch responses + save feedback
+│   │   │   ├── parse-markdown/          # Markdown → TipTap JSON
+│   │   │   └── upload/                  # Image upload to Supabase Storage
+│   │   ├── lessons/[lessonId]/quiz/     # Student quiz submission
+│   │   ├── students/quiz-feedback/      # Fetch instructor feedback
 │   │   └── webhooks/
-│   │       ├── clerk/route.ts    # Syncs Clerk users → users table
-│   │       └── stripe/route.ts  # Creates enrollments on payment success
-│   ├── dashboard/page.tsx        # Student dashboard
-│   ├── sign-in/[[...sign-in]]/   # Clerk sign-in UI
-│   ├── sign-up/[[...sign-up]]/   # Clerk sign-up UI
-│   ├── courses/                  # Course catalogue + lesson pages (next step)
-│   ├── globals.css
-│   ├── layout.tsx                # Root layout with ClerkProvider
-│   └── page.tsx                  # Homepage
-├── lib/
-│   ├── supabase.ts               # Browser, server, and service role clients
-│   └── types.ts                  # TypeScript types matching the DB schema
-└── middleware.ts                  # Clerk auth middleware (route protection)
+│   │       ├── clerk/                   # Sync Clerk users → users table
+│   │       └── stripe/                  # Create enrollments on payment
+│   ├── courses/
+│   │   ├── page.tsx                     # Public course catalogue
+│   │   └── [slug]/
+│   │       ├── page.tsx                 # Course detail + enroll
+│   │       └── lessons/[lessonId]/      # Lesson viewer + quiz
+│   ├── dashboard/page.tsx               # Student + instructor dashboard
+│   └── sign-in / sign-up               # Clerk auth pages
+├── components/
+│   ├── TipTapEditor.tsx                 # Rich text editor (KaTeX + code + images)
+│   ├── LessonRenderer.tsx               # Read-only lesson renderer
+│   ├── QuizEditor.tsx                   # Admin quiz builder
+│   ├── QuizTaker.tsx                    # Student quiz UI
+│   ├── LatexModal.tsx                   # Algebra 1 LaTeX formula picker
+│   └── MarkdownImport.tsx               # Import .md/.mdx files into editor
+└── lib/
+    ├── supabase.ts                       # Browser, server, service role clients
+    ├── types.ts                          # TypeScript types matching DB schema
+    └── markdownToTipTap.ts              # Markdown AST → TipTap JSON converter
 ```
 
 ---
 
-## Next steps (in order)
+## Feature status
 
-1. **Course catalogue** — `/courses` page listing published courses
-2. **Lesson viewer** — `/courses/[slug]/lessons/[lessonId]` with TipTap renderer + KaTeX
-3. **Stripe Checkout** — API route to create a PaymentIntent and redirect to Stripe
-4. **Quiz engine** — question display, answer submission, score calculation
-5. **Certificate generation** — PDF generation on course completion
-6. **Admin / instructor UI** — course + lesson editor with TipTap + KaTeX
+| Feature | Status |
+|---|---|
+| Auth (Clerk + Google OAuth) | ✅ Complete |
+| User sync (Clerk → Supabase) | ✅ Complete |
+| Course + lesson CRUD | ✅ Complete |
+| Rich text editor with KaTeX | ✅ Complete |
+| Image upload (Supabase Storage) | ✅ Complete |
+| Markdown import (.md, .mdx) | ✅ Complete |
+| LaTeX formula modal | ✅ Complete |
+| Course catalogue + lesson viewer | ✅ Complete |
+| Quiz engine (MC, T/F, text) | ✅ Complete |
+| Per-option explanations | ✅ Complete |
+| Instructor grading view | ✅ Complete |
+| Student feedback display | ✅ Complete |
+| Responsive design | 🔲 Planned |
+| Visual design polish | 🔲 Planned |
+| Certificates | 🔲 Planned |
+| PDF slideshow viewer | 🔲 Planned |
+| Onboarding + email | 🔲 Planned |
+| Stripe payments | 🔲 Planned |
+
+---
+
+## PowerShell note
+
+When deleting folders with brackets in the name (e.g. `[courseId]`), use `-LiteralPath`:
+
+```powershell
+Remove-Item -Recurse -Force -LiteralPath "src\app\admin\courses\[courseId]"
+```
+
+The standard `-Path` flag treats brackets as wildcards and silently fails.
