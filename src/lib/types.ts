@@ -25,6 +25,7 @@ export interface Course {
   price_cents: number
   currency: string
   is_published: boolean
+  thumbnail_url: string | null
   created_at: string
   updated_at: string
 }
@@ -85,6 +86,21 @@ export interface Enrollment {
   stripe_payment_intent_id: string | null
   enrolled_at: string
   completed_at: string | null
+}
+
+export interface CoursePage {
+  id: string
+  course_id: string
+  module_id: string | null
+  page_type: string
+  title: string
+  slug: string | null
+  content: Record<string, unknown> | null
+  introduction: string | null
+  is_published: boolean
+  position: number
+  created_at: string
+  updated_at: string
 }
 
 export interface LessonProgress {

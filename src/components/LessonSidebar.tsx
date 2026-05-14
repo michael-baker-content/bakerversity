@@ -8,6 +8,7 @@ interface CoursePage {
   slug: string | null
   title: string
   page_type: string
+  module_id: string | null
 }
 
 interface SidebarLesson {
@@ -24,15 +25,12 @@ interface SidebarModule {
   position: number
 }
 
-const BEFORE_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
-
 interface LessonSidebarProps {
   courseSlug: string
   courseTitle: string
   lessons: SidebarLesson[]
   modules: SidebarModule[]
-  beforePages: CoursePage[]
-  afterPages: CoursePage[]
+  pages: CoursePage[]
   currentLessonId: string
   currentLessonSlug: string | null
   currentPageId?: string
@@ -50,7 +48,7 @@ function pageHref(courseSlug: string, page: CoursePage) {
     : `/courses/${courseSlug}/pages/${page.id}`
 }
 
-function isActive(lesson: SidebarLesson, currentId: string, currentSlug: string | null) {
+function isActiveLesson(lesson: SidebarLesson, currentId: string, currentSlug: string | null) {
   return lesson.slug === currentSlug || lesson.id === currentId
 }
 
@@ -79,23 +77,52 @@ function SidebarLink({ href, active, children, indent }: {
   )
 }
 
-function PageLink({ href, title }: { href: string; title: string }) {
+function PageLink({ href, title, active }: { href: string; title: string; active?: boolean }) {
   return (
     <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{
         padding: '7px 1rem',
+        paddingLeft: '1.75rem',
         fontSize: 13,
-        color: 'var(--text-2)',
+        color: active ? 'var(--text)' : 'var(--text-2)',
+        fontWeight: active ? 500 : 400,
         display: 'flex',
         alignItems: 'center',
         gap: 6,
-        borderLeft: '3px solid transparent',
+        background: active ? 'var(--surface-2)' : 'transparent',
+        borderLeft: `3px solid ${active ? 'var(--indigo)' : 'transparent'}`,
         transition: 'color 0.1s',
       }}>
         <span style={{ fontSize: 9, color: 'var(--text-3)', flexShrink: 0 }}>◆</span>
         {title}
       </div>
     </Link>
+  )
+}
+
+function ModuleHeader({ title, collapsed, onToggle }: {
+  title: string
+  collapsed: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        width: '100%', textAlign: 'left',
+        padding: '7px 1rem',
+        fontSize: 10, fontWeight: 700,
+        color: 'var(--text-3)',
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        background: 'none', border: 'none', cursor: 'pointer',
+        borderTop: '1px solid var(--border)',
+        marginTop: 4,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}
+    >
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+      <span style={{ flexShrink: 0, marginLeft: 4, fontSize: 8 }}>{collapsed ? '▶' : '▼'}</span>
+    </button>
   )
 }
 
@@ -116,21 +143,27 @@ function SectionDivider({ label }: { label?: string }) {
   )
 }
 
+const INTRO_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
+
 function SidebarContent({
-  courseSlug, courseTitle, lessons, modules, beforePages, afterPages,
-  currentLessonId, currentLessonSlug, onLessonClick,
-}: LessonSidebarProps & { onLessonClick?: () => void }) {
+  courseSlug, courseTitle, lessons, modules, pages,
+  currentLessonId, currentLessonSlug, currentPageId, onNavClick,
+}: LessonSidebarProps & { onNavClick?: () => void }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
-  const toggleModule = (id: string) => setCollapsed((prev) => {
+  const toggle = (id: string) => setCollapsed((prev) => {
     const next = new Set(prev)
     next.has(id) ? next.delete(id) : next.add(id)
     return next
   })
 
-  const unassigned = lessons.filter((l) => !l.module_id)
+  const introductionPages = pages.filter((p) => !p.module_id && INTRO_TYPES.includes(p.page_type))
+  const conclusionPages = pages.filter((p) => !p.module_id && !INTRO_TYPES.includes(p.page_type))
+  const unassignedLessons = lessons.filter((l) => !l.module_id)
+
   const byModule = modules.map((m) => ({
     module: m,
+    pages: pages.filter((p) => p.module_id === m.id),
     lessons: lessons.filter((l) => l.module_id === m.id),
   }))
 
@@ -151,83 +184,86 @@ function SidebarContent({
         </Link>
       </div>
 
-      {/* Before pages */}
-      {beforePages.length > 0 && (
+      {/* Introduction pages (course-level, no module) */}
+      {introductionPages.length > 0 && (
         <>
           <SectionDivider label="Introduction" />
-          {beforePages.map((p) => (
-            <PageLink key={p.id} href={pageHref(courseSlug, p)} title={p.title} />
+          {introductionPages.map((p) => (
+            <div key={p.id} onClick={onNavClick}>
+              <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
+            </div>
           ))}
         </>
       )}
 
-      {/* Lessons header */}
-      {(unassigned.length > 0 || modules.length > 0) && (
-        <SectionDivider label="Lessons" />
-      )}
-
-      {/* Unassigned lessons */}
-      {unassigned.map((lesson) => {
-        globalIndex++
-        const active = isActive(lesson, currentLessonId, currentLessonSlug)
-        return (
-          <div key={lesson.id} onClick={onLessonClick}>
-            <SidebarLink href={lessonHref(courseSlug, lesson)} active={active}>
-              <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>{globalIndex}</span>
-              {lesson.title}
-            </SidebarLink>
-          </div>
-        )
-      })}
-
       {/* Module groups */}
-      {byModule.map(({ module, lessons: modLessons }) => {
-        if (!modLessons.length) return null
+      {byModule.map(({ module, pages: modPages, lessons: modLessons }) => {
+        if (!modPages.length && !modLessons.length) return null
         const isCollapsed = collapsed.has(module.id)
-        const startIndex = globalIndex
+        const moduleStartIndex = globalIndex
         globalIndex += modLessons.length
 
         return (
           <div key={module.id}>
-            <button
-              onClick={() => toggleModule(module.id)}
-              style={{
-                width: '100%', textAlign: 'left',
-                padding: '7px 1rem',
-                fontSize: 10, fontWeight: 700,
-                color: 'var(--text-3)',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
-                background: 'none', border: 'none', cursor: 'pointer',
-                borderTop: '1px solid var(--border)',
-                marginTop: 4,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}
-            >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{module.title}</span>
-              <span style={{ flexShrink: 0, marginLeft: 4, fontSize: 8 }}>{isCollapsed ? '▶' : '▼'}</span>
-            </button>
-            {!isCollapsed && modLessons.map((lesson, i) => {
-              const active = isActive(lesson, currentLessonId, currentLessonSlug)
-              return (
-                <div key={lesson.id} onClick={onLessonClick}>
-                  <SidebarLink href={lessonHref(courseSlug, lesson)} active={active} indent>
-                    <span style={{ fontSize: 10, color: 'var(--text-3)', marginRight: 6, flexShrink: 0 }}>Lesson {startIndex + i + 1}</span>
-                    {lesson.title}
-                  </SidebarLink>
-                </div>
-              )
-            })}
+            <ModuleHeader
+              title={module.title}
+              collapsed={isCollapsed}
+              onToggle={() => toggle(module.id)}
+            />
+            {!isCollapsed && (
+              <>
+                {modPages.map((p) => (
+                  <div key={p.id} onClick={onNavClick}>
+                    <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
+                  </div>
+                ))}
+                {modLessons.map((lesson, i) => {
+                  const active = isActiveLesson(lesson, currentLessonId, currentLessonSlug)
+                  return (
+                    <div key={lesson.id} onClick={onNavClick}>
+                      <SidebarLink href={lessonHref(courseSlug, lesson)} active={active} indent>
+                        <span style={{ fontSize: 10, color: 'var(--text-3)', marginRight: 6, flexShrink: 0 }}>
+                          Lesson {moduleStartIndex + i + 1}
+                        </span>
+                        {lesson.title}
+                      </SidebarLink>
+                    </div>
+                  )
+                })}
+              </>
+            )}
           </div>
         )
       })}
 
-      {/* After pages */}
-      {afterPages.length > 0 && (
+      {/* Conclusion pages (course-level, no module) */}
+      {conclusionPages.length > 0 && (
         <>
           <SectionDivider label="Conclusion" />
-          {afterPages.map((p) => (
-            <PageLink key={p.id} href={pageHref(courseSlug, p)} title={p.title} />
+          {conclusionPages.map((p) => (
+            <div key={p.id} onClick={onNavClick}>
+              <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
+            </div>
           ))}
+        </>
+      )}
+
+      {/* Unassigned lessons */}
+      {unassignedLessons.length > 0 && (
+        <>
+          <SectionDivider label="Lessons" />
+          {unassignedLessons.map((lesson) => {
+            globalIndex++
+            const active = isActiveLesson(lesson, currentLessonId, currentLessonSlug)
+            return (
+              <div key={lesson.id} onClick={onNavClick}>
+                <SidebarLink href={lessonHref(courseSlug, lesson)} active={active}>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>{globalIndex}</span>
+                  {lesson.title}
+                </SidebarLink>
+              </div>
+            )
+          })}
         </>
       )}
     </div>
@@ -236,16 +272,22 @@ function SidebarContent({
 
 export default function LessonSidebar(props: LessonSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const currentIndex = props.lessons.findIndex((l) => isActive(l, props.currentLessonId, props.currentLessonSlug))
-  const currentLesson = props.lessons[currentIndex]
 
-  // When viewing a course page, find it and determine its section label
+  const currentLesson = props.lessons.find((l) =>
+    isActiveLesson(l, props.currentLessonId, props.currentLessonSlug)
+  )
+  const currentLessonIndex = props.lessons.findIndex((l) =>
+    isActiveLesson(l, props.currentLessonId, props.currentLessonSlug)
+  )
   const currentPage = props.currentPageId
-    ? [...props.beforePages, ...props.afterPages].find((p) => p.id === props.currentPageId)
+    ? props.pages.find((p) => p.id === props.currentPageId)
     : null
-  const currentPageSection = currentPage
-    ? (BEFORE_TYPES.includes(currentPage.page_type) ? 'Introduction' : 'Conclusion')
-    : null
+
+  const mobileLabel = currentPage
+    ? currentPage.title
+    : currentLesson
+      ? `Lesson ${currentLessonIndex + 1}: ${currentLesson.title}`
+      : 'Contents'
 
   return (
     <>
@@ -275,13 +317,7 @@ export default function LessonSidebar(props: LessonSidebarProps) {
               maxWidth: '60vw', overflow: 'hidden',
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentPage
-                ? `${currentPageSection}: ${currentPage.title}`
-                : currentLesson
-                  ? `Lesson ${currentIndex + 1}: ${currentLesson.title}`
-                  : 'Contents'}
-            </span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mobileLabel}</span>
             <span style={{ flexShrink: 0, fontSize: 10 }}>{mobileOpen ? '▲' : '▼'}</span>
           </button>
         </div>
@@ -295,7 +331,7 @@ export default function LessonSidebar(props: LessonSidebarProps) {
               zIndex: 40, maxHeight: '60vh', overflowY: 'auto',
               boxShadow: 'var(--shadow)',
             }}>
-              <SidebarContent {...props} onLessonClick={() => setMobileOpen(false)} />
+              <SidebarContent {...props} onNavClick={() => setMobileOpen(false)} />
             </div>
           </>
         )}

@@ -25,7 +25,7 @@ export async function PATCH(
   const body = await req.json()
 
   // Only allow updating safe fields
-  const allowed = ['title', 'description', 'price_cents', 'is_published', 'slug']
+  const allowed = ['title', 'description', 'price_cents', 'is_published', 'slug', 'thumbnail_url']
   const updates = Object.fromEntries(
     Object.entries(body).filter(([key]) => allowed.includes(key))
   )

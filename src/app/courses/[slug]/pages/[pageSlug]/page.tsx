@@ -13,6 +13,7 @@ interface CoursePage {
   slug: string | null
   title: string
   page_type: string
+  module_id: string | null
   content: Record<string, unknown> | null
   introduction: string | null
   is_published: boolean
@@ -20,8 +21,6 @@ interface CoursePage {
 }
 
 interface Module { id: string; title: string; position: number }
-
-const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
 
 export default async function CoursePageViewer({
   params,
@@ -58,7 +57,7 @@ export default async function CoursePageViewer({
 
   // Fetch all content for sidebar + navigation
   const [allPagesRes, lessonsRes, modulesRes] = await Promise.all([
-    supabase.from('course_pages').select('id, slug, title, page_type, position')
+    supabase.from('course_pages').select('id, slug, title, page_type, module_id, position')
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
     supabase.from('lessons').select('id, slug, title, position, module_id')
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
@@ -71,20 +70,11 @@ export default async function CoursePageViewer({
   const allLessons = lessonsRes.data ?? []
   const modules = modulesRes.data ?? []
 
-  const sidebarBeforePages = allPages.filter((p) => beforeTypes.includes(p.page_type))
-  const sidebarAfterPages = allPages.filter((p) => !beforeTypes.includes(p.page_type))
-
-  // Build ordered sequence for prev/next: beforePages → lessons → afterPages
-  const isBefore = beforeTypes.includes(page.page_type)
-  const beforePages = allPages.filter((p) => beforeTypes.includes(p.page_type))
-  const afterPages = allPages.filter((p) => !beforeTypes.includes(p.page_type))
-
-  // Full sequence for prev/next
+  // Full sequence for prev/next: all pages by position interleaved with lessons by position
   const sequence: { type: 'page' | 'lesson'; id: string; slug: string | null; title: string }[] = [
-    ...beforePages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
-    ...allLessons.map((l) => ({ type: 'lesson' as const, id: l.id, slug: l.slug ?? null, title: l.title })),
-    ...afterPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
-  ]
+    ...allPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title, position: p.position, sort: p.position })),
+    ...allLessons.map((l) => ({ type: 'lesson' as const, id: l.id, slug: l.slug ?? null, title: l.title, position: l.position, sort: l.position + 10000 })),
+  ].sort((a, b) => a.sort - b.sort)
 
   const currentSeqIndex = sequence.findIndex((s) => s.id === page.id)
   const prevItem = sequence[currentSeqIndex - 1]
@@ -105,8 +95,7 @@ export default async function CoursePageViewer({
           courseTitle={course.title}
           lessons={allLessons}
           modules={modules}
-          beforePages={sidebarBeforePages}
-          afterPages={sidebarAfterPages}
+          pages={allPages}
           currentLessonId=""
           currentLessonSlug={null}
           currentPageId={page.id}

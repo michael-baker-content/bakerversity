@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface Props {
   courseId: string
@@ -8,19 +8,36 @@ interface Props {
   description: string
   slug: string
   priceCents: number
+  thumbnailUrl: string | null
 }
 
-export default function CourseSettings({ courseId, title, description, slug, priceCents }: Props) {
+export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl }: Props) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ title, description, slug, priceCents })
+  const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   function set(field: string, value: string | number) {
     setForm((f) => ({ ...f, [field]: value }))
     setSaved(false)
     setError('')
+  }
+
+  async function uploadThumbnail(file: File) {
+    setUploading(true)
+    setUploadError('')
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/admin/upload-thumbnail', { method: 'POST', body: fd })
+    const data = await res.json()
+    if (!res.ok) setUploadError(data.error ?? 'Upload failed')
+    else setThumbnail(data.url)
+    setUploading(false)
   }
 
   async function save() {
@@ -35,6 +52,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
           description: form.description,
           slug: form.slug,
           price_cents: form.priceCents,
+          thumbnail_url: thumbnail,
         }),
       })
       if (!res.ok) {
@@ -42,9 +60,10 @@ export default function CourseSettings({ courseId, title, description, slug, pri
         setError(d.error || 'Failed to save')
       } else {
         setSaved(true)
-        // If slug changed, redirect to new URL
         if (form.slug !== slug) {
           window.location.href = `/admin/courses/${form.slug}`
+        } else {
+          window.location.reload()
         }
       }
     } finally {
@@ -54,11 +73,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
 
   return (
     <>
-      <button
-        onClick={() => setOpen(!open)}
-        className="btn btn-ghost btn-sm"
-        style={{ gap: 6 }}
-      >
+      <button onClick={() => setOpen(!open)} className="btn btn-ghost btn-sm">
         ⚙ Settings
       </button>
 
@@ -87,20 +102,13 @@ export default function CourseSettings({ courseId, title, description, slug, pri
               <button
                 onClick={() => setOpen(false)}
                 style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)' }}
-              >
-                ×
-              </button>
+              >×</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <label>
                 <span style={labelStyle}>Title</span>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => set('title', e.target.value)}
-                  style={inputStyle}
-                />
+                <input type="text" value={form.title} onChange={(e) => set('title', e.target.value)} style={inputStyle} />
               </label>
 
               <label>
@@ -141,6 +149,55 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Enter 0 for free</span>
                 </div>
               </label>
+
+              {/* Thumbnail */}
+              <div>
+                <span style={labelStyle}>Thumbnail</span>
+                {thumbnail && (
+                  <div style={{ marginBottom: 8, position: 'relative' }}>
+                    <img
+                      src={thumbnail}
+                      alt="Course thumbnail"
+                      style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 'var(--radius)', display: 'block' }}
+                    />
+                    <button
+                      onClick={() => setThumbnail(null)}
+                      style={{
+                        position: 'absolute', top: 6, right: 6,
+                        background: 'rgba(0,0,0,0.6)', color: '#fff',
+                        border: 'none', borderRadius: 'var(--radius-full)',
+                        width: 24, height: 24, cursor: 'pointer', fontSize: 14, lineHeight: 1,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >×</button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="btn btn-ghost btn-sm"
+                >
+                  {uploading ? 'Uploading…' : thumbnail ? 'Replace image' : 'Upload image'}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadThumbnail(file)
+                    e.target.value = ''
+                  }}
+                />
+                {uploadError && (
+                  <p style={{ fontSize: 12, color: 'var(--danger)', margin: '4px 0 0' }}>{uploadError}</p>
+                )}
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>
+                  Recommended: 1280×640px (2:1 ratio). Images are cropped to fit — keep the subject centred. JPEG, PNG, WebP or GIF.
+                </p>
+              </div>
             </div>
 
             {error && (
@@ -154,12 +211,10 @@ export default function CourseSettings({ courseId, title, description, slug, pri
             )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button onClick={() => setOpen(false)} className="btn btn-ghost btn-sm">
-                Cancel
-              </button>
+              <button onClick={() => setOpen(false)} className="btn btn-ghost btn-sm">Cancel</button>
               <button
                 onClick={save}
-                disabled={saving}
+                disabled={saving || uploading}
                 className="btn btn-primary btn-sm"
                 style={{ opacity: saving ? 0.7 : 1 }}
               >
@@ -174,8 +229,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
 }
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 13, fontWeight: 600,
-  marginBottom: 6, color: 'var(--text)',
+  display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)',
 }
 
 const inputStyle: React.CSSProperties = {

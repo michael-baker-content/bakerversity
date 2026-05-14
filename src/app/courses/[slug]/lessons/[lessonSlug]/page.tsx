@@ -11,7 +11,7 @@ import MarkCompleteButton from '@/components/MarkCompleteButton'
 import type { Course, Lesson, User } from '@/lib/types'
 
 interface Module { id: string; title: string; position: number }
-interface CoursePage { id: string; slug: string | null; title: string; page_type: string; position: number }
+interface CoursePage { id: string; slug: string | null; title: string; page_type: string; module_id: string | null; position: number }
 
 export default async function LessonViewerPage({
   params,
@@ -64,17 +64,13 @@ export default async function LessonViewerPage({
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
     supabase.from('modules').select('id, title, position')
       .eq('course_id', course.id).order('position', { ascending: true }).returns<Module[]>(),
-    supabase.from('course_pages').select('id, slug, title, page_type, position')
+    supabase.from('course_pages').select('id, slug, title, page_type, module_id, position')
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
   ])
 
   const allLessons = lessonsRes.data ?? []
   const modules = modulesRes.data ?? []
   const coursePages = (pagesRes.data ?? []) as CoursePage[]
-
-  const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
-  const beforePages = coursePages.filter((p) => beforeTypes.includes(p.page_type))
-  const afterPages = coursePages.filter((p) => !beforeTypes.includes(p.page_type))
 
   const currentIndex = allLessons.findIndex((l) => l.slug === lessonSlug || l.id === lesson.id)
 
@@ -97,8 +93,7 @@ export default async function LessonViewerPage({
           courseTitle={course.title}
           lessons={allLessons}
           modules={modules}
-          beforePages={beforePages}
-          afterPages={afterPages}
+          pages={coursePages}
           currentLessonId={lesson.id}
           currentLessonSlug={lesson.slug ?? null}
         />

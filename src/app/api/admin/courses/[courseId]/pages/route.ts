@@ -50,7 +50,7 @@ export async function POST(
   const ctx = await verifyInstructor(clerkUser.id, courseId)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { title, page_type, content, introduction } = await req.json()
+  const { title, page_type, content, introduction, module_id } = await req.json()
 
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
   if (!PAGE_TYPES.includes(page_type)) return NextResponse.json({ error: 'Invalid page_type' }, { status: 400 })
@@ -80,6 +80,7 @@ export async function POST(
       slug,
       content: content ?? null,
       introduction: introduction ?? null,
+      module_id: module_id ?? null,
       position: count ?? 0,
     })
     .select('*')

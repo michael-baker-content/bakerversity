@@ -60,8 +60,9 @@ RESEND_API_KEY=
 
 1. Create an application at [dashboard.clerk.com](https://dashboard.clerk.com)
 2. Copy **Publishable key** and **Secret key** into `.env.local`
-3. Under **User & Authentication → SSO connections**, add Google with your own OAuth credentials
-4. Add a webhook under **Developers → Webhooks**:
+3. Under **User & Authentication → Email, Phone, Username**, enable **Email address** and **Password** to allow email/password sign-up alongside Google
+4. Under **User & Authentication → SSO connections**, add Google with your own OAuth credentials
+5. Add a webhook under **Developers → Webhooks**:
    - URL: `https://your-domain.com/api/webhooks/clerk`
    - Events: `user.created`, `user.updated`, `user.deleted`
    - Copy the **Signing Secret** → `CLERK_WEBHOOK_SECRET`
@@ -77,7 +78,7 @@ For local development, use [ngrok](https://ngrok.com) to expose localhost and us
 3. Copy keys from **Settings → API** into `.env.local`
 4. Create two storage buckets:
 
-   **lesson-images** (public) — images embedded in lesson content
+   **lesson-images** (public) — images embedded in lesson content, and course thumbnails (stored under a `thumbnails/` prefix)
    - File size limit: 5MB · MIME types: `image/jpeg, image/png, image/gif, image/webp`
    - Policies: SELECT for public · INSERT + DELETE for authenticated
 
@@ -103,55 +104,59 @@ Open [http://localhost:3000](http://localhost:3000). After signing up, go to Sup
 src/
 ├── app/
 │   ├── admin/
-│   │   ├── layout.tsx                   # Adds SiteNav to all admin pages
-│   │   ├── certificates/                # Certificate management — list and revoke
-│   │   ├── courses/[slug]/              # Course editor — lessons, modules, pages
-│   │   └── grading/                     # Review and respond to student text responses
+│   │   ├── layout.tsx                      # Adds SiteNav to all admin pages
+│   │   ├── certificates/                   # Certificate management — list and revoke
+│   │   ├── courses/[slug]/
+│   │   │   ├── page.tsx                    # Course editor — server component, fetches data
+│   │   │   ├── CourseDetailLayout.tsx      # Client component — collapsible module sections
+│   │   │   ├── PublishToggle.tsx           # Publish/unpublish toggle
+│   │   │   ├── lessons/[lessonId]/         # Lesson editor
+│   │   │   ├── modules/[moduleId]/         # Module editor
+│   │   │   └── pages/[pageId]/             # Course page editor
+│   │   └── grading/                        # Review and respond to student text responses
 │   ├── api/
-│   │   ├── admin/                       # Instructor CRUD — courses, lessons, modules, pages, certificates
-│   │   ├── course-pages/                # Student read/unread toggle
-│   │   ├── lessons/[lessonId]/quiz/     # Quiz submission and scoring
-│   │   ├── student/completions/         # Mark lesson complete / unmark
-│   │   ├── student/progress/            # Fetch progress across all enrolled courses
-│   │   ├── students/quiz-feedback/      # Fetch instructor feedback
-│   │   └── webhooks/clerk + stripe/     # User sync and enrollment
+│   │   ├── admin/                          # Instructor CRUD — courses, lessons, modules, pages, certificates
+│   │   ├── course-pages/                   # Student read/unread toggle
+│   │   ├── lessons/[lessonId]/quiz/        # Quiz submission and scoring
+│   │   ├── student/completions/            # Mark lesson complete / unmark
+│   │   ├── student/progress/              # Fetch progress across all enrolled courses
+│   │   ├── students/quiz-feedback/         # Fetch instructor feedback
+│   │   └── webhooks/clerk + stripe/        # User sync and enrollment
 │   ├── courses/
 │   │   └── [slug]/
-│   │       ├── page.tsx                 # Course detail + full contents list
-│   │       ├── contents/                # Standalone table of contents
-│   │       ├── lessons/[lessonSlug]/    # Lesson viewer
-│   │       └── pages/[pageSlug]/        # Course page viewer
-│   ├── progress/                        # Student progress dashboard
-│   └── profile/                         # Clerk user profile
+│   │       ├── page.tsx                    # Course detail + full contents list
+│   │       ├── contents/                   # Standalone table of contents
+│   │       ├── lessons/[lessonSlug]/       # Lesson viewer
+│   │       └── pages/[pageSlug]/           # Course page viewer
+│   ├── progress/                           # Student progress dashboard
+│   └── profile/                            # Clerk user profile
 ├── components/
-│   ├── SiteNav.tsx                      # Server shell for site navigation
-│   ├── SiteNavClient.tsx                # Interactive nav — hamburger, theme toggle
-│   ├── ThemeProvider.tsx                # next-themes wrapper
-│   ├── ThemeToggle.tsx                  # Light/dark mode toggle
-│   ├── TipTapEditor.tsx                 # Rich text editor — configurable packs (math, code)
-│   ├── LessonRenderer.tsx               # Read-only lesson content renderer
-│   ├── LessonSidebar.tsx                # Responsive sidebar with modules and course pages
-│   ├── LessonList.tsx                   # Reorderable lesson list with module assignment
-│   ├── CoursePageList.tsx               # Reorderable course page list with section headers
-│   ├── ModuleManager.tsx                # Module CRUD
-│   ├── ContentRow.tsx                   # Course contents row (client, handles hover)
-│   ├── QuizEditor.tsx                   # Instructor quiz builder
-│   ├── QuizTaker.tsx                    # Student quiz UI
-│   ├── LatexModal.tsx                   # LaTeX formula reference
-│   ├── MarkdownImport.tsx               # Import .md/.mdx into the editor
-│   ├── SlidesViewer.tsx                 # PDF and Google Slides embed
-│   ├── SlidesSection.tsx                # Client boundary for slides viewer
-│   ├── CoursePageReadToggle.tsx         # Student read progress tracking
-│   ├── MarkCompleteButton.tsx           # Lesson completion toggle
-│   ├── ModuleProgressBars.tsx           # Per-module progress bar UI
-│   ├── CourseProgressLoader.tsx         # Fetches and renders progress on course detail
-│   ├── CourseSettings.tsx               # Modal for editing course title, slug, price
-│   ├── EnrollSelfButton.tsx             # Instructor self-enrollment for testing
-│   └── DeleteButton.tsx                 # Reusable inline delete with confirm
+│   ├── SiteNav.tsx                         # Server shell for site navigation
+│   ├── SiteNavClient.tsx                   # Interactive nav — hamburger, theme toggle
+│   ├── ThemeProvider.tsx                   # next-themes wrapper
+│   ├── ThemeToggle.tsx                     # Light/dark mode toggle
+│   ├── TipTapEditor.tsx                    # Rich text editor — configurable packs (math, code)
+│   ├── LessonRenderer.tsx                  # Read-only lesson content renderer
+│   ├── LessonSidebar.tsx                   # Responsive sidebar — modules, pages, lessons
+│   ├── LessonList.tsx                      # Reorderable lesson list with module assignment
+│   ├── ContentRow.tsx                      # Course contents row (client, handles hover)
+│   ├── QuizEditor.tsx                      # Instructor quiz builder
+│   ├── QuizTaker.tsx                       # Student quiz UI
+│   ├── LatexModal.tsx                      # LaTeX formula reference
+│   ├── MarkdownImport.tsx                  # Import .md/.mdx into the editor
+│   ├── SlidesViewer.tsx                    # PDF and Google Slides embed
+│   ├── SlidesSection.tsx                   # Client boundary for slides viewer
+│   ├── CoursePageReadToggle.tsx            # Student read progress tracking
+│   ├── MarkCompleteButton.tsx              # Lesson completion toggle
+│   ├── ModuleProgressBars.tsx              # Per-module progress bar UI
+│   ├── CourseProgressLoader.tsx            # Fetches and renders progress on course detail
+│   ├── CourseSettings.tsx                  # Modal for editing course title, slug, price, thumbnail
+│   ├── EnrollSelfButton.tsx                # Instructor self-enrollment for testing
+│   └── DeleteButton.tsx                    # Reusable inline delete with confirm
 └── lib/
-    ├── supabase.ts                       # Browser, server, and service role clients
-    ├── types.ts                          # TypeScript types
-    └── markdownToTipTap.ts              # Markdown → TipTap JSON converter
+    ├── supabase.ts                          # Browser, server, and service role clients
+    ├── types.ts                             # TypeScript types
+    └── markdownToTipTap.ts                 # Markdown → TipTap JSON converter
 ```
 
 ---

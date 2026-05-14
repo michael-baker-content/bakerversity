@@ -41,13 +41,26 @@ export default async function CoursesPage() {
             {courses.map((course) => (
               <Link key={course.id} href={`/courses/${course.slug}`} style={{ textDecoration: 'none' }}>
                 <div className="card card-hover" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {/* Color bar */}
-                  <div style={{
-                    height: 4,
-                    background: `linear-gradient(90deg, var(--amber), var(--indigo))`,
-                    borderRadius: 'var(--radius-sm)',
-                    marginBottom: '0.25rem',
-                  }} />
+                  {/* Thumbnail or gradient fallback */}
+                  {course.thumbnail_url ? (
+                    <div style={{
+                      height: 160, margin: '-1.25rem -1.25rem 0',
+                      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                      overflow: 'hidden',
+                    }}>
+                      <img
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{
+                      height: 160, margin: '-1.25rem -1.25rem 0',
+                      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                      background: 'linear-gradient(135deg, var(--amber), var(--indigo))',
+                    }} />
+                  )}
 
                   <h2 style={{
                     fontFamily: 'var(--font-serif)',

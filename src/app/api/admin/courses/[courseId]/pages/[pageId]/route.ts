@@ -41,7 +41,7 @@ export async function PATCH(
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const allowed = ['title', 'slug', 'page_type', 'content', 'introduction', 'is_published', 'position']
+  const allowed = ['title', 'slug', 'page_type', 'content', 'introduction', 'is_published', 'position', 'module_id']
   const updates = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)))
 
   const { error } = await ctx.supabase.from('course_pages').update(updates).eq('id', pageId)

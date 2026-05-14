@@ -43,6 +43,7 @@ create table courses (
   price_cents   integer not null default 0,
   currency      text not null default 'usd',
   is_published  boolean not null default false,
+  thumbnail_url text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -104,6 +105,7 @@ create table lessons (
 create table course_pages (
   id           uuid primary key default gen_random_uuid(),
   course_id    uuid not null references courses(id) on delete cascade,
+  module_id    uuid references modules(id) on delete set null,
   page_type    course_page_type not null default 'custom',
   title        text not null,
   slug         text,
@@ -184,6 +186,17 @@ create table lesson_completions (
 );
 
 -- ============================================================
+-- LESSON PROGRESS (legacy)
+-- ============================================================
+create table lesson_progress (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references users(id) on delete cascade,
+  lesson_id    uuid not null references lessons(id) on delete cascade,
+  completed_at timestamptz not null default now(),
+  unique (user_id, lesson_id)
+);
+
+-- ============================================================
 -- QUIZ ATTEMPTS
 -- ============================================================
 create table quiz_attempts (
@@ -233,6 +246,7 @@ create index on lessons (course_id, position);
 create index on lessons (module_id);
 create index on lessons (course_id, slug);
 create index on course_pages (course_id, position);
+create index on course_pages (module_id);
 create index on course_page_views (user_id);
 create index on enrollments (user_id);
 create index on enrollments (course_id);
