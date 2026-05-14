@@ -124,3 +124,27 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, slug: updates.slug })
 }
+
+// DELETE /api/admin/courses/[courseId]/lessons/[lessonId]
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ courseId: string; lessonId: string }> }
+) {
+  const { courseId, lessonId } = await params
+  const clerkUser = await currentUser()
+  if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const user = await getInstructor(clerkUser.id)
+  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const owned = await verifyLessonOwnership(courseId, lessonId, user.id)
+  if (!owned) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('lessons').delete().eq('id', lessonId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

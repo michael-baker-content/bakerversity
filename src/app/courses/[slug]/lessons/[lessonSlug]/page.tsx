@@ -7,6 +7,7 @@ import QuizTaker from '@/components/QuizTaker'
 import SlidesSection from '@/components/SlidesSection'
 import LessonSidebar from '@/components/LessonSidebar'
 import SiteNav from '@/components/SiteNav'
+import MarkCompleteButton from '@/components/MarkCompleteButton'
 import type { Course, Lesson, User } from '@/lib/types'
 
 interface Module { id: string; title: string; position: number }
@@ -47,6 +48,15 @@ export default async function LessonViewerPage({
     .single<Lesson>()
   if (!lesson) notFound()
   if (isUuid && lesson.slug) redirect(`/courses/${slug}/lessons/${lesson.slug}`)
+
+  // Fetch completion status for this lesson
+  const { data: completionRecord } = await serviceSupabase
+    .from('lesson_completions')
+    .select('id')
+    .eq('user_id', dbUser.id)
+    .eq('lesson_id', lesson.id)
+    .maybeSingle()
+  const isCompleted = !!completionRecord
 
   const [lessonsRes, modulesRes, pagesRes] = await Promise.all([
     supabase.from('lessons').select('id, slug, title, position, module_id')
@@ -145,6 +155,15 @@ export default async function LessonViewerPage({
 
           {/* Quiz */}
           <QuizTaker lessonId={lesson.id} />
+
+          {/* Mark complete */}
+          <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+            <MarkCompleteButton
+              lessonId={lesson.id}
+              courseId={lesson.course_id}
+              initialCompleted={isCompleted}
+            />
+          </div>
 
           {/* Prev / Next */}
           <div style={{

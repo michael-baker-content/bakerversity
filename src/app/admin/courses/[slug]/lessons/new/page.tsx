@@ -15,6 +15,8 @@ export default function NewLessonPage() {
 
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
+  const [modules, setModules] = useState<{ id: string; title: string }[]>([])
+  const [moduleId, setModuleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
@@ -22,9 +24,20 @@ export default function NewLessonPage() {
 
   // Resolve slug → courseId once on mount
   useEffect(() => {
+    // Pre-select module from query param (e.g. ?module=uuid)
+    const params = new URLSearchParams(window.location.search)
+    const preselectedModule = params.get('module')
+
     fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then((r) => r.json())
-      .then((data) => { if (data.id) setCourseId(data.id) })
+      .then(async (data) => {
+        if (!data.id) return
+        setCourseId(data.id)
+        const res = await fetch(`/api/admin/courses/${data.id}/modules`)
+        const mods = await res.json()
+        setModules(Array.isArray(mods) ? mods : [])
+        if (preselectedModule) setModuleId(preselectedModule)
+      })
   }, [slug])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +49,7 @@ export default function NewLessonPage() {
     const res = await fetch(`/api/admin/courses/${courseId}/lessons`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify({ title, content, module_id: moduleId ?? undefined }),
     })
 
     if (!res.ok) {
@@ -50,63 +63,78 @@ export default function NewLessonPage() {
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1rem' }}>
-      <Link href={`/admin/courses/${slug}`} style={{ fontSize: 14, color: '#666' }}>← Back to course</Link>
-      <h1 style={{ margin: '0.5rem 0 1.5rem' }}>New lesson</h1>
+    <main className="page">
+      <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: '1.25rem' }}>
+        <Link href="/admin/courses" style={{ color: 'var(--text-3)' }}>My courses</Link>
+        <span style={{ margin: '0 6px' }}>›</span>
+        <Link href={`/admin/courses/${slug}`} style={{ color: 'var(--text-3)' }}>{slug}</Link>
+        <span style={{ margin: '0 6px' }}>›</span>
+        <span style={{ color: 'var(--text-2)' }}>New lesson</span>
+      </div>
+
+      <h1 style={{ margin: '0 0 2rem' }}>New lesson</h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-            Title <span style={{ color: 'red' }}>*</span>
-          </label>
+          <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
           <input
+            className="input"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Solving Linear Equations"
             required
-            style={{ width: '100%', padding: '8px 10px', fontSize: 14, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
           />
         </div>
 
+        {modules.length > 0 && (
+          <div>
+            <label style={labelStyle}>Module</label>
+            <select
+              className="input"
+              value={moduleId ?? ''}
+              onChange={(e) => setModuleId(e.target.value || null)}
+            >
+              <option value="">— No module —</option>
+              {modules.map((m) => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Content</label>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <p style={{ fontSize: 12, color: '#888', margin: 0 }}>
-              Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
-            </p>
+            <label style={labelStyle}>Content</label>
             <MarkdownImport
               hasExistingContent={Object.keys(content).length > 0}
               onInsert={(doc) => insertFnRef.current?.(doc)}
             />
           </div>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>
+            Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
+          </p>
           <TipTapEditor
             onChange={setContent}
             onEditorReady={(fn) => { insertFnRef.current = fn }}
           />
         </div>
 
-        {error && <p style={{ color: 'red', fontSize: 14 }}>{error}</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="submit"
-            disabled={loading || !title || !courseId}
-            style={{
-              padding: '8px 20px', background: '#111', color: '#fff', border: 'none', borderRadius: 6,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading || !title || !courseId ? 0.6 : 1,
-            }}
-          >
-            {loading ? 'Saving...' : 'Save lesson'}
+          <button type="submit" disabled={loading || !title || !courseId} className="btn btn-primary">
+            {loading ? 'Saving…' : 'Save lesson'}
           </button>
           <Link href={`/admin/courses/${slug}`}>
-            <button type="button" style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
-              Cancel
-            </button>
+            <button type="button" className="btn btn-ghost">Cancel</button>
           </Link>
         </div>
       </form>
     </main>
   )
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)',
 }

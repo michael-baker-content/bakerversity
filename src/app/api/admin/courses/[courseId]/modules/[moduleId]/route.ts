@@ -23,7 +23,7 @@ export async function PATCH(
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const allowed = ['title', 'position']
+  const allowed = ['title', 'description', 'position']
   const updates = Object.fromEntries(
     Object.entries(body).filter(([k]) => allowed.includes(k))
   )

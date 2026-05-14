@@ -1,6 +1,6 @@
 # Bakerversity
 
-A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, and a module system for organizing lesson sequences.
+A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion.
 
 ---
 
@@ -73,9 +73,7 @@ For local development, use [ngrok](https://ngrok.com) to expose localhost and us
 1. Create a project at [supabase.com](https://supabase.com)
    - Uncheck **Automatically expose new tables** at project creation
    - Enable **Automatic RLS**
-2. Run the SQL files in order (Dashboard → SQL Editor):
-   - `supabase/schema.sql`
-   - `supabase/migration_002_modules_pages_videos.sql`
+2. Run `supabase/schema.sql` in the SQL Editor (Dashboard → SQL Editor)
 3. Copy keys from **Settings → API** into `.env.local`
 4. Create two storage buckets:
 
@@ -106,12 +104,15 @@ src/
 ├── app/
 │   ├── admin/
 │   │   ├── layout.tsx                   # Adds SiteNav to all admin pages
+│   │   ├── certificates/                # Certificate management — list and revoke
 │   │   ├── courses/[slug]/              # Course editor — lessons, modules, pages
 │   │   └── grading/                     # Review and respond to student text responses
 │   ├── api/
-│   │   ├── admin/                       # Instructor CRUD — courses, lessons, modules, pages
+│   │   ├── admin/                       # Instructor CRUD — courses, lessons, modules, pages, certificates
 │   │   ├── course-pages/                # Student read/unread toggle
 │   │   ├── lessons/[lessonId]/quiz/     # Quiz submission and scoring
+│   │   ├── student/completions/         # Mark lesson complete / unmark
+│   │   ├── student/progress/            # Fetch progress across all enrolled courses
 │   │   ├── students/quiz-feedback/      # Fetch instructor feedback
 │   │   └── webhooks/clerk + stripe/     # User sync and enrollment
 │   ├── courses/
@@ -120,6 +121,7 @@ src/
 │   │       ├── contents/                # Standalone table of contents
 │   │       ├── lessons/[lessonSlug]/    # Lesson viewer
 │   │       └── pages/[pageSlug]/        # Course page viewer
+│   ├── progress/                        # Student progress dashboard
 │   └── profile/                         # Clerk user profile
 ├── components/
 │   ├── SiteNav.tsx                      # Server shell for site navigation
@@ -139,7 +141,13 @@ src/
 │   ├── MarkdownImport.tsx               # Import .md/.mdx into the editor
 │   ├── SlidesViewer.tsx                 # PDF and Google Slides embed
 │   ├── SlidesSection.tsx                # Client boundary for slides viewer
-│   └── CoursePageReadToggle.tsx         # Student read progress tracking
+│   ├── CoursePageReadToggle.tsx         # Student read progress tracking
+│   ├── MarkCompleteButton.tsx           # Lesson completion toggle
+│   ├── ModuleProgressBars.tsx           # Per-module progress bar UI
+│   ├── CourseProgressLoader.tsx         # Fetches and renders progress on course detail
+│   ├── CourseSettings.tsx               # Modal for editing course title, slug, price
+│   ├── EnrollSelfButton.tsx             # Instructor self-enrollment for testing
+│   └── DeleteButton.tsx                 # Reusable inline delete with confirm
 └── lib/
     ├── supabase.ts                       # Browser, server, and service role clients
     ├── types.ts                          # TypeScript types
@@ -157,8 +165,10 @@ src/
 | `/courses/[slug]/contents` | Table of contents |
 | `/courses/[slug]/lessons/[lessonSlug]` | Lesson viewer |
 | `/courses/[slug]/pages/[pageSlug]` | Course page viewer |
+| `/progress` | Student progress across all enrolled courses |
 | `/admin/courses` | Instructor course list |
 | `/admin/courses/[slug]` | Course editor |
+| `/admin/certificates` | Certificate management |
 | `/admin/grading` | Student response grading |
 | `/dashboard` | Student and instructor dashboard |
 | `/profile` | User profile (Clerk) |
@@ -178,6 +188,5 @@ The UI is built on CSS custom properties defined in `globals.css`. Key tokens:
 
 ## Roadmap
 
-- Certificates on course completion
-- Student onboarding and email notifications (Resend)
+- Email notifications on enrollment and certificate issuance (Resend)
 - Stripe payments for paid courses

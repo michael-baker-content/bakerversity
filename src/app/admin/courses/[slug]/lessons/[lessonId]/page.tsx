@@ -18,6 +18,9 @@ export default function EditLessonPage() {
   const lessonParam = params.lessonId as string
 
   const [courseId, setCourseId] = useState<string | null>(null)
+  const [modules, setModules] = useState<{ id: string; title: string }[]>([])
+  const [moduleId, setModuleId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [lessonUuid, setLessonUuid] = useState<string | null>(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonParam) ? lessonParam : null
   )
@@ -59,14 +62,17 @@ export default function EditLessonPage() {
           setLessonUuid(resolvedLessonId)
         }
 
-        return fetch(`/api/admin/courses/${data.id}/lessons/${resolvedLessonId}`)
-          .then((r) => r.json())
-          .then((lesson) => {
+        return Promise.all([
+          fetch(`/api/admin/courses/${data.id}/lessons/${resolvedLessonId}`).then((r) => r.json()),
+          fetch(`/api/admin/courses/${data.id}/modules`).then((r) => r.json()),
+        ]).then(([lesson, mods]) => {
             setTitle(lesson.title ?? '')
             setLessonSlug(lesson.slug ?? '')
             setIntroduction(lesson.introduction ?? '')
             setContent(lesson.content ?? {})
             setIsPublished(lesson.is_published ?? false)
+            setModuleId(lesson.module_id ?? null)
+            setModules(Array.isArray(mods) ? mods : [])
             setSlidesTitle(lesson.slides_meta?.title ?? '')
             setSlidesDescription(lesson.slides_meta?.description ?? '')
             const url = lesson.slides_url ?? ''
@@ -95,6 +101,7 @@ export default function EditLessonPage() {
         introduction: introduction || null,
         content,
         is_published: isPublished,
+        module_id: moduleId ?? null,
         slides_url: slidesUrl || null,
         slides_meta: (slidesTitle || slidesDescription) ? {
           title: slidesTitle || undefined,
@@ -110,6 +117,14 @@ export default function EditLessonPage() {
       setSaving(false)
       return
     }
+    router.push(`/admin/courses/${slug}`)
+  }
+
+  const handleDelete = async () => {
+    if (!courseId || !lessonUuid) return
+    if (!confirm('Delete this lesson? This cannot be undone.')) return
+    setDeleting(true)
+    await fetch(`/api/admin/courses/${courseId}/lessons/${lessonUuid}`, { method: 'DELETE' })
     router.push(`/admin/courses/${slug}`)
   }
 
@@ -150,6 +165,23 @@ export default function EditLessonPage() {
           />
           <p style={hintStyle}>Used in the lesson URL: /courses/{slug}/lessons/{lessonSlug || 'your-slug'}</p>
         </div>
+
+        {/* Module */}
+        {modules.length > 0 && (
+          <div>
+            <label style={labelStyle}>Module</label>
+            <select
+              className="input"
+              value={moduleId ?? ''}
+              onChange={(e) => setModuleId(e.target.value || null)}
+            >
+              <option value="">— No module —</option>
+              {modules.map((m) => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Introduction */}
         <div>
@@ -271,6 +303,22 @@ export default function EditLessonPage() {
           <QuizEditor courseId={courseId} lessonId={lessonUuid} />
         </div>
       )}
+
+      {/* Delete */}
+      <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+        <h3 style={{ margin: '0 0 0.5rem', fontSize: 15, color: 'var(--danger)' }}>Danger zone</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1rem' }}>
+          Permanently delete this lesson and all its quiz questions.
+        </p>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="btn btn-sm"
+          style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
+        >
+          {deleting ? 'Deleting…' : 'Delete lesson'}
+        </button>
+      </div>
     </main>
   )
 }

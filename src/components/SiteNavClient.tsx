@@ -8,9 +8,10 @@ import ThemeToggle from './ThemeToggle'
 interface SiteNavClientProps {
   active?: 'courses' | 'dashboard'
   isSignedIn: boolean
+  isAdmin: boolean
 }
 
-export default function SiteNavClient({ active, isSignedIn }: SiteNavClientProps) {
+export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavClientProps) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   // Close menu on any resize while open
@@ -66,7 +67,16 @@ export default function SiteNavClient({ active, isSignedIn }: SiteNavClientProps
           <nav className="sitenav-desktop" style={{ display: 'flex', gap: 2 }}>
             <NavLink href="/courses" active={active === 'courses'}>Courses</NavLink>
             {isSignedIn && (
-              <NavLink href="/dashboard" active={active === 'dashboard'}>Dashboard</NavLink>
+              <>
+                <NavLink href="/dashboard" active={active === 'dashboard'}>Dashboard</NavLink>
+                <NavLink href="/progress">My Progress</NavLink>
+                {isAdmin && (
+                  <>
+                    <NavLink href="/admin/courses">Admin</NavLink>
+                    <NavLink href="/admin/certificates">Certificates</NavLink>
+                  </>
+                )}
+              </>
             )}
           </nav>
 
@@ -156,6 +166,19 @@ export default function SiteNavClient({ active, isSignedIn }: SiteNavClientProps
                 <MobileLink href="/dashboard" active={active === 'dashboard'} onClick={() => setMenuOpen(false)}>
                   Dashboard
                 </MobileLink>
+                <MobileLink href="/progress" onClick={() => setMenuOpen(false)}>
+                  My Progress
+                </MobileLink>
+                {isAdmin && (
+                  <>
+                    <MobileLink href="/admin/courses" onClick={() => setMenuOpen(false)}>
+                      Admin
+                    </MobileLink>
+                    <MobileLink href="/admin/certificates" onClick={() => setMenuOpen(false)}>
+                      Certificates
+                    </MobileLink>
+                  </>
+                )}
                 <MobileLink href="/profile" onClick={() => setMenuOpen(false)}>
                   Profile
                 </MobileLink>
