@@ -109,27 +109,35 @@ export default async function HomePage() {
                   color: 'var(--amber)',
                 },
                 {
-                  icon: '</>',
-                  title: 'Code + math',
-                  body: 'Syntax-highlighted code blocks alongside mathematical notation.',
+                  icon: '📈',
+                  title: 'Interactive graphs',
+                  body: 'Dynamic math graphs embedded directly in lessons to visualise concepts.',
                   color: 'var(--indigo)',
                 },
               ].map((f) => (
                 <div key={f.title}>
+                  {/* Icon + title on one line */}
                   <div style={{
-                    width: 40, height: 40,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: f.color === 'var(--amber)' ? 'var(--amber-muted)' : 'var(--indigo-muted)',
-                    borderRadius: 'var(--radius)',
-                    fontSize: 18,
-                    color: f.color,
-                    marginBottom: '0.75rem',
-                    fontFamily: 'var(--font-serif)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: '0.4rem',
                   }}>
-                    {f.icon}
+                    <div style={{
+                      width: 36, height: 36, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: f.color === 'var(--amber)' ? 'var(--amber-muted)' : 'var(--indigo-muted)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: 16,
+                      color: f.color,
+                      fontFamily: 'var(--font-serif)',
+                    }}>
+                      {f.icon}
+                    </div>
+                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', margin: 0 }}>{f.title}</h3>
                   </div>
-                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', margin: '0 0 0.4rem' }}>{f.title}</h3>
-                  <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0, lineHeight: 1.6 }}>{f.body}</p>
+                  {/* Description indented to align with title */}
+                  <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0, paddingLeft: 46, lineHeight: 1.6 }}>{f.body}</p>
                 </div>
               ))}
             </div>
