@@ -75,8 +75,8 @@ export default async function CoursePageViewer({
     (() => {
       const q = serviceSupabase.from('lessons').select('id, slug, title, position, module_id')
         .eq('course_id', course.id).order('position', { ascending: true })
+      return (isInstructor ? q : q.eq('is_published', true))
         .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>()
-      return isInstructor ? q : q.eq('is_published', true)
     })(),
     serviceSupabase.from('modules').select('id, title, position, slug')
       .eq('course_id', course.id).order('position', { ascending: true }).returns<Module[]>(),
