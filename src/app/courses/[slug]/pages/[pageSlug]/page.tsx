@@ -6,6 +6,7 @@ import LessonRenderer from '@/components/LessonRenderer'
 import CoursePageReadToggle from '@/components/CoursePageReadToggle'
 import LessonSidebar from '@/components/LessonSidebar'
 import SiteNav from '@/components/SiteNav'
+import { lessonHref, buildModuleSlugMap } from '@/lib/lessonUrl'
 import type { Course, Lesson, User } from '@/lib/types'
 
 interface CoursePage {
@@ -34,47 +35,68 @@ export default async function CoursePageViewer({
   const supabase = createServerClient()
   const serviceSupabase = createServiceClient()
 
-  const { data: course } = await supabase
-    .from('courses').select('*').eq('slug', slug).eq('is_published', true).single<Course>()
-  if (!course) notFound()
-
   const { data: dbUser } = await serviceSupabase
     .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
   if (!dbUser) redirect('/sign-in')
 
-  const isFree = course.price_cents === 0
-  if (!isFree) {
-    const { data: enrollment } = await serviceSupabase
-      .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
-    if (!enrollment) redirect(`/courses/${slug}`)
+  const isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
+
+  const courseBaseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const { data: course } = await (isInstructor
+    ? courseBaseQuery
+    : courseBaseQuery.eq('is_published', true)
+  ).single<Course>()
+  if (!course) notFound()
+
+  if (!isInstructor) {
+    const isFree = course.price_cents === 0
+    if (!isFree) {
+      const { data: enrollment } = await serviceSupabase
+        .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
+      if (!enrollment) redirect(`/courses/${slug}`)
+    }
   }
 
-  const { data: page } = await supabase
-    .from('course_pages').select('*')
-    .eq('slug', pageSlug).eq('course_id', course.id).eq('is_published', true)
-    .single<CoursePage>()
+  const pageBaseQuery = serviceSupabase.from('course_pages').select('*')
+    .eq('slug', pageSlug).eq('course_id', course.id)
+  const { data: page } = await (isInstructor
+    ? pageBaseQuery
+    : pageBaseQuery.eq('is_published', true)
+  ).single<CoursePage>()
   if (!page) notFound()
 
   // Fetch all content for sidebar + navigation
   const [allPagesRes, lessonsRes, modulesRes] = await Promise.all([
-    supabase.from('course_pages').select('id, slug, title, page_type, module_id, position')
-      .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
-    supabase.from('lessons').select('id, slug, title, position, module_id')
-      .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
-      .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
-    supabase.from('modules').select('id, title, position, slug')
+    (() => {
+      const q = serviceSupabase.from('course_pages').select('id, slug, title, page_type, module_id, position')
+        .eq('course_id', course.id).order('position', { ascending: true })
+      return isInstructor ? q : q.eq('is_published', true)
+    })(),
+    (() => {
+      const q = serviceSupabase.from('lessons').select('id, slug, title, position, module_id')
+        .eq('course_id', course.id).order('position', { ascending: true })
+        .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>()
+      return isInstructor ? q : q.eq('is_published', true)
+    })(),
+    serviceSupabase.from('modules').select('id, title, position, slug')
       .eq('course_id', course.id).order('position', { ascending: true }).returns<Module[]>(),
   ])
 
   const allPages = (allPagesRes.data ?? []) as CoursePage[]
   const allLessons = lessonsRes.data ?? []
   const modules = modulesRes.data ?? []
+  const moduleSlugMap = buildModuleSlugMap(modules)
 
-  // Full sequence for prev/next: all pages by position interleaved with lessons by position
-  const sequence: { type: 'page' | 'lesson'; id: string; slug: string | null; title: string }[] = [
-    ...allPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title, position: p.position, sort: p.position })),
-    ...allLessons.map((l) => ({ type: 'lesson' as const, id: l.id, slug: l.slug ?? null, title: l.title, position: l.position, sort: l.position + 10000 })),
-  ].sort((a, b) => a.sort - b.sort)
+  const INTRO_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
+  const introPages = allPages.filter((p) => INTRO_TYPES.includes(p.page_type))
+  const conclusionPages = allPages.filter((p) => !INTRO_TYPES.includes(p.page_type))
+
+  // Full sequence: intro pages → lessons (in module/position order) → conclusion pages
+  const sequence: { type: 'page' | 'lesson'; id: string; slug: string | null; title: string; module_id?: string | null }[] = [
+    ...introPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
+    ...allLessons.map((l) => ({ type: 'lesson' as const, id: l.id, slug: l.slug ?? null, title: l.title, module_id: l.module_id })),
+    ...conclusionPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
+  ]
 
   const currentSeqIndex = sequence.findIndex((s) => s.id === page.id)
   const prevItem = sequence[currentSeqIndex - 1]
@@ -82,7 +104,7 @@ export default async function CoursePageViewer({
 
   const itemHref = (item: typeof sequence[0]) =>
     item.type === 'lesson'
-      ? (item.slug ? `/courses/${slug}/lessons/${item.slug}` : `/courses/${slug}/lessons/${item.id}`)
+      ? lessonHref(slug, { id: item.id, slug: item.slug, module_id: item.module_id ?? null }, moduleSlugMap)
       : (item.slug ? `/courses/${slug}/pages/${item.slug}` : `/courses/${slug}/pages/${item.id}`)
 
   return (

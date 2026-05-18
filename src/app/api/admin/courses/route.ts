@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       description: description || null,
       price_cents: price_cents ?? 0,
     })
-    .select('id')
+    .select('id, slug')
     .single()
 
   if (error) {
@@ -43,5 +43,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ id: data.id }, { status: 201 })
+  return NextResponse.json({ id: data.id, slug: data.slug }, { status: 201 })
 }

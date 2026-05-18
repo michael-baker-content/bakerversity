@@ -11,11 +11,25 @@ interface Props {
   thumbnailUrl: string | null
   introDescription: string | null
   conclusionDescription: string | null
+  editorTools: string[]
 }
 
-export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl, introDescription, conclusionDescription }: Props) {
+const TOOL_OPTIONS = [
+  { value: 'math', label: 'LaTeX math formulas', description: 'Inline and block math rendering via KaTeX' },
+  { value: 'graph', label: 'Interactive graphs', description: 'Mafs graph editor for plotting functions' },
+  { value: 'python-lint', label: 'Python linting', description: 'Heuristic lint checks on Python code blocks' },
+  { value: 'terminal', label: 'Terminal blocks', description: 'Styled terminal/bash output blocks' },
+  { value: 'lang-select', label: 'Language selector', description: 'Per-block language dropdown on code blocks' },
+]
+
+export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl, introDescription, conclusionDescription, editorTools }: Props) {
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title, description, slug, priceCents, introDescription: introDescription ?? '', conclusionDescription: conclusionDescription ?? '' })
+  const [form, setForm] = useState({
+    title, description, slug, priceCents,
+    introDescription: introDescription ?? '',
+    conclusionDescription: conclusionDescription ?? '',
+    editorTools: editorTools ?? [],
+  })
   const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -57,6 +71,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
           thumbnail_url: thumbnail,
           intro_description: form.introDescription || null,
           conclusion_description: form.conclusionDescription || null,
+          editor_tools: form.editorTools,
         }),
       })
       if (!res.ok) {
@@ -146,6 +161,32 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                   style={{ ...inputStyle, resize: 'vertical' }}
                 />
               </label>
+
+              <div>
+                <span style={labelStyle}>Lesson editor tools</span>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>Choose which extended tools are available in the lesson editor for this course.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {TOOL_OPTIONS.map((tool) => (
+                    <label key={tool.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.editorTools.includes(tool.value)}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...form.editorTools, tool.value]
+                            : form.editorTools.filter((t) => t !== tool.value)
+                          set('editorTools', next)
+                        }}
+                        style={{ marginTop: 2, flexShrink: 0 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{tool.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{tool.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               <label>
                 <span style={labelStyle}>URL slug</span>

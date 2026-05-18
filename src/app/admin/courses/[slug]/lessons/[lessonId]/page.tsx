@@ -21,6 +21,7 @@ export default function EditLessonPage() {
   const lessonParam = params.lessonId as string
 
   const [courseId, setCourseId] = useState<string | null>(null)
+  const [editorTools, setEditorTools] = useState<string[]>([])
   const [modules, setModules] = useState<{ id: string; title: string }[]>([])
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -72,7 +73,8 @@ export default function EditLessonPage() {
         return Promise.all([
           fetch(`/api/admin/courses/${data.id}/lessons/${resolvedLessonId}`).then((r) => r.json()),
           fetch(`/api/admin/courses/${data.id}/modules`).then((r) => r.json()),
-        ]).then(([lesson, mods]) => {
+          fetch(`/api/admin/courses/${data.id}`).then((r) => r.json()),
+        ]).then(([lesson, mods, course]) => {
             setTitle(lesson.title ?? '')
             setLessonSlug(lesson.slug ?? '')
             setIntroduction(lesson.introduction ?? '')
@@ -80,6 +82,7 @@ export default function EditLessonPage() {
             setIsPublished(lesson.is_published ?? false)
             setModuleId(lesson.module_id ?? null)
             setModules(Array.isArray(mods) ? mods : [])
+            setEditorTools(Array.isArray(course.editor_tools) ? course.editor_tools : [])
             setSlidesTitle(lesson.slides_meta?.title ?? '')
             setSlidesDescription(lesson.slides_meta?.description ?? '')
             const url = lesson.slides_url ?? ''
@@ -208,7 +211,7 @@ export default function EditLessonPage() {
           {ready && (
             <TipTapEditor
               key="lesson-editor"
-              packs={['math', 'code', 'graph']}
+              packs={(['code', ...editorTools] as import('@/components/TipTapEditor').EditorPack[])}
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
               onEditorReady={(fn) => { insertFnRef.current = fn }}
@@ -329,7 +332,7 @@ export default function EditLessonPage() {
         </button>
       </div>
       {/* Latex modal — lives at page level to avoid re-render instability */}
-      {showLatexModal && (
+      {showLatexModal && editorTools.includes('math') && (
         <LatexModal
           onInsert={(latex, displayMode) => {
             insertLatexRef.current?.(latex, displayMode)
@@ -340,7 +343,7 @@ export default function EditLessonPage() {
       )}
 
       {/* Graph editor modal — lives at page level to avoid re-render instability */}
-      {showGraphEditor && (
+      {showGraphEditor && editorTools.includes('graph') && (
         <MafsGraphEditor
           onSave={(attrs) => {
             insertGraphRef.current?.(attrs)

@@ -36,7 +36,19 @@ function renderNode(node: Record<string, unknown>): string {
     case 'blockquote':    return `<blockquote>${children}</blockquote>`
     case 'codeBlock': {
       const lang = (attrs.language as string) ?? ''
-      return `<pre><code class="language-${lang}">${children}</code></pre>`
+      const label = lang && lang !== 'plaintext' ? `<div style="font-size:10px;color:#858585;padding:6px 1rem 0;font-family:monospace;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(lang)}</div>` : ''
+      return `<pre>${label}<code class="language-${lang}">${children}</code></pre>`
+    }
+    case 'terminalBlock': {
+      const content = escapeHtml((attrs.content as string) ?? '')
+      return `<div data-terminal style="background:#0d1117;border-radius:8px;padding:12px 16px;margin:0.75rem 0;border:1px solid #30363d;overflow-x:auto;">
+        <div style="display:flex;gap:6px;margin-bottom:8px;opacity:0.6;">
+          <span style="width:10px;height:10px;border-radius:50%;background:#ff5f56;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <pre style="margin:0;color:#e6edf3;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all;">${content}</pre>
+      </div>`
     }
     case 'image': {
       const src = escapeAttr((attrs.src as string) ?? '')

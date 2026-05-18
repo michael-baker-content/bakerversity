@@ -76,6 +76,7 @@ For local development, use [ngrok](https://ngrok.com) to expose localhost and us
    - Uncheck **Automatically expose new tables** at project creation
    - Enable **Automatic RLS**
 2. Run `supabase/schema.sql` in the SQL Editor (Dashboard → SQL Editor)
+   Key columns added over time: `modules.slug`, `courses.thumbnail_url`, `courses.intro_description`, `courses.conclusion_description`, `courses.editor_tools`
 3. Copy keys from **Settings → API** into `.env.local`
 4. Create two storage buckets:
 
@@ -214,5 +215,7 @@ The UI is built on CSS custom properties defined in `globals.css`. Key tokens:
 
 ## Roadmap
 
-- Email notifications on enrollment and certificate issuance (Resend)
 - Stripe payments for paid courses
+- Email notifications on enrollment and certificate issuance (Resend)
+- Certificate PDF generation (DB record issued, certificate_url always null)
+- Course search and filtering on the catalogue

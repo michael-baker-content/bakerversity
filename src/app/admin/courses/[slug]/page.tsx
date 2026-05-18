@@ -35,7 +35,7 @@ export default async function AdminCourseDetailPage({
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description')
+    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
     .eq('slug', slug)
     .single()
 
@@ -49,7 +49,7 @@ export default async function AdminCourseDetailPage({
     { count: enrollmentCount },
   ] = await Promise.all([
     supabase.from('modules')
-      .select('id, title, description, position')
+      .select('id, title, description, slug, position')
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('course_pages')
@@ -102,6 +102,7 @@ export default async function AdminCourseDetailPage({
             thumbnailUrl={course.thumbnail_url ?? null}
             introDescription={course.intro_description ?? null}
             conclusionDescription={course.conclusion_description ?? null}
+            editorTools={course.editor_tools ?? []}
           />
           <Link href={`/admin/grading?course=${course.id}`}>
             <button className="btn btn-ghost btn-sm">Responses</button>

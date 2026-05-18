@@ -26,37 +26,56 @@ export default async function LessonViewerPage({
   const supabase = createServerClient()
   const serviceSupabase = createServiceClient()
 
-  const { data: course } = await supabase
-    .from('courses').select('*').eq('slug', slug).eq('is_published', true).single<Course>()
-  if (!course) notFound()
-
   const { data: dbUser } = await serviceSupabase
     .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
   if (!dbUser) redirect('/sign-in')
 
-  const isFree = course.price_cents === 0
-  if (!isFree) {
-    const { data: enrollment } = await serviceSupabase
-      .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
-    if (!enrollment) redirect(`/courses/${slug}`)
+  const isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
+
+  // Instructors can preview unpublished courses; students need it published
+  const courseBaseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const { data: course } = await (isInstructor
+    ? courseBaseQuery
+    : courseBaseQuery.eq('is_published', true)
+  ).single<Course>()
+  if (!course) notFound()
+
+  // Instructors always have access; students need enrollment or free course
+  if (!isInstructor) {
+    const isFree = course.price_cents === 0
+    if (!isFree) {
+      const { data: enrollment } = await serviceSupabase
+        .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
+      if (!enrollment) redirect(`/courses/${slug}`)
+    }
   }
 
   // Resolve the module from moduleSlug
-  const { data: module_ } = await supabase
+  const { data: module_ } = await serviceSupabase
     .from('modules')
     .select('id, title, position, slug')
     .eq('course_id', course.id)
     .eq('slug', moduleSlug)
     .single<Module>()
-  if (!module_) notFound()
 
-  // Resolve the lesson from lessonSlug within this module
-  const { data: lesson } = await supabase
-    .from('lessons').select('*')
-    .eq('slug', lessonSlug)
-    .eq('module_id', module_.id)
-    .eq('is_published', true)
-    .single<Lesson>()
+  let lesson: Lesson | null = null
+
+  if (module_) {
+    // Normal path: find lesson within the resolved module
+    const lessonQuery = serviceSupabase.from('lessons').select('*')
+      .eq('slug', lessonSlug).eq('module_id', module_.id)
+    const { data } = await (isInstructor ? lessonQuery : lessonQuery.eq('is_published', true)).single<Lesson>()
+    lesson = data
+  }
+
+  // Fallback: module slug didn't resolve (e.g. module missing slug) — find lesson by slug in course
+  if (!lesson) {
+    const fallbackQuery = serviceSupabase.from('lessons').select('*')
+      .eq('slug', lessonSlug).eq('course_id', course.id)
+    const { data } = await (isInstructor ? fallbackQuery : fallbackQuery.eq('is_published', true)).single<Lesson>()
+    lesson = data
+  }
+
   if (!lesson) notFound()
 
   // Fetch completion status
@@ -83,9 +102,28 @@ export default async function LessonViewerPage({
   const coursePages = (pagesRes.data ?? []) as CoursePage[]
   const moduleSlugMap = buildModuleSlugMap(modules)
 
+  const INTRO_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
+  const introPages = coursePages.filter((p) => INTRO_TYPES.includes(p.page_type))
+  const conclusionPages = coursePages.filter((p) => !INTRO_TYPES.includes(p.page_type))
+
   const currentIndex = allLessons.findIndex((l) => l.id === lesson.id)
   const prevLesson = allLessons[currentIndex - 1]
   const nextLesson = allLessons[currentIndex + 1]
+
+  // If at start/end of lessons, link to intro/conclusion pages
+  const prevHref = prevLesson
+    ? lessonHref(slug, prevLesson, moduleSlugMap)
+    : introPages.length > 0
+      ? (introPages[introPages.length - 1].slug ? `/courses/${slug}/pages/${introPages[introPages.length - 1].slug}` : `/courses/${slug}/pages/${introPages[introPages.length - 1].id}`)
+      : null
+  const prevTitle = prevLesson?.title ?? (introPages.length > 0 ? introPages[introPages.length - 1].title : null)
+
+  const nextHref = nextLesson
+    ? lessonHref(slug, nextLesson, moduleSlugMap)
+    : conclusionPages.length > 0
+      ? (conclusionPages[0].slug ? `/courses/${slug}/pages/${conclusionPages[0].slug}` : `/courses/${slug}/pages/${conclusionPages[0].id}`)
+      : null
+  const nextTitle = nextLesson?.title ?? (conclusionPages.length > 0 ? conclusionPages[0].title : null)
 
   return (
     <>
@@ -106,7 +144,7 @@ export default async function LessonViewerPage({
             {/* Header */}
             <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: '0.5rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span>{module_.title} · </span>
+                <span>{module_?.title ?? ''}{module_ ? ' · ' : ''}</span>
                 <span>Lesson {currentIndex + 1} of {allLessons.length}</span>
               </div>
               <h1 style={{ margin: 0, fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>{lesson.title}</h1>
@@ -170,22 +208,22 @@ export default async function LessonViewerPage({
               borderTop: '1px solid var(--border)',
               gap: 8,
             }}>
-              {prevLesson ? (
-                <Link href={lessonHref(slug, prevLesson, moduleSlugMap)} style={{ minWidth: 0, maxWidth: '45vw' }}>
+              {prevHref ? (
+                <Link href={prevHref} style={{ minWidth: 0, maxWidth: '45vw' }}>
                   <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'left' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ flexShrink: 0 }}>←</span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prevLesson.title}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prevTitle}</span>
                     </span>
                   </button>
                 </Link>
               ) : <div />}
 
-              {nextLesson ? (
-                <Link href={lessonHref(slug, nextLesson, moduleSlugMap)} style={{ minWidth: 0, maxWidth: '45vw' }}>
+              {nextHref ? (
+                <Link href={nextHref} style={{ minWidth: 0, maxWidth: '45vw' }}>
                   <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'right' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextLesson.title}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextTitle}</span>
                       <span style={{ flexShrink: 0 }}>→</span>
                     </span>
                   </button>

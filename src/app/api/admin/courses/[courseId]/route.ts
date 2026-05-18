@@ -2,6 +2,30 @@ import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ courseId: string }> }
+) {
+  const { courseId } = await params
+  const clerkUser = await currentUser()
+  if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createServiceClient()
+  const { data: user } = await supabase.from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
+  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
+    .eq('id', courseId)
+    .single()
+
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(data)
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ courseId: string }> }
@@ -25,7 +49,7 @@ export async function PATCH(
   const body = await req.json()
 
   // Only allow updating safe fields
-  const allowed = ['title', 'description', 'price_cents', 'is_published', 'slug', 'thumbnail_url', 'intro_description', 'conclusion_description']
+  const allowed = ['title', 'description', 'price_cents', 'is_published', 'slug', 'thumbnail_url', 'intro_description', 'conclusion_description', 'editor_tools']
   const updates = Object.fromEntries(
     Object.entries(body).filter(([key]) => allowed.includes(key))
   )

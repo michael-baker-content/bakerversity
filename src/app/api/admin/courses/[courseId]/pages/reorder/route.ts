@@ -19,8 +19,11 @@ export async function POST(
   }
 
   const { data: course } = await supabase
-    .from('courses').select('id').eq('id', courseId).eq('instructor_id', user.id).single()
+    .from('courses').select('id, instructor_id').eq('id', courseId).single()
   if (!course) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (user.role !== 'admin' && course.instructor_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const { pages } = await req.json() as { pages: { id: string; position: number }[] }
   if (!Array.isArray(pages)) return NextResponse.json({ error: 'pages array required' }, { status: 400 })

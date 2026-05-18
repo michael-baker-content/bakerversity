@@ -5,7 +5,7 @@ import { useEditor, EditorContent, Node, mergeAttributes, Extension, NodeViewWra
 import StarterKit from '@tiptap/starter-kit'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
-import { common, createLowlight } from 'lowlight'
+import { all, createLowlight } from 'lowlight'
 import katex from 'katex'
 import dynamic from 'next/dynamic'
 import 'katex/dist/katex.min.css'
@@ -13,7 +13,7 @@ import type { MafsGraphAttrs } from '@/components/MafsGraph'
 
 const MafsGraph = dynamic(() => import('@/components/MafsGraph'), { ssr: false })
 
-const lowlight = createLowlight(common)
+const lowlight = createLowlight(all)
 
 // ── Math nodes ───────────────────────────────────────────────────────────────
 const InlineMath = Node.create({
@@ -129,8 +129,147 @@ const MathShortcut = Extension.create({
   },
 })
 
+// ── Terminal block node ───────────────────────────────────────────────────────
+function TerminalNodeView({ node, selected }: { node: { attrs: { prompt: string; content: string } }; selected: boolean; updateAttributes: (a: Record<string, unknown>) => void }) {
+  return (
+    <NodeViewWrapper>
+      <div style={{
+        background: '#0d1117',
+        borderRadius: 8,
+        padding: '12px 16px',
+        margin: '0.75rem 0',
+        fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
+        fontSize: 13,
+        lineHeight: 1.6,
+        outline: selected ? '3px solid var(--amber)' : 'none',
+        border: '1px solid #30363d',
+        overflowX: 'auto',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, opacity: 0.6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56', display: 'inline-block' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e', display: 'inline-block' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f', display: 'inline-block' }} />
+        </div>
+        <pre style={{ margin: 0, color: '#e6edf3', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{node.attrs.content}</pre>
+      </div>
+    </NodeViewWrapper>
+  )
+}
+
+const TerminalNode = Node.create({
+  name: 'terminalBlock',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      content: { default: '$ ' },
+      prompt: { default: '$' },
+    }
+  },
+  parseHTML() { return [{ tag: 'div[data-terminal]' }] },
+  renderHTML({ node, HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-terminal': node.attrs.content })]
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(TerminalNodeView as Parameters<typeof ReactNodeViewRenderer>[0])
+  },
+})
+
+// ── Language-aware code block node view ───────────────────────────────────────
+const LANGUAGES = [
+  { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+  { value: 'bash', label: 'Bash' },
+  { value: 'sql', label: 'SQL' },
+  { value: 'json', label: 'JSON' },
+  { value: 'java', label: 'Java' },
+  { value: 'c', label: 'C' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'rust', label: 'Rust' },
+  { value: 'go', label: 'Go' },
+  { value: 'plaintext', label: 'Plain text' },
+]
+
+// ── Python heuristic linter extension ────────────────────────────────────────
+function lintPython(code: string): { line: number; message: string; severity: 'error' | 'warning' }[] {
+  const issues: { line: number; message: string; severity: 'error' | 'warning' }[] = []
+  const lines = code.split('\n')
+
+  lines.forEach((line, i) => {
+    const ln = i + 1
+    const stripped = line.trimEnd()
+    const trimmed = stripped.trim()
+
+    // Python 2 print statement
+    if (/^print\s+[^(]/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Python 2 print statement — use print() in Python 3', severity: 'error' })
+    }
+    // Python 2 exec statement
+    if (/^exec\s+[^(]/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Python 2 exec statement — use exec() in Python 3', severity: 'error' })
+    }
+    // Tabs vs spaces (mixed)
+    if (/^\t/.test(line) && /^ /.test(code.split('\n').find(l => /^ /.test(l)) ?? '')) {
+      issues.push({ line: ln, message: 'Mixed tabs and spaces — use spaces consistently (PEP 8)', severity: 'warning' })
+    }
+    // Trailing whitespace
+    if (/\s+$/.test(line) && line.length > 0) {
+      issues.push({ line: ln, message: 'Trailing whitespace', severity: 'warning' })
+    }
+    // == None / != None (should use is/is not)
+    if (/==\s*None/.test(trimmed) || /!=\s*None/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Use "is None" or "is not None" instead of == / !=', severity: 'warning' })
+    }
+    // == True / == False
+    if (/==\s*True/.test(trimmed) || /==\s*False/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Use "if x:" or "if not x:" instead of comparing to True/False', severity: 'warning' })
+    }
+    // Bare except
+    if (/^except\s*:/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Bare except: catches all exceptions — specify exception type', severity: 'warning' })
+    }
+    // mutable default argument
+    if (/def\s+\w+\s*\(.*=\s*(\[\]|\{\}|\(\))/.test(trimmed)) {
+      issues.push({ line: ln, message: 'Mutable default argument — use None and set inside the function', severity: 'warning' })
+    }
+    // Line too long (>79 chars per PEP 8)
+    if (stripped.length > 79) {
+      issues.push({ line: ln, message: `Line too long (${stripped.length} > 79 characters, PEP 8)`, severity: 'warning' })
+    }
+  })
+
+  return issues
+}
+
+const PythonLintExtension = Extension.create({
+  name: 'pythonLint',
+  addStorage() {
+    return { diagnostics: [] as { line: number; message: string; severity: 'error' | 'warning' }[] }
+  },
+  onUpdate() {
+    const doc = this.editor.state.doc
+    const diagnostics: { line: number; message: string; severity: 'error' | 'warning' }[] = []
+    doc.forEach((node) => {
+      if (node.type.name === 'codeBlock') {
+        const lang = node.attrs.language ?? 'python'
+        if (lang === 'python' || lang === '') {
+          const results = lintPython(node.textContent)
+          diagnostics.push(...results)
+        }
+      }
+    })
+    this.storage.diagnostics = diagnostics
+    // Force re-render by dispatching a meta transaction
+    this.editor.view.dispatch(this.editor.state.tr.setMeta('pythonLint', diagnostics))
+  },
+})
+
 // ── Pack definitions ──────────────────────────────────────────────────────────
-export type EditorPack = 'math' | 'code' | 'graph'
+export type EditorPack = 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface TipTapEditorProps {
@@ -163,6 +302,13 @@ export default function TipTapEditor({
   const hasMath = packs.includes('math')
   const hasCode = packs.includes('code')
   const hasGraph = packs.includes('graph')
+  const hasPythonLint = packs.includes('python-lint')
+  const hasTerminal = packs.includes('terminal')
+  const hasLangSelect = packs.includes('lang-select')
+
+  const [lintDiagnostics, setLintDiagnostics] = useState<{ line: number; message: string; severity: 'error' | 'warning' }[]>([])
+  const [showTerminalModal, setShowTerminalModal] = useState(false)
+  const [terminalContent, setTerminalContent] = useState('$ ')
 
   // ── Build extensions list based on packs ──────────────────────────────────
   const extensions = [
@@ -171,6 +317,8 @@ export default function TipTapEditor({
     ...(hasCode ? [CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'python' })] : []),
     ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
     ...(hasGraph ? [MafsGraphNode] : []),
+    ...(hasTerminal ? [TerminalNode] : []),
+    ...(hasPythonLint ? [PythonLintExtension] : []),
   ]
 
   // ── Editor instance ───────────────────────────────────────────────────────
@@ -250,6 +398,23 @@ export default function TipTapEditor({
     onInsertLatex?.(insertLatexFormula)
   }, [insertLatexFormula, onInsertLatex])
 
+  const insertTerminal = useCallback((content: string) => {
+    if (!editor) return
+    editor.chain().focus().insertContent({ type: 'terminalBlock', attrs: { content } }).run()
+    setShowTerminalModal(false)
+  }, [editor])
+
+  // Sync lint diagnostics from extension storage
+  useEffect(() => {
+    if (!editor || !hasPythonLint) return
+    const update = () => {
+      const storage = (editor.extensionStorage as Record<string, unknown>).pythonLint as { diagnostics: { line: number; message: string; severity: 'error' | 'warning' }[] } | undefined
+      setLintDiagnostics(storage?.diagnostics ?? [])
+    }
+    editor.on('update', update)
+    return () => { editor.off('update', update) }
+  }, [editor, hasPythonLint])
+
   const insertGraph = useCallback((attrs: MafsGraphAttrs) => {
     if (!editor) return
     editor.chain().focus().insertContent({ type: 'mafsGraph', attrs }).run()
@@ -273,6 +438,21 @@ export default function TipTapEditor({
           <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. List</ToolbarButton>
           {hasCode && (
             <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
+          )}
+          {hasTerminal && (
+            <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>⬛ Terminal</ToolbarButton>
+          )}
+          {hasLangSelect && editor.isActive('codeBlock') && (
+            <select
+              value={editor.getAttributes('codeBlock').language ?? 'python'}
+              onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run()}
+              style={{
+                padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer',
+              }}
+            >
+              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
           )}
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>" Quote</ToolbarButton>
           <ToolbarButton onClick={() => fileInputRef.current?.click()} active={false}>
@@ -329,7 +509,48 @@ export default function TipTapEditor({
         .tiptap .ProseMirror-selectednode[data-inline-math] { outline: 3px solid var(--amber); border-radius: 3px; }
         .tiptap img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5rem 0; display: block; }
         .tiptap img.ProseMirror-selectednode { outline: 3px solid var(--amber); }
+        .tiptap [data-terminal] { font-family: monospace; }
+        .tiptap .ProseMirror-selectednode [data-terminal-inner] { outline: 3px solid var(--amber); }
       `}</style>
+      {/* Terminal insert modal */}
+      {showTerminalModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowTerminalModal(false) }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 520, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>Insert terminal block</h3>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>Content</label>
+              <textarea
+                value={terminalContent}
+                onChange={(e) => setTerminalContent(e.target.value)}
+                rows={6}
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: '#0d1117', color: '#e6edf3', resize: 'vertical', boxSizing: 'border-box' }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>Enter terminal output exactly as it should appear.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowTerminalModal(false)} className="btn btn-ghost btn-sm">Cancel</button>
+              <button onClick={() => insertTerminal(terminalContent)} className="btn btn-primary btn-sm">Insert</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Python lint panel */}
+      {hasPythonLint && lintDiagnostics.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)', padding: '8px 12px', maxHeight: 140, overflowY: 'auto' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Python linter</div>
+          {lintDiagnostics.map((d, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, marginBottom: 2 }}>
+              <span style={{ color: d.severity === 'error' ? 'var(--danger)' : 'var(--amber)', fontWeight: 600, flexShrink: 0 }}>
+                {d.severity === 'error' ? '✕' : '⚠'} L{d.line}
+              </span>
+              <span style={{ color: 'var(--text-2)' }}>{d.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

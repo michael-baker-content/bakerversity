@@ -46,6 +46,7 @@ create table courses (
   thumbnail_url text,
   intro_description text,
   conclusion_description text,
+  editor_tools  text[] not null default '{}',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

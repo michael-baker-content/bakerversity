@@ -49,8 +49,8 @@ export default function NewCoursePage() {
       return
     }
 
-    const { id } = await res.json()
-    router.push(`/admin/courses/${id}`)
+    const { id, slug: newSlug } = await res.json()
+    router.push(`/admin/courses/${newSlug ?? id}`)
   }
 
   return (
