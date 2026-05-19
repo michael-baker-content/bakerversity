@@ -1,13 +1,13 @@
 // Pure functions — no React imports needed
 
-export function escapeHtml(str: string) {
+function escapeHtml(str: string) {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }
 
-export function escapeAttr(str: string) {
+function escapeAttr(str: string) {
   return str.replace(/"/g, '&quot;')
 }
 

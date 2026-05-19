@@ -24,7 +24,7 @@ interface ToolbarProps {
   setFilenameInput: (v: string) => void
 }
 
-export function ToolbarButton({ onClick, active, children }: {
+function ToolbarButton({ onClick, active, children }: {
   onClick: () => void
   active: boolean
   children: React.ReactNode

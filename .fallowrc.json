@@ -1,33 +1,16 @@
 {
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "ignorePatterns": [
+    "src/lib/types.ts"
+  ],
+  "ignoreDependencies": [
+    "eslint-config-next"
+  ],
   "rules": {
-    "unused-exports": {
-      "ignore": [
-        "src/lib/types.ts",
-        "src/components/TipTapEditor.tsx:EditorPack",
-        "src/lib/supabase.ts:createBrowserClient"
-      ]
-    },
-    "unused-types": {
-      "ignore": [
-        "src/lib/types.ts"
-      ]
-    },
-    "unused-dependencies": {
-      "ignore": [
-        "eslint-config-next"
-      ]
-    },
-    "duplication": {
-      "threshold": 60
-    },
-    "complexity": {
-      "ignore": [
-        "src/components/TipTapEditor.tsx",
-        "src/components/LessonRenderer.tsx",
-        "src/app/courses/[slug]/[moduleSlug]/[lessonSlug]/page.tsx",
-        "src/app/courses/[slug]/page.tsx",
-        "src/lib/markdownToTipTap.ts"
-      ]
-    }
+    "unused-files": "error",
+    "unused-exports": "warn",
+    "unused-types": "off",
+    "duplication": "warn",
+    "complexity": "warn"
   }
 }

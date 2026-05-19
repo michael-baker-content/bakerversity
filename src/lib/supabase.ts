@@ -7,7 +7,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 // ── Browser client ────────────────────────────────────────────────────────────
 // Uses the anon key. Safe to use in Client Components.
 // RLS policies enforce row-level access.
-export function createBrowserClient() {
+function createBrowserClient() {
   return createClient(supabaseUrl, supabaseAnonKey)
 }
 
