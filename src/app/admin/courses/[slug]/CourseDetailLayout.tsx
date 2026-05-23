@@ -119,7 +119,7 @@ function CollapsibleSection({
     const withPositions = next.map((s, i) => ({
       ...s,
       item: { ...s.item, position: i },
-    }))
+    })) as SequenceItem[]
     setSequence(withPositions)
 
     // Persist lessons and assessments separately — each has its own endpoint
