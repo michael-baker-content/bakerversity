@@ -1,226 +1,159 @@
 # Bakerversity
 
-A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion. The lesson editor supports per-course configurable tool packs: LaTeX math (with double-click to edit formulas), Mafs interactive graphs, syntax-highlighted code blocks with line numbers and filename labels, terminal/bash blocks, Python linting, language selector, callout blocks (tip, info, warning, note, further reading, alert), and tables. The editor toolbar is sticky, supports HTML/Markdown/TXT export, and markdown input rules are disabled to avoid accidental formatting.
-
----
+A custom online course platform built with Next.js, Supabase, and Clerk. Designed for a single instructor offering structured courses with modules, lessons, rich content, and assessments.
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Frontend / API | Next.js 15 (App Router, TypeScript) |
-| Auth | Clerk |
-| Database | Supabase (Postgres) |
-| Storage | Supabase Storage |
-| Payments | Stripe (not yet wired up) |
-| Email | Resend (planned) |
-| Rich text editor | TipTap |
-| Math rendering | KaTeX |
-| Graph rendering | Mafs |
-| Code highlighting | Lowlight |
-| Theming | next-themes (light/dark mode) |
-
----
-
-## Setup
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Add the following to `.env.local`:
-
-```
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-CLERK_WEBHOOK_SECRET=
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_USER_PROFILE_URL=/profile
-
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-
-RESEND_API_KEY=
-```
-
-### 3. Clerk
-
-1. Create an application at [dashboard.clerk.com](https://dashboard.clerk.com)
-2. Copy **Publishable key** and **Secret key** into `.env.local`
-3. Under **User & Authentication → Email, Phone, Username**, enable **Email address** and **Password** to allow email/password sign-up alongside Google
-4. Under **User & Authentication → SSO connections**, add Google with your own OAuth credentials
-5. Add a webhook under **Developers → Webhooks**:
-   - URL: `https://your-domain.com/api/webhooks/clerk`
-   - Events: `user.created`, `user.updated`, `user.deleted`
-   - Copy the **Signing Secret** → `CLERK_WEBHOOK_SECRET`
-
-For local development, use [ngrok](https://ngrok.com) to expose localhost and use the HTTPS URL as your webhook endpoint.
-
-### 4. Supabase
-
-1. Create a project at [supabase.com](https://supabase.com)
-   - Uncheck **Automatically expose new tables** at project creation
-   - Enable **Automatic RLS**
-2. Run `supabase/schema.sql` in the SQL Editor (Dashboard → SQL Editor)
-   Key columns added over time: `modules.slug`, `courses.thumbnail_url`, `courses.intro_description`, `courses.conclusion_description`, `courses.editor_tools` (text[] — stores selected editor tool packs per course)
-3. Copy keys from **Settings → API** into `.env.local`
-4. Create two storage buckets:
-
-   **lesson-images** (public) — images embedded in lesson content, and course thumbnails (stored under a `thumbnails/` prefix)
-   - File size limit: 5MB · MIME types: `image/jpeg, image/png, image/gif, image/webp`
-   - Policies: SELECT for public · INSERT + DELETE for authenticated
-
-   **lesson-slides** (public) — PDF slide decks
-   - File size limit: 50MB · MIME types: `application/pdf`
-   - Policies: SELECT for public · INSERT + DELETE for authenticated
-
-5. Enable SSL: **Database → Settings → SSL Configuration**
-
-### 5. Configure next.config.js
-
-Ensure `mafs` is included in `transpilePackages` (required because mafs ships as ESM):
-
-```js
-const nextConfig = {
-  transpilePackages: ["mafs"],
-  // ...rest of config
-}
-```
-
-### 6. Run
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000). After signing up, go to Supabase → Table Editor → `users` and set your `role` to `instructor`.
-
----
+- **Framework** — Next.js 15 (App Router)
+- **Database** — Supabase (PostgreSQL + RLS)
+- **Auth** — Clerk
+- **Payments** — Stripe
+- **Rich text** — TipTap with custom nodes (inline/block math, Mafs graphs, code blocks, callouts, terminal blocks)
+- **Math rendering** — KaTeX
+- **Graphing** — Mafs
+- **Styling** — Custom CSS (amber/indigo theme, DM Sans + DM Serif Display, dark mode via next-themes)
 
 ## Project structure
 
 ```
 src/
-├── app/
-│   ├── admin/
-│   │   ├── layout.tsx                      # Adds SiteNav to all admin pages
-│   │   ├── certificates/                   # Certificate management — list and revoke
-│   │   ├── courses/[slug]/
-│   │   │   ├── page.tsx                    # Course editor — server component, fetches data
-│   │   │   ├── CourseDetailLayout.tsx      # Client component — collapsible module sections
-│   │   │   ├── PublishToggle.tsx           # Publish/unpublish toggle
-│   │   │   ├── modules/new/                # New module form
-│   │   │   └── modules/[moduleId]/         # Module editor
-│   │   │   ├── lessons/[lessonId]/         # Lesson editor
-│   │   │   ├── modules/[moduleId]/         # Module editor
-│   │   │   └── pages/[pageId]/             # Course page editor
-│   │   └── grading/                        # Review and respond to student text responses
-│   ├── api/
-│   │   ├── admin/                          # Instructor CRUD — courses, lessons, modules, pages, certificates
-│   │   ├── course-pages/                   # Student read/unread toggle
-│   │   ├── lessons/[lessonId]/quiz/        # Quiz submission and scoring
-│   │   ├── student/completions/            # Mark lesson complete / unmark
-│   │   ├── student/progress/              # Fetch progress across all enrolled courses
-│   │   ├── students/quiz-feedback/         # Fetch instructor feedback
-│   │   └── webhooks/clerk + stripe/        # User sync and enrollment
-│   ├── courses/
-│   │   └── [slug]/
-│   │       ├── page.tsx                    # Course detail + full contents list
-│   │       ├── [moduleSlug]/[lessonSlug]/  # Canonical lesson viewer
-│   │       ├── [moduleSlug]/               # Module landing — redirects to first lesson
-│   │       ├── lessons/[lessonSlug]/       # Legacy URL — redirects to canonical URL
-│   │       └── pages/[pageSlug]/           # Course page viewer
-│   ├── progress/                           # Student progress dashboard
-│   └── profile/                            # Clerk user profile
-├── components/
-│   ├── SiteNav.tsx                         # Server shell for site navigation
-│   ├── SiteNavClient.tsx                   # Interactive nav — hamburger, theme toggle
-│   ├── ThemeProvider.tsx                   # next-themes wrapper
-│   ├── ThemeToggle.tsx                     # Light/dark mode toggle
-│   ├── TipTapEditor.tsx                    # Rich text editor — sticky toolbar, export, table support, LaTeX double-click edit
-│   ├── editor/
-│   │   ├── constants.ts                    # LANGUAGES, LANG_EXTENSIONS, CALLOUT_TYPES
-│   │   ├── nodes.ts                        # All TipTap node/extension definitions (math, graph, code, terminal, callout, python-lint, table)
-│   │   ├── NodeViews.tsx                   # React node view components including InlineMathNodeView, BlockMathNodeView (with double-click edit)
-│   │   └── Toolbar.tsx                     # Toolbar UI, terminal modal, lint panel, table controls
-│   ├── LessonRenderer.tsx                  # Read-only renderer — thin orchestration layer (~52 lines); delegates to renderer/ submodules
-│   ├── renderer/
-│   │   ├── renderNode.ts                   # Pure node-to-HTML switch (code blocks, callouts, terminal, math, marks)
-│   │   └── HtmlSegment.tsx                 # React component — KaTeX and lowlight syntax highlighting via useEffect
-│   ├── LessonSidebar.tsx                   # Responsive sidebar — modules, pages, lessons
-│   ├── LessonList.tsx                      # Reorderable lesson list with module assignment
-│   ├── ContentRow.tsx                      # Course contents row (client, handles hover)
-│   ├── QuizEditor.tsx                      # Instructor quiz builder
-│   ├── QuizTaker.tsx                       # Student quiz UI
-│   ├── MarkdownImport.tsx                  # Import .md/.mdx into the editor
-│   ├── SlidesViewer.tsx                    # PDF and Google Slides embed
-│   ├── SlidesSection.tsx                   # Client boundary for slides viewer
-│   ├── CoursePageReadToggle.tsx            # Student read progress tracking
-│   ├── MafsGraph.tsx                      # Mafs graph renderer (ssr:false) — used in editor node view and lesson preview
-│   ├── MafsGraphEditor.tsx                # Instructor graph authoring modal — presets, function colours, viewport/step controls
-│   ├── LatexModal.tsx                       # LaTeX formula reference with editable field, live KaTeX preview, and category tabs
-│   ├── BakerversityLogo.tsx                 # Inline SVG logo, theme-aware via .logo-bg CSS class
-│   ├── MarkCompleteButton.tsx              # Lesson completion toggle
-│   ├── CourseSettings.tsx                  # Course settings modal — title, slug, price, thumbnail, intro/conclusion descriptions, per-course editor tools
-│   ├── EnrollSelfButton.tsx                # Instructor self-enrollment for testing
-│   └── DeleteButton.tsx                    # Reusable inline delete with confirm
-└── lib/
-    ├── supabase.ts                          # Browser, server, and service role clients
-    ├── lessonUrl.ts                         # Shared lesson URL helpers (module-aware hrefs)
-    ├── types.ts                             # TypeScript types
-    └── markdownToTipTap.ts                 # Markdown → TipTap JSON converter
+  app/
+    admin/                      # Instructor-only area
+      courses/                  # Course management
+        [slug]/
+          page.tsx              # Course detail (modules, lessons, assessments)
+          CourseDetailLayout.tsx # Unified sequence editor with reordering
+          assessments/
+            new/                # Create assessment
+            [assessmentId]/     # Edit assessment + questions
+          lessons/[lessonId]/   # Edit lesson
+          modules/[moduleId]/   # Edit module
+          pages/[pageId]/       # Edit course page
+      certificates/             # Certificate management
+      grading/                  # Review text_response answers (needs update — see Known gaps)
+    api/
+      admin/                    # Instructor API routes
+        courses/[courseId]/
+          assessments/          # CRUD + reorder
+          lessons/              # CRUD + reorder
+          modules/              # CRUD
+          pages/                # CRUD + reorder
+      students/
+        assessments/[assessmentId]/submit/  # Grading + attempt recording
+      webhooks/
+        clerk/                  # User sync
+        stripe/                 # Payment handling
+    courses/                    # Student-facing area
+      [slug]/
+        page.tsx                # Course detail (contents list)
+        [moduleSlug]/[lessonSlug]/  # Lesson viewer
+        pages/[pageSlug]/       # Course page viewer
+        assessments/[assessmentSlug]/  # Assessment taker
+  components/
+    AssessmentTaker.tsx         # Student assessment UI
+    CourseSettings.tsx          # Course settings panel
+    LessonRenderer.tsx          # Renders TipTap JSON content
+    LessonSidebar.tsx           # Course navigation sidebar
+    TipTapEditor.tsx            # Rich text editor
+    editor/
+      nodes.ts                  # Custom TipTap nodes
+      NodeViews.tsx             # React node views
+      Toolbar.tsx               # Editor toolbar
+    renderer/
+      renderNode.ts             # TipTap JSON → HTML
+      HtmlSegment.tsx           # Sanitised HTML output
+  lib/
+    courseSequence.ts           # Canonical course content ordering (single source of truth)
+    lessonUrl.ts                # Lesson URL helpers
+    supabase.ts                 # Supabase client factory
+    types.ts                    # Database types
 ```
 
----
+## Database schema
 
-## URL structure
+See `schema.sql` for the full schema. Key tables:
 
-| Route | Description |
+| Table | Purpose |
 |---|---|
-| `/courses` | Course catalogue |
-| `/courses/[slug]` | Course detail and contents |
-| `/courses/[slug]/[moduleSlug]/[lessonSlug]` | Lesson viewer (canonical) |
-| `/courses/[slug]/[moduleSlug]` | Module landing — redirects to first lesson |
-| `/courses/[slug]/lessons/[lessonSlug]` | Legacy lesson URL — redirects to canonical |
-| `/courses/[slug]/pages/[pageSlug]` | Course page viewer |
-| `/progress` | Student progress across all enrolled courses |
-| `/admin/courses` | Instructor course list |
-| `/admin/courses/[slug]` | Course editor |
-| `/admin/certificates` | Certificate management |
-| `/admin/grading` | Student response grading |
-| `/dashboard` | Student and instructor dashboard |
-| `/profile` | User profile (Clerk) |
+| `users` | Clerk-synced user records with role |
+| `courses` | Course metadata, pricing, publish state |
+| `modules` | Ordered groups of lessons and assessments within a course |
+| `lessons` | Individual lesson content (TipTap JSON, slides, video) |
+| `course_pages` | Static content pages (overview, syllabus, etc.) |
+| `course_page_views` | Tracks when a student reads a page |
+| `assessments` | Quizzes, exams, and practice sets as sequence items |
+| `assessment_questions` | Questions with rich TipTap bodies, four types |
+| `assessment_attempts` | Every submission; infinite retakes allowed |
+| `assessment_completions` | Best score per student per assessment |
+| `enrollments` | Student↔course access records |
+| `lesson_completions` | Student-initiated mark-complete per lesson |
+| `certificates` | Issued on course completion |
+| `response_feedback` | Instructor feedback on text_response answers |
+| `videos` | Video asset metadata |
 
----
+## Course content model
 
-## Design system
+Content within a module is ordered by a shared `position` column. Lessons and assessments are interleaved — a quiz can sit between two lessons at any position. The canonical sequence is built by `src/lib/courseSequence.ts` and used by all viewer pages and the sidebar for consistent prev/next navigation.
 
-The UI is built on CSS custom properties defined in `globals.css`. Key tokens:
+Full sequence order:
+1. Course-level intro pages (overview, introduction, syllabus, requirements)
+2. For each module (by module position): lessons and assessments interleaved by position
+3. Unassigned lessons
+4. Course-level conclusion pages
 
-- **Fonts:** DM Serif Display (headings) · DM Sans (body/UI)
-- **Primary:** `#FFB415` amber — buttons, CTAs, active states
-- **Secondary:** `#3D3BF3` indigo — links, lesson active indicator, code
-- **Themes:** light and dark, toggled via `next-themes` with `data-theme` attribute
+## Assessment types
 
----
+| Type | Graded | Retakes | Notes |
+|---|---|---|---|
+| `quiz` | Yes | Unlimited, best score wins | Short check within a module |
+| `exam` | Yes | Unlimited, best score wins | End-of-module or end-of-course |
+| `practice` | No | Unlimited | Always passes, no score recorded |
 
-## Roadmap
+## Question types
 
-- Stripe payments for paid courses
-- Email notifications on enrollment and certificate issuance (Resend)
-- Certificate PDF generation (DB record issued, certificate_url always null)
-- Course search and filtering on the catalogue
+| Type | Grading | Notes |
+|---|---|---|
+| `multiple_choice` | Auto | Correct answer stored as option index string |
+| `true_false` | Auto | Correct answer is `'true'` or `'false'` |
+| `short_answer` | Auto | Compared against `accepted_answers` after trim + lowercase |
+| `text_response` | Never | Optional reflection prompt, excluded from score |
+
+Question bodies and explanations use TipTap JSON, supporting the full editor feature set (math, graphs, code blocks, etc.).
+
+## Security
+
+- All student-facing viewer pages use `serviceSupabase` (bypasses RLS) with explicit `is_published: true` filters on every content fetch. Instructor role is only used to allow access to unpublished courses and the specific lesson/page/assessment being viewed — never to bypass content filters for sidebar or sequence data.
+- Student-submitted text answers are sanitised (HTML stripped) before storage and always rendered as plain text, never as HTML.
+- Short-answer accepted answers are normalised (trimmed, lowercased) at write time so comparisons are simple string equality.
+
+## Setup
+
+1. Create a Supabase project and run `schema.sql` in the SQL Editor
+2. Create a Clerk application and configure JWT template for Supabase
+3. Create a Stripe account and configure webhook
+4. Copy `.env.example` to `.env.local` and fill in all values
+5. `npm install && npm run dev`
+
+### Environment variables
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+```
+
+## Known gaps
+
+The following features are planned but not yet built:
+
+- **Progress tracking** — `lesson_completions` and `assessment_completions` tables are written to, but there is no `/progress` page or progress bar UI on course pages yet.
+- **Grading page** — `/admin/grading` currently queries the old `quiz_attempts` table which has been dropped. It needs updating to query `assessment_attempts` and `response_feedback`.
+- **Certificate issuance** — the `certificates` table exists but no logic exists to check completion and issue certificates.
+- **Inline practice quizzes** — ungraded quiz questions embedded inside lesson content via a TipTap node are not yet implemented.
+- **Lesson-level quizzes** — the old model of a quiz attached directly to a lesson has been removed. Quizzes are now standalone sequence items within a module.

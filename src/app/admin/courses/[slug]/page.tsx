@@ -45,6 +45,7 @@ export default async function AdminCourseDetailPage({
     { data: modules },
     { data: coursePages },
     { data: allLessons },
+    { data: allAssessments },
     { data: selfEnrollment },
     { count: enrollmentCount },
   ] = await Promise.all([
@@ -58,6 +59,10 @@ export default async function AdminCourseDetailPage({
       .order('position', { ascending: true }),
     supabase.from('lessons')
       .select('id, title, slug, position, is_published, module_id')
+      .eq('course_id', course.id)
+      .order('position', { ascending: true }),
+    supabase.from('assessments')
+      .select('id, title, slug, assessment_type, is_graded, is_published, module_id, position')
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('enrollments')
@@ -119,7 +124,7 @@ export default async function AdminCourseDetailPage({
           Course content
         </h2>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1.25rem' }}>
-          Introduction and conclusion pages appear in the sidebar before and after the modules. Modules contain the lessons students work through in sequence.
+          Introduction and conclusion pages appear before and after modules. Lessons and assessments inside a module appear in sequence by position.
         </p>
         <CourseDetailLayout
           course={{
@@ -131,6 +136,7 @@ export default async function AdminCourseDetailPage({
           modules={modules ?? []}
           pages={coursePages ?? []}
           lessons={allLessons ?? []}
+          assessments={allAssessments ?? []}
         />
       </div>
     </main>

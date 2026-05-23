@@ -58,6 +58,68 @@ export interface Lesson {
   updated_at: string
 }
 
+// ── Assessments ───────────────────────────────────────────────────────────────
+
+export type AssessmentType = 'quiz' | 'exam' | 'practice'
+
+export interface Assessment {
+  id: string
+  course_id: string
+  module_id: string | null
+  title: string
+  slug: string | null
+  assessment_type: AssessmentType
+  is_graded: boolean
+  passing_score: number
+  // TipTap JSON — optional preamble shown before questions
+  intro_content: Record<string, unknown> | null
+  position: number
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type QuestionType =
+  | 'multiple_choice'
+  | 'true_false'
+  | 'short_answer'   // auto-graded exact-match (case/whitespace normalised)
+  | 'text_response'  // instructor-graded free response
+
+export interface AssessmentQuestion {
+  id: string
+  assessment_id: string
+  question_type: QuestionType
+  // Rich TipTap JSON body for the question (preferred).
+  // question_text is the legacy plain-text field kept for backward compat.
+  content: Record<string, unknown> | null
+  question_text: string              // legacy — kept until full migration
+  options: string[] | null           // choices for multiple_choice
+  correct_answer: string             // index string or 'true'/'false' or exact match
+  // short_answer only: all accepted answers after normalisation.
+  // At least one entry required for short_answer questions.
+  // Values are stored normalised (trimmed, lowercased) at write time.
+  accepted_answers: string[] | null
+  explanation: string | null         // legacy plain-text explanation
+  explanation_content: Record<string, unknown> | null  // rich TipTap explanation
+  position: number
+  created_at: string
+}
+
+export interface AssessmentCompletion {
+  id: string
+  user_id: string
+  assessment_id: string
+  course_id: string
+  passed: boolean
+  score: number | null
+  completed_at: string
+}
+
+// ── Legacy Quiz (kept for backward compat during migration) ───────────────────
+// The quizzes table has been dropped. This type is retained only if any
+// existing code still references it during the transition. Remove in v2.
+
+/** @deprecated Use Assessment instead */
 export interface Quiz {
   id: string
   lesson_id: string
@@ -65,20 +127,6 @@ export interface Quiz {
   passing_score: number
   created_at: string
   updated_at: string
-}
-
-export type QuestionType = 'multiple_choice' | 'true_false'
-
-export interface QuizQuestion {
-  id: string
-  quiz_id: string
-  question_text: string        // may contain LaTeX ($...$)
-  question_type: QuestionType
-  options: string[] | null     // answer choices for multiple_choice
-  correct_answer: string       // index (as string) or 'true'/'false'
-  explanation: string | null
-  position: number
-  created_at: string
 }
 
 export interface Enrollment {
@@ -115,7 +163,7 @@ export interface LessonProgress {
 export interface QuizAttempt {
   id: string
   user_id: string
-  quiz_id: string
+  assessment_id: string            // replaces quiz_id
   answers: Record<string, string>  // { question_id: chosen_answer }
   score: number
   passed: boolean
@@ -131,7 +179,6 @@ export interface Certificate {
 }
 
 // ── Joined / view types ───────────────────────────────────────────────────────
-// Convenience types for common query shapes
 
 export interface CourseWithInstructor extends Course {
   instructor: Pick<User, 'id' | 'full_name' | 'avatar_url'>
@@ -141,6 +188,13 @@ export interface LessonWithProgress extends Lesson {
   completed: boolean
 }
 
+export interface AssessmentWithCompletion extends Assessment {
+  completed: boolean
+  score: number | null
+  passed: boolean | null
+}
+
 export interface ModuleWithLessons extends Module {
   lessons: LessonWithProgress[]
+  assessments: AssessmentWithCompletion[]
 }
