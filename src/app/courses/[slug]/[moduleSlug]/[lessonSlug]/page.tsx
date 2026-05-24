@@ -132,11 +132,14 @@ export default async function LessonViewerPage({
   const nextHref = nextItem ? sequenceItemHref(slug, nextItem) : null
 
   // Count position within lessons only (for "Lesson X of Y" display)
-  const lessonSequenceItems = sequence.filter((s) => s.type === 'lesson')
-  const lessonIndex = lessonSequenceItems.findIndex(
+  const moduleLessonItems = sequence.filter(
+    (s) => s.type === 'lesson' && s.module_id === lesson!.module_id
+  )
+  const lessonIndex = moduleLessonItems.findIndex(
     (s) => s.id === lesson!.id || s.slug === lesson!.slug
   )
-  console.log(coursePages)
+  const lessonTotal = moduleLessonItems.length
+  console.log(lesson.module_id, moduleLessonItems)
   return (
     <>
       <SiteNav />
@@ -163,7 +166,7 @@ export default async function LessonViewerPage({
                 display: 'flex', gap: '0.75rem', flexWrap: 'wrap',
               }}>
                 {module_ && <span>{module_.title} · </span>}
-                <span>Lesson {lessonIndex + 1} of {lessonSequenceItems.length}</span>
+                <span>Lesson {lessonIndex + 1} of {lessonTotal}</span>
               </div>
               <h1 style={{ margin: 0, fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>{lesson.title}</h1>
               {lesson.introduction && (

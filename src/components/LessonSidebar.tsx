@@ -284,14 +284,8 @@ function SidebarContent({
         ].sort((a, b) => a.item.position - b.item.position)
 
         // Pre-assign lesson numbers for this module before rendering
-        const moduleStartNumber = lessonNumber + 1
-        let localLessonIdx = 0
-        for (const e of entries) {
-          if (e.kind === 'lesson') lessonNumber++
-        }
-
         const isCollapsed = collapsed.has(mod.id)
-        let innerLessonNumber = moduleStartNumber - 1
+        let innerLessonNumber = 0
 
         return (
           <div key={mod.id}>
@@ -430,7 +424,7 @@ export default function LessonSidebar(props: LessonSidebarProps) {
     : currentAssessment
       ? currentAssessment.title
       : currentLesson
-        ? `Lesson ${currentIndex + 1}: ${currentLesson.title}`
+        ? `Lesson ${currentLesson.title}`
         : 'Contents'
 
   return (
