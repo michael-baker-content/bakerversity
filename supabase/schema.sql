@@ -1,5 +1,5 @@
 -- ============================================================
--- Bakerversity — Supabase Schema (current as of May 2026)
+-- Bakerversity — Supabase Schema (current as of May 2026, migration 005)
 -- ============================================================
 -- Run this in Supabase SQL Editor on a fresh project.
 -- Extensions, tables, indexes, RLS policies, and grants
@@ -43,6 +43,7 @@ create table courses (
   price_cents   integer not null default 0,
   currency      text not null default 'usd',
   is_published  boolean not null default false,
+  is_public     boolean not null default false,
   thumbnail_url text,
   intro_description text,
   conclusion_description text,

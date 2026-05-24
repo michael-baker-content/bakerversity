@@ -11,7 +11,7 @@ import type { MafsGraphAttrs } from '@/components/MafsGraph'
 import {
   InlineMath, BlockMath, MathShortcut,
   MafsGraphNode, TerminalNode, CalloutNode,
-  ExtendedCodeBlock, PythonLintExtension,
+  ExtendedCodeBlock, PythonLintExtension, PracticeQuizNode,
 } from './editor/nodes'
 import type { LintDiagnostic } from './editor/nodes'
 import { Toolbar } from './editor/Toolbar'
@@ -27,16 +27,16 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
   const children = () => content.map((n) => nodeToMd(n, indent)).join('')
 
   switch (type) {
-    case 'doc':           return content.map((n) => nodeToMd(n)).join('\n')
-    case 'paragraph':     return children() ? `${children()}\n` : '\n'
-    case 'heading':       return `${'#'.repeat((attrs.level as number) ?? 2)} ${children()}\n`
-    case 'bulletList':    return content.map((n) => nodeToMd(n, indent)).join('') + '\n'
-    case 'orderedList':   return content.map((n, i) => nodeToMd(n, indent, i + 1)).join('') + '\n'
+    case 'doc': return content.map((n) => nodeToMd(n)).join('\n')
+    case 'paragraph': return children() ? `${children()}\n` : '\n'
+    case 'heading': return `${'#'.repeat((attrs.level as number) ?? 2)} ${children()}\n`
+    case 'bulletList': return content.map((n) => nodeToMd(n, indent)).join('') + '\n'
+    case 'orderedList': return content.map((n, i) => nodeToMd(n, indent, i + 1)).join('') + '\n'
     case 'listItem':
       return num !== undefined
         ? `${indent}${num}. ${content.map((n) => nodeToMd(n, indent + '   ')).join('').trimEnd()}\n`
         : `${indent}- ${content.map((n) => nodeToMd(n, indent + '  ')).join('').trimEnd()}\n`
-    case 'blockquote':    return children().split('\n').map((l) => `> ${l}`).join('\n') + '\n'
+    case 'blockquote': return children().split('\n').map((l) => `> ${l}`).join('\n') + '\n'
     case 'codeBlock': {
       const lang = (attrs.language as string) ?? ''
       return `\`\`\`${lang}\n${children()}\n\`\`\`\n`
@@ -50,14 +50,14 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
       }
       return rows.join('\n') + '\n'
     }
-    case 'tableRow':    return '| ' + content.map((n) => nodeToMd(n, indent)).join(' | ') + ' |\n'
+    case 'tableRow': return '| ' + content.map((n) => nodeToMd(n, indent)).join(' | ') + ' |\n'
     case 'tableCell':
     case 'tableHeader': return children().replace(/\n/g, ' ').trim()
     case 'horizontalRule': return '---\n'
-    case 'hardBreak':      return '  \n'
-    case 'inlineMath':     return `$${attrs.latex ?? ''}$`
-    case 'blockMath':      return `$$\n${attrs.latex ?? ''}\n$$\n`
-    case 'terminalBlock':  return `\`\`\`bash\n${attrs.content ?? ''}\n\`\`\`\n`
+    case 'hardBreak': return '  \n'
+    case 'inlineMath': return `$${attrs.latex ?? ''}$`
+    case 'blockMath': return `$$\n${attrs.latex ?? ''}\n$$\n`
+    case 'terminalBlock': return `\`\`\`bash\n${attrs.content ?? ''}\n\`\`\`\n`
     case 'callout': {
       const label = (attrs.type as string) ?? 'note'
       return `> **${label.toUpperCase()}**: ${attrs.content ?? ''}\n`
@@ -65,9 +65,9 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
     case 'text': {
       const marks = (node.marks as { type: string }[]) ?? []
       let t = (node.text as string) ?? ''
-      if (marks.some((m) => m.type === 'bold'))   t = `**${t}**`
+      if (marks.some((m) => m.type === 'bold')) t = `**${t}**`
       if (marks.some((m) => m.type === 'italic')) t = `*${t}*`
-      if (marks.some((m) => m.type === 'code'))   t = `\`${t}\``
+      if (marks.some((m) => m.type === 'code')) t = `\`${t}\``
       return t
     }
     default: return children()
@@ -114,20 +114,28 @@ export default function TipTapEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [uploading, setUploading]               = useState(false)
-  const [lintDiagnostics, setLintDiagnostics]   = useState<LintDiagnostic[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [lintDiagnostics, setLintDiagnostics] = useState<LintDiagnostic[]>([])
   const [showTerminalModal, setShowTerminalModal] = useState(false)
-  const [terminalContent, setTerminalContent]   = useState('$ ')
-  const [filenameInput, setFilenameInput]        = useState('')
+  const [terminalContent, setTerminalContent] = useState('$ ')
+  const [filenameInput, setFilenameInput] = useState('')
   const [showCalloutPicker, setShowCalloutPicker] = useState(false)
   // Latex editing — null = inserting new, object = editing existing node
   const [editingLatex, setEditingLatex] = useState<{ latex: string; displayMode: boolean; pos: number } | null>(null)
 
-  const hasMath       = packs.includes('math')
-  const hasCode       = packs.includes('code')
-  const hasGraph      = packs.includes('graph')
+  // Image modal — shown after upload and on double-click of existing image
+  const [imageModal, setImageModal] = useState<{
+    src: string
+    alt: string
+    title: string
+    pos: number | null   // null = newly uploaded (insert), number = existing (update)
+  } | null>(null)
+
+  const hasMath = packs.includes('math')
+  const hasCode = packs.includes('code')
+  const hasGraph = packs.includes('graph')
   const hasPythonLint = packs.includes('python-lint')
-  const hasTerminal   = packs.includes('terminal')
+  const hasTerminal = packs.includes('terminal')
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
@@ -139,11 +147,12 @@ export default function TipTapEditor({
     TableRow,
     TableCell,
     TableHeader,
-    ...(hasCode       ? [ExtendedCodeBlock]                  : []),
-    ...(hasMath       ? [InlineMath, BlockMath, MathShortcut] : []),
-    ...(hasGraph      ? [MafsGraphNode]                      : []),
-    ...(hasTerminal   ? [TerminalNode]                       : []),
-    ...(hasPythonLint ? [PythonLintExtension]                : []),
+    ...(hasCode ? [ExtendedCodeBlock] : []),
+    ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
+    ...(hasGraph ? [MafsGraphNode] : []),
+    ...(hasTerminal ? [TerminalNode] : []),
+    ...(hasPythonLint ? [PythonLintExtension] : []),
+    PracticeQuizNode,
   ]
 
   // ── Editor ─────────────────────────────────────────────────────────────────
@@ -180,6 +189,16 @@ export default function TipTapEditor({
             setEditingLatex({ latex: node.attrs.latex, displayMode: node.type.name === 'blockMath', pos: pos.pos })
             return true
           }
+          if (node.type.name === 'image') {
+            setImageModal({
+              src: node.attrs.src ?? '',
+              alt: node.attrs.alt ?? '',
+              title: node.attrs.title ?? '',
+              pos: pos.pos,
+            })
+            return true
+          }
+
           return false
         },
       },
@@ -220,7 +239,8 @@ export default function TipTapEditor({
       const res = await fetch('/api/admin/upload', { method: 'POST', body: formData })
       if (!res.ok) { const d = await res.json(); alert(`Upload failed: ${d.error}`); return }
       const { url } = await res.json()
-      editor.chain().focus().setImage({ src: url }).run()
+      // Show modal to set alt text and caption before inserting
+      setImageModal({ src: url, alt: '', title: '', pos: null })
     } finally { setUploading(false) }
   }, [editor])
 
@@ -324,6 +344,10 @@ export default function TipTapEditor({
               onLatexButtonClick={onLatexButtonClick}
               onGraphButtonClick={onGraphButtonClick}
               onInsertTerminal={insertTerminal}
+              onInsertPracticeQuiz={() => editor?.chain().focus().insertContent({
+                type: 'practiceQuiz',
+                attrs: { title: 'Practice Quiz', questions: [] },
+              }).run()}
               setShowCalloutPicker={setShowCalloutPicker}
               setShowTerminalModal={setShowTerminalModal}
               setTerminalContent={setTerminalContent}
@@ -363,6 +387,65 @@ export default function TipTapEditor({
           }}
           onClose={() => setEditingLatex(null)}
         />
+      )}
+      {/* Image alt/caption modal */}
+      {imageModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+          onClick={() => setImageModal(null)}
+        >
+          <div
+            style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', width: 400, maxWidth: '90vw', boxShadow: 'var(--shadow-lg)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1rem', fontSize: 15 }}>Image settings</h3>
+            <img src={imageModal.src} alt="" style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 4, marginBottom: '1rem', display: 'block' }} />
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Alt text</label>
+              <input
+                className="input"
+                value={imageModal.alt}
+                onChange={(e) => setImageModal((m) => m ? { ...m, alt: e.target.value } : m)}
+                placeholder="Describe the image for screen readers…"
+                autoFocus
+              />
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Caption <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+              <input
+                className="input"
+                value={imageModal.title}
+                onChange={(e) => setImageModal((m) => m ? { ...m, title: e.target.value } : m)}
+                placeholder="Shown below the image…"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  if (!editor) return
+                  if (imageModal.pos === null) {
+                    editor.chain().focus().setImage({ src: imageModal.src, alt: imageModal.alt, title: imageModal.title }).run()
+                  } else {
+                    const node = editor.state.doc.nodeAt(imageModal.pos)
+                    if (node) {
+                      editor.chain()
+                        .updateAttributes('image', { alt: imageModal.alt, title: imageModal.title })
+                        .run()
+                    }
+                  }
+                  setImageModal(null)
+                }}
+              >
+                {imageModal.pos === null ? 'Insert image' : 'Update'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImageModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`

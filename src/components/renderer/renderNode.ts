@@ -75,15 +75,15 @@ export function renderNode(node: Record<string, unknown>): string {
       return `<pre data-lang="${escapeAttr(lang)}" data-start-line="${startLine}">${header}<code class="language-${lang}">${children}</code></pre>`
     }
     case 'callout': {
-      const calloutType    = (attrs.type as string) ?? 'tip'
-      const calloutContent = (attrs.content as string) ?? ''
+      const calloutType = (attrs.type as string) ?? 'tip'
       const s = CALLOUT_STYLES[calloutType] ?? CALLOUT_STYLES.tip
+      // children is the TipTap-managed content (paragraphs, math, etc.)
       return `<div data-callout="${escapeAttr(calloutType)}" style="border-left:4px solid ${s.border};background:${s.bg};border-radius:0 6px 6px 0;padding:0.875rem 1rem;margin:1rem 0;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="font-size:14px;">${s.icon}</span>
           <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:${s.labelColor};">${s.label}</span>
         </div>
-        <div style="font-size:15px;line-height:1.65;color:var(--text);">${calloutContent}</div>
+        <div style="font-size:15px;line-height:1.65;color:var(--text);">${children}</div>
       </div>`
     }
     case 'terminalBlock': {
@@ -98,9 +98,24 @@ export function renderNode(node: Record<string, unknown>): string {
       </div>`
     }
     case 'image': {
-      const src = escapeAttr((attrs.src as string) ?? '')
-      const alt = escapeAttr((attrs.alt as string) ?? '')
-      return `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:0.5rem 0;display:block;" />`
+      const src     = escapeAttr((attrs.src as string) ?? '')
+      const alt     = escapeAttr((attrs.alt as string) ?? '')
+      const caption = (attrs.title as string) ?? ''
+      const img = `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:0.5rem 0;display:block;" />`
+      if (caption) {
+        return `<figure style="margin:1rem 0;">${img}<figcaption style="text-align:center;font-size:13px;color:var(--text-3);margin-top:4px;font-style:italic;">${escapeHtml(caption)}</figcaption></figure>`
+      }
+      return img
+    }
+    case 'practiceQuiz': {
+      // Static placeholder in HTML output — interactive version handled by LessonRenderer
+      const quizTitle = escapeHtml((attrs.title as string) ?? 'Practice Quiz')
+      const questions = Array.isArray(attrs.questions) ? attrs.questions : []
+      return `<div data-practice-quiz style="border:2px solid var(--indigo);border-radius:var(--radius-lg);padding:1rem;margin:1rem 0;">
+        <p style="margin:0 0 0.5rem;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--indigo);">✦ Practice Quiz</p>
+        <p style="margin:0;font-size:15px;font-weight:600;">${quizTitle}</p>
+        <p style="margin:4px 0 0;font-size:13px;color:var(--text-3);">${questions.length} question${questions.length !== 1 ? 's' : ''}</p>
+      </div>`
     }
     case 'table':     return `<table>${children}</table>`
     case 'tableRow':  return `<tr>${children}</tr>`

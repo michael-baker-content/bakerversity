@@ -1,7 +1,10 @@
 import { Node, Extension, mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { all, createLowlight } from 'lowlight'
-import { TerminalNodeView, MafsGraphNodeView, CalloutNodeView, InlineMathNodeView, BlockMathNodeView } from './NodeViews'
+import {
+  TerminalNodeView, MafsGraphNodeView, CalloutNodeView,
+  InlineMathNodeView, BlockMathNodeView, PracticeQuizNodeView,
+} from './NodeViews'
 
 const lowlight = createLowlight(all)
 
@@ -189,22 +192,70 @@ export const PythonLintExtension = Extension.create({
 })
 
 // ── Callout block node ─────────────────────────────────────────────────────────
+// Uses content: 'block+' so TipTap manages the content — formulas, code blocks,
+// and other nodes can be inserted naturally. The old atom + HTML-string approach
+// has been replaced with NodeViewContent for proper cursor support.
 export const CalloutNode = Node.create({
   name: 'callout',
+  group: 'block',
+  content: 'block+',   // NOT atom — allows nested content including math nodes
+  draggable: true,
+  addAttributes() {
+    return {
+      type: { default: 'tip' },
+    }
+  },
+  parseHTML() { return [{ tag: 'div[data-callout]' }] },
+  renderHTML({ node, HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-callout': node.attrs.type }), 0]
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(CalloutNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
+  },
+})
+
+// ── Practice quiz node ─────────────────────────────────────────────────────────
+// Stores questions inline in attrs as JSON — no DB rows needed.
+// Ungraded only; for review/practice within lesson content.
+//
+// questions: array of {
+//   id: string,
+//   question_type: 'multiple_choice' | 'true_false' | 'short_answer',
+//   question_text: string,
+//   options: string[] | null,
+//   correct_answer: string,
+//   accepted_answers: string[] | null,
+//   explanation: string | null,
+// }
+
+export interface PracticeQuizQuestion {
+  id: string
+  question_type: 'multiple_choice' | 'true_false' | 'short_answer'
+  question_text: string
+  options: string[] | null
+  correct_answer: string
+  accepted_answers: string[] | null
+  explanation: string | null
+}
+
+export const PracticeQuizNode = Node.create({
+  name: 'practiceQuiz',
   group: 'block',
   atom: true,
   draggable: true,
   addAttributes() {
     return {
-      type: { default: 'tip' },
-      content: { default: '' },
+      title: { default: 'Practice Quiz' },
+      questions: { default: [] },
     }
   },
-  parseHTML() { return [{ tag: 'div[data-callout]' }] },
+  parseHTML() { return [{ tag: 'div[data-practice-quiz]' }] },
   renderHTML({ node, HTMLAttributes }) {
-    return ['div', mergeAttributes(HTMLAttributes, { 'data-callout': node.attrs.type, 'data-content': node.attrs.content })]
+    return ['div', mergeAttributes(HTMLAttributes, {
+      'data-practice-quiz': JSON.stringify({ title: node.attrs.title, questions: node.attrs.questions }),
+    })]
   },
   addNodeView() {
-    return ReactNodeViewRenderer(CalloutNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
+    return ReactNodeViewRenderer(PracticeQuizNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
   },
 })

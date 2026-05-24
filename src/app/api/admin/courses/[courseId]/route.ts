@@ -18,7 +18,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
+    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
     .eq('id', courseId)
     .single()
 
@@ -48,19 +48,29 @@ export async function PATCH(
 
   const body = await req.json()
 
-  // Only allow updating safe fields
-  const allowed = ['title', 'description', 'price_cents', 'is_published', 'slug', 'thumbnail_url', 'intro_description', 'conclusion_description', 'editor_tools']
+  const allowed = [
+    'title', 'description', 'price_cents', 'is_published', 'is_public',
+    'slug', 'thumbnail_url', 'intro_description', 'conclusion_description', 'editor_tools',
+  ]
   const updates = Object.fromEntries(
     Object.entries(body).filter(([key]) => allowed.includes(key))
   )
+
+  // is_public only makes sense on free courses — enforce at API level
+  if (updates.is_public === true) {
+    const { data: course } = await supabase
+      .from('courses').select('price_cents').eq('id', courseId).single()
+    if (course && course.price_cents > 0) {
+      return NextResponse.json({ error: 'Only free courses can be made public' }, { status: 400 })
+    }
+  }
 
   const { error } = await supabase
     .from('courses')
     .update(updates)
     .eq('id', courseId)
-    .eq('instructor_id', user.id) // ensure instructor owns this course
+    .eq('instructor_id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ ok: true })
 }

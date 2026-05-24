@@ -25,6 +25,7 @@ export interface Course {
   price_cents: number
   currency: string
   is_published: boolean
+  is_public: boolean
   thumbnail_url: string | null
   created_at: string
   updated_at: string

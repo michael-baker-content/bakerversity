@@ -165,7 +165,7 @@ function SectionDivider({ label, collapsible, collapsed, onToggle }: {
       fontSize: 10, fontWeight: 700,
       color: 'var(--text-3)',
       textTransform: 'uppercase', letterSpacing: '0.07em',
-      marginTop: 4, background: 'none', border: 'none',
+      marginTop: 0, background: 'none', border: 'none',
       borderTop: '1px solid var(--border)',
       cursor: collapsible ? 'pointer' : 'default',
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -229,13 +229,16 @@ function SidebarContent({
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      {/* Back link */}
-      <div style={{ padding: '0 1rem 0.875rem', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+      {/* Back link — distinct header area */}
+      <div style={{
+        padding: '0.75rem 1rem 0.875rem',
+        background: 'var(--surface-2)',
+      }}>
         <Link href={backHref} style={{
-          fontSize: 12, color: 'var(--text-3)', textDecoration: 'none',
-          display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: 12, color: 'var(--text-2)', textDecoration: 'none',
+          display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500,
         }}>
-          <span>←</span> <span>{courseTitle}</span>
+          <span>←</span> <span>Course Details</span>
         </Link>
       </div>
 
@@ -284,8 +287,14 @@ function SidebarContent({
         ].sort((a, b) => a.item.position - b.item.position)
 
         // Pre-assign lesson numbers for this module before rendering
+        const moduleStartNumber = lessonNumber + 1
+        let localLessonIdx = 0
+        for (const e of entries) {
+          if (e.kind === 'lesson') lessonNumber++
+        }
+
         const isCollapsed = collapsed.has(mod.id)
-        let innerLessonNumber = 0
+        let innerLessonNumber = moduleStartNumber - 1
 
         return (
           <div key={mod.id}>
@@ -424,7 +433,7 @@ export default function LessonSidebar(props: LessonSidebarProps) {
     : currentAssessment
       ? currentAssessment.title
       : currentLesson
-        ? `Lesson ${currentLesson.title}`
+        ? `Lesson ${currentIndex + 1}: ${currentLesson.title}`
         : 'Contents'
 
   return (

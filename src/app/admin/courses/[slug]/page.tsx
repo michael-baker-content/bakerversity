@@ -35,7 +35,7 @@ export default async function AdminCourseDetailPage({
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
+    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
     .eq('slug', slug)
     .single()
 
@@ -82,8 +82,11 @@ export default async function AdminCourseDetailPage({
         <h1 style={{ margin: '0 0 0.25rem', fontFamily: 'var(--font-serif)' }}>{course.title}</h1>
         <div style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
           <span>/courses/{course.slug}</span>
-          <span className="meta-wrap"> · {course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
-          {enrollmentCount !== null && ` · ${enrollmentCount} enrolled`}</span>
+          <span className="meta-wrap">
+            {' · '}{course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
+            {course.is_public && <span style={{ marginLeft: 6, color: 'var(--indigo)', fontWeight: 600 }}>· Public</span>}
+            {enrollmentCount !== null && ` · ${enrollmentCount} enrolled`}
+          </span>
         </div>
       </div>
 
@@ -104,6 +107,7 @@ export default async function AdminCourseDetailPage({
             description={course.description ?? ''}
             slug={course.slug}
             priceCents={course.price_cents ?? 0}
+            isPublic={course.is_public ?? false}
             thumbnailUrl={course.thumbnail_url ?? null}
             introDescription={course.intro_description ?? null}
             conclusionDescription={course.conclusion_description ?? null}

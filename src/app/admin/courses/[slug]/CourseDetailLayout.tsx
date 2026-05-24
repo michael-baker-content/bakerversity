@@ -311,6 +311,11 @@ function CollapsibleSection({
                           <Link href={`/admin/courses/${courseSlug}/assessments/${item.id}`}>
                             <button className="btn btn-ghost btn-sm">Edit</button>
                           </Link>
+                          {(item as Assessment).slug && (
+                            <Link href={`/courses/${courseSlug}/assessments/${(item as Assessment).slug}`} target="_blank">
+                              <button className="btn btn-ghost btn-sm">Preview ↗</button>
+                            </Link>
+                          )}
                           <DeleteButton
                             url={`/api/admin/courses/${courseId}/assessments/${item.id}`}
                             confirm={`Delete "${item.title}"? This cannot be undone.`}

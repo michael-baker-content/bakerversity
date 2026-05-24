@@ -18,6 +18,7 @@ interface ToolbarProps {
   onLatexButtonClick?: () => void
   onGraphButtonClick?: () => void
   onInsertTerminal: (content: string) => void
+  onInsertPracticeQuiz?: () => void
   setShowCalloutPicker: (v: boolean | ((prev: boolean) => boolean)) => void
   setShowTerminalModal: (v: boolean) => void
   setTerminalContent: (v: string) => void
@@ -52,6 +53,7 @@ export function Toolbar({
   editor, packs, uploading, showCalloutPicker, showTerminalModal,
   terminalContent, filenameInput, lintDiagnostics,
   onFileClick, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
+  onInsertPracticeQuiz,
   setShowCalloutPicker, setShowTerminalModal, setTerminalContent, setFilenameInput,
 }: ToolbarProps) {
   const hasMath      = packs.includes('math')
@@ -72,7 +74,7 @@ export function Toolbar({
         <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })}>H3</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>• List</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. List</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>" Quote</ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>\" Quote</ToolbarButton>
 
         {/* Callout picker */}
         <div style={{ position: 'relative' }}>
@@ -90,7 +92,11 @@ export function Toolbar({
                 <button
                   key={t.value}
                   onClick={() => {
-                    editor.chain().focus().insertContent({ type: 'callout', attrs: { type: t.value, content: '' } }).run()
+                    editor.chain().focus().insertContent({
+                      type: 'callout',
+                      attrs: { type: t.value },
+                      content: [{ type: 'paragraph' }],
+                    }).run()
                     setShowCalloutPicker(false)
                   }}
                   style={{
@@ -130,6 +136,8 @@ export function Toolbar({
             </>
           )}
         </div>
+
+        <ToolbarButton onClick={() => onInsertPracticeQuiz?.()} active={false}>✦ Quiz</ToolbarButton>
 
         {hasMath && <ToolbarButton onClick={() => onLatexButtonClick?.()} active={false}>∑ Formula</ToolbarButton>}
         {hasGraph && <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>📈 Graph</ToolbarButton>}

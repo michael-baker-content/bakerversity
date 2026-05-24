@@ -8,7 +8,7 @@ A custom online course platform built with Next.js, Supabase, and Clerk. Designe
 - **Database** — Supabase (PostgreSQL + RLS)
 - **Auth** — Clerk
 - **Payments** — Stripe
-- **Rich text** — TipTap with custom nodes (inline/block math, Mafs graphs, code blocks, callouts, terminal blocks)
+- **Rich text** — TipTap with custom nodes (inline/block math, Mafs graphs, code blocks, callouts, terminal blocks, practice quizzes, images with captions)
 - **Math rendering** — KaTeX
 - **Graphing** — Mafs
 - **Styling** — Custom CSS (amber/indigo theme, DM Sans + DM Serif Display, dark mode via next-themes)
@@ -30,7 +30,7 @@ src/
           modules/[moduleId]/   # Edit module
           pages/[pageId]/       # Edit course page
       certificates/             # Certificate management
-      grading/                  # Review text_response answers (needs update — see Known gaps)
+      grading/                  # Review text_response answers
     api/
       admin/                    # Instructor API routes
         courses/[courseId]/
@@ -51,13 +51,13 @@ src/
         assessments/[assessmentSlug]/  # Assessment taker
   components/
     AssessmentTaker.tsx         # Student assessment UI
-    CourseSettings.tsx          # Course settings panel
+    CourseSettings.tsx          # Course settings panel (includes is_public toggle)
     LessonRenderer.tsx          # Renders TipTap JSON content
     LessonSidebar.tsx           # Course navigation sidebar
     TipTapEditor.tsx            # Rich text editor
     editor/
       nodes.ts                  # Custom TipTap nodes
-      NodeViews.tsx             # React node views
+      NodeViews.tsx             # React node views (includes LatexInput, PracticeQuizNodeView)
       Toolbar.tsx               # Editor toolbar
     renderer/
       renderNode.ts             # TipTap JSON → HTML
@@ -76,7 +76,7 @@ See `schema.sql` for the full schema. Key tables:
 | Table | Purpose |
 |---|---|
 | `users` | Clerk-synced user records with role |
-| `courses` | Course metadata, pricing, publish state |
+| `courses` | Course metadata, pricing, publish state, public access flag |
 | `modules` | Ordered groups of lessons and assessments within a course |
 | `lessons` | Individual lesson content (TipTap JSON, slides, video) |
 | `course_pages` | Static content pages (overview, syllabus, etc.) |
@@ -101,6 +101,16 @@ Full sequence order:
 3. Unassigned lessons
 4. Course-level conclusion pages
 
+## Public course access
+
+Free courses can be made publicly viewable without login via the `is_public` flag in Course Settings. When enabled:
+
+- Any visitor can read lessons and pages without signing in
+- A "Sign in to track your progress" nudge replaces the Mark Complete button for unauthenticated visitors, with a redirect back to the current page after sign-in
+- Assessments (quizzes and exams) always require authentication regardless of `is_public`
+- Inline practice quizzes embedded in lesson content via the TipTap editor are always accessible to all visitors
+- `is_public` is only available on free courses; setting a price automatically disables it
+
 ## Assessment types
 
 | Type | Graded | Retakes | Notes |
@@ -118,13 +128,36 @@ Full sequence order:
 | `short_answer` | Auto | Compared against `accepted_answers` after trim + lowercase |
 | `text_response` | Never | Optional reflection prompt, excluded from score |
 
-Question bodies and explanations use TipTap JSON, supporting the full editor feature set (math, graphs, code blocks, etc.).
+Question bodies and explanations use TipTap JSON for rich content. Answer options and accepted answers support inline KaTeX via `$...$` / `$$...$$` notation with a live preview.
+
+## Inline practice quizzes
+
+The TipTap editor includes a `✦ Quiz` toolbar button that inserts a `practiceQuiz` node directly into lesson content. These are:
+
+- Ungraded — no DB rows, questions stored inline in the node's attrs
+- Always publicly accessible (no auth required)
+- Support multiple choice, true/false, and short answer question types
+- Rendered interactively in `LessonRenderer` via `PracticeQuizPlayer`
+
+## Editor tools (per course)
+
+Each course has a configurable set of editor tools. Only enabled tools appear in the lesson editor toolbar and related UI hints:
+
+| Tool | Description |
+|---|---|
+| `math` | LaTeX inline and block math via KaTeX (`$...$`, `$$...$$`) |
+| `graph` | Mafs interactive graph editor |
+| `terminal` | Styled terminal/bash output blocks |
+| `code` | Syntax-highlighted code blocks with line numbers and filename |
+| `python-lint` | Heuristic lint checks on Python code blocks (requires `code`) |
+| `lang-select` | Per-block language dropdown (requires `code`) |
 
 ## Security
 
-- All student-facing viewer pages use `serviceSupabase` (bypasses RLS) with explicit `is_published: true` filters on every content fetch. Instructor role is only used to allow access to unpublished courses and the specific lesson/page/assessment being viewed — never to bypass content filters for sidebar or sequence data.
+- All student-facing viewer pages use `serviceSupabase` (bypasses RLS) with explicit `is_published: true` filters on every content fetch. Instructor role is only used to allow access to unpublished courses and the specific item being viewed — never to bypass content filters for sidebar or sequence data.
 - Student-submitted text answers are sanitised (HTML stripped) before storage and always rendered as plain text, never as HTML.
 - Short-answer accepted answers are normalised (trimmed, lowercased) at write time so comparisons are simple string equality.
+- `is_public` is enforced in application code; the database service role bypasses RLS so the check must be explicit in every viewer page.
 
 ## Setup
 
@@ -152,8 +185,5 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 
 The following features are planned but not yet built:
 
-- **Progress tracking** — `lesson_completions` and `assessment_completions` tables are written to, but there is no `/progress` page or progress bar UI on course pages yet.
-- **Grading page** — `/admin/grading` currently queries the old `quiz_attempts` table which has been dropped. It needs updating to query `assessment_attempts` and `response_feedback`.
-- **Certificate issuance** — the `certificates` table exists but no logic exists to check completion and issue certificates.
-- **Inline practice quizzes** — ungraded quiz questions embedded inside lesson content via a TipTap node are not yet implemented.
-- **Lesson-level quizzes** — the old model of a quiz attached directly to a lesson has been removed. Quizzes are now standalone sequence items within a module.
+- **Certificate issuance** — the `certificates` table exists and the completion criteria are defined (all lessons marked complete + all graded assessments passed), but no logic exists to check completion and issue certificates.
+- **Progress bars on course detail page** — `lesson_completions` and `assessment_completions` are written correctly and the `/progress` page shows them, but the student-facing course detail page does not yet show per-module progress bars.

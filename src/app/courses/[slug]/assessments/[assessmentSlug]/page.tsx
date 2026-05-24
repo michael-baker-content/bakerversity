@@ -1,4 +1,4 @@
-import { createServerClient, createServiceClient } from '@/lib/supabase'
+import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -34,7 +34,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string; assessmentSlug: string }>
 }) {
   const { assessmentSlug } = await params
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
   const { data } = await supabase.from('assessments').select('title').eq('slug', assessmentSlug).single()
   return { title: data?.title ?? 'Assessment' }
 }
@@ -45,8 +45,13 @@ export default async function AssessmentPage({
   params: Promise<{ slug: string; assessmentSlug: string }>
 }) {
   const { slug, assessmentSlug } = await params
+
+  // Assessments always require authentication — even on public courses.
+  // Redirect unauthenticated visitors to sign-in with return URL.
   const clerkUser = await currentUser()
-  if (!clerkUser) redirect(`/sign-in?redirect=/courses/${slug}/assessments/${assessmentSlug}`)
+  if (!clerkUser) {
+    redirect(`/sign-in?redirect=${encodeURIComponent(`/courses/${slug}/assessments/${assessmentSlug}`)}`)
+  }
 
   const serviceSupabase = createServiceClient()
 
@@ -63,13 +68,13 @@ export default async function AssessmentPage({
   ).single<Course>()
   if (!course) notFound()
 
+  // Enrollment check for paid courses
   if (!isInstructor && course.price_cents > 0) {
     const { data: enrollment } = await serviceSupabase
       .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
     if (!enrollment) redirect(`/courses/${slug}`)
   }
 
-  // Load this assessment
   const assessmentQuery = serviceSupabase
     .from('assessments')
     .select('id, title, slug, assessment_type, is_graded, passing_score, intro_content, module_id, position, is_published')
@@ -81,14 +86,14 @@ export default async function AssessmentPage({
   ).single<Assessment>()
   if (!assessment) notFound()
 
-  // Load questions — students don't receive correct_answer or accepted_answers
+  // Questions — students don't receive correct_answer or accepted_answers
   const { data: questions } = await serviceSupabase
     .from('assessment_questions')
     .select('id, question_type, content, question_text, options, explanation, explanation_content, position')
     .eq('assessment_id', assessment.id)
     .order('position', { ascending: true })
 
-  // Load all course content for sequence + sidebar
+  // Sidebar/sequence data — always published-only
   const [lessonsRes, modulesRes, pagesRes, allAssessmentsRes] = await Promise.all([
     serviceSupabase.from('lessons')
       .select('id, slug, title, position, module_id')
@@ -111,7 +116,6 @@ export default async function AssessmentPage({
   const coursePages = (pagesRes.data ?? []) as CoursePage[]
   const allAssessments = (allAssessmentsRes.data ?? []) as Assessment[]
 
-  // Canonical sequence
   const sequence = buildCourseSequence({
     modules, lessons: allLessons, assessments: allAssessments, pages: coursePages,
   })
@@ -184,7 +188,7 @@ export default async function AssessmentPage({
                 </Link>
               ) : (
                 <Link href={`/courses/${slug}`}>
-                  <button className="btn btn-primary">Complete course ✓</button>
+                  <button className="btn btn-primary">Back to course</button>
                 </Link>
               )}
             </div>

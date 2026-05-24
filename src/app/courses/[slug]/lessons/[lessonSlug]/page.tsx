@@ -4,10 +4,10 @@ import { notFound, redirect } from 'next/navigation'
 
 /**
  * Legacy lesson URL: /courses/[slug]/lessons/[lessonSlug]
- * Redirects to the new canonical URL: /courses/[slug]/[moduleSlug]/[lessonSlug]
+ * Redirects to the canonical URL: /courses/[slug]/[moduleSlug]/[lessonSlug]
  *
- * Instructors can preview unpublished lessons and courses.
- * Students are blocked from unpublished content as normal.
+ * On public free courses, unauthenticated visitors are allowed through.
+ * On non-public or paid courses, unauthenticated visitors are redirected to sign-in.
  */
 export default async function LegacyLessonRedirect({
   params,
@@ -18,7 +18,6 @@ export default async function LegacyLessonRedirect({
   const clerkUser = await currentUser()
   const supabase = createServiceClient()
 
-  // Determine if the viewer is an instructor so we can bypass published checks
   let isInstructor = false
   if (clerkUser) {
     const { data: dbUser } = await supabase
@@ -26,15 +25,18 @@ export default async function LegacyLessonRedirect({
     isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
   }
 
-  // Load course — instructors can see unpublished courses
-  const courseQuery = supabase.from('courses').select('id').eq('slug', slug)
+  const courseQuery = supabase.from('courses').select('id, is_public, price_cents').eq('slug', slug)
   const { data: course } = await (isInstructor
     ? courseQuery
     : courseQuery.eq('is_published', true)
   ).single()
   if (!course) notFound()
 
-  // Find lesson by slug or UUID
+  // Gate unauthenticated visitors on non-public or paid courses
+  if (!clerkUser && (!course.is_public || course.price_cents > 0)) {
+    redirect(`/sign-in?redirect=/courses/${slug}/lessons/${lessonSlug}`)
+  }
+
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonSlug)
   const lessonQuery = supabase
     .from('lessons').select('id, slug, module_id')
@@ -46,18 +48,14 @@ export default async function LegacyLessonRedirect({
   ).single()
   if (!lesson) notFound()
 
-  // Redirect to canonical URL with module slug
   if (lesson.module_id) {
     const { data: module_ } = await supabase
       .from('modules').select('slug').eq('id', lesson.module_id).single()
-
     if (module_?.slug) {
-      const ls = lesson.slug ?? lesson.id
-      redirect(`/courses/${slug}/${module_.slug}/${ls}`)
+      redirect(`/courses/${slug}/${module_.slug}/${lesson.slug ?? lesson.id}`)
     }
   }
 
-  // Fallback: no module assigned
   if (isUuid && lesson.slug) redirect(`/courses/${slug}/lessons/${lesson.slug}`)
   notFound()
 }

@@ -1,4 +1,4 @@
-import { createServerClient, createServiceClient } from '@/lib/supabase'
+import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -28,34 +28,41 @@ export default async function LessonViewerPage({
 }) {
   const { slug, moduleSlug, lessonSlug } = await params
   const clerkUser = await currentUser()
-  if (!clerkUser) redirect(`/sign-in?redirect=/courses/${slug}/${moduleSlug}/${lessonSlug}`)
-
-  const supabase = createServerClient()
   const serviceSupabase = createServiceClient()
 
-  const { data: dbUser } = await serviceSupabase
-    .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
-  if (!dbUser) redirect('/sign-in')
+  // Resolve user (may be null for unauthenticated visitors)
+  let dbUser: User | null = null
+  if (clerkUser) {
+    const { data } = await serviceSupabase
+      .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
+    dbUser = data
+  }
 
-  const isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
+  const isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
 
-  const courseBaseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  // Load course
+  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
   const { data: course } = await (isInstructor
-    ? courseBaseQuery
-    : courseBaseQuery.eq('is_published', true)
+    ? courseQuery
+    : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
 
-  if (!isInstructor) {
-    const isFree = course.price_cents === 0
-    if (!isFree) {
-      const { data: enrollment } = await serviceSupabase
-        .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
-      if (!enrollment) redirect(`/courses/${slug}`)
+  // Auth gate: unauthenticated visitors can only proceed on public free courses
+  if (!dbUser) {
+    if (!course.is_public || course.price_cents > 0) {
+      redirect(`/sign-in?redirect=/courses/${slug}/${moduleSlug}/${lessonSlug}`)
     }
   }
 
-  // Resolve module from moduleSlug
+  // Enrolled-only check for paid courses (authenticated non-instructors)
+  if (dbUser && !isInstructor && course.price_cents > 0) {
+    const { data: enrollment } = await serviceSupabase
+      .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
+    if (!enrollment) redirect(`/courses/${slug}`)
+  }
+
+  // Resolve module
   const { data: module_ } = await serviceSupabase
     .from('modules')
     .select('id, title, position, slug')
@@ -72,7 +79,6 @@ export default async function LessonViewerPage({
     lesson = data
   }
 
-  // Fallback: module slug didn't resolve
   if (!lesson) {
     const q = serviceSupabase.from('lessons').select('*')
       .eq('slug', lessonSlug).eq('course_id', course.id)
@@ -82,21 +88,21 @@ export default async function LessonViewerPage({
 
   if (!lesson) notFound()
 
-  // Completion status
-  const { data: completionRecord } = await serviceSupabase
-    .from('lesson_completions').select('id')
-    .eq('user_id', dbUser.id).eq('lesson_id', lesson.id).maybeSingle()
-  const isCompleted = !!completionRecord
+  // Completion status — only for authenticated users
+  let isCompleted = false
+  if (dbUser) {
+    const { data: completionRecord } = await serviceSupabase
+      .from('lesson_completions').select('id')
+      .eq('user_id', dbUser.id).eq('lesson_id', lesson.id).maybeSingle()
+    isCompleted = !!completionRecord
+  }
 
-  // Load all content for sequence + sidebar
+  // Load sidebar/sequence data — always published-only
   const [lessonsRes, modulesRes, pagesRes, assessmentsRes] = await Promise.all([
-    (() => {
-      const q = serviceSupabase.from('lessons')
-        .select('id, slug, title, position, module_id')
-        .eq('course_id', course.id).order('position', { ascending: true })
-      return q.eq('is_published', true)
-        .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>()
-    })(),
+    serviceSupabase.from('lessons')
+      .select('id, slug, title, position, module_id')
+      .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
+      .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
     serviceSupabase.from('modules')
       .select('id, title, position, slug')
       .eq('course_id', course.id).order('position', { ascending: true })
@@ -114,13 +120,7 @@ export default async function LessonViewerPage({
   const coursePages = (pagesRes.data ?? []) as CoursePage[]
   const assessments = (assessmentsRes.data ?? []) as Assessment[]
 
-  // Build canonical sequence — this is the single source of truth for ordering
-  const sequence = buildCourseSequence({
-    modules,
-    lessons: allLessons,
-    assessments,
-    pages: coursePages,
-  })
+  const sequence = buildCourseSequence({ modules, lessons: allLessons, assessments, pages: coursePages })
 
   const currentIndex = sequence.findIndex(
     (s) => s.type === 'lesson' && (s.id === lesson!.id || s.slug === lesson!.slug)
@@ -131,7 +131,6 @@ export default async function LessonViewerPage({
   const prevHref = prevItem ? sequenceItemHref(slug, prevItem) : null
   const nextHref = nextItem ? sequenceItemHref(slug, nextItem) : null
 
-  // Count position within lessons only (for "Lesson X of Y" display)
   const moduleLessonItems = sequence.filter(
     (s) => s.type === 'lesson' && s.module_id === lesson!.module_id
   )
@@ -139,7 +138,10 @@ export default async function LessonViewerPage({
     (s) => s.id === lesson!.id || s.slug === lesson!.slug
   )
   const lessonTotal = moduleLessonItems.length
-  console.log(lesson.module_id, moduleLessonItems)
+
+  // Redirect URL for sign-in prompts — takes visitor back here after signing in
+  const currentPath = `/courses/${slug}/${moduleSlug}/${lessonSlug}`
+
   return (
     <>
       <SiteNav />
@@ -210,13 +212,33 @@ export default async function LessonViewerPage({
               }
             </div>
 
-            {/* Mark complete */}
+            {/* Progress tracking — authenticated users get the button; guests get a sign-in nudge */}
             <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
-              <MarkCompleteButton
-                lessonId={lesson.id}
-                courseId={lesson.course_id}
-                initialCompleted={isCompleted}
-              />
+              {dbUser ? (
+                <MarkCompleteButton
+                  lessonId={lesson.id}
+                  courseId={lesson.course_id}
+                  initialCompleted={isCompleted}
+                />
+              ) : (
+                <Link
+                  href={`/sign-in?redirect=${encodeURIComponent(currentPath)}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '10px 20px',
+                    borderRadius: 'var(--radius)',
+                    border: '2px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text-3)',
+                    fontSize: 14, fontWeight: 500,
+                    transition: 'border-color 0.15s, color 0.15s',
+                  }}>
+                    <span>→</span> Sign in to track your progress
+                  </div>
+                </Link>
+              )}
             </div>
 
             {/* Prev / Next */}
@@ -252,7 +274,7 @@ export default async function LessonViewerPage({
                 </Link>
               ) : (
                 <Link href={`/courses/${slug}`}>
-                  <button className="btn btn-primary">Complete course ✓</button>
+                  <button className="btn btn-primary">Back to course</button>
                 </Link>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { createServerClient, createServiceClient } from '@/lib/supabase'
+import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -29,38 +29,44 @@ export default async function CoursePageViewer({
 }) {
   const { slug, pageSlug } = await params
   const clerkUser = await currentUser()
-  if (!clerkUser) redirect(`/sign-in?redirect=/courses/${slug}/pages/${pageSlug}`)
-
-  const supabase = createServerClient()
   const serviceSupabase = createServiceClient()
 
-  const { data: dbUser } = await serviceSupabase
-    .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
-  if (!dbUser) redirect('/sign-in')
+  // Resolve user (may be null for unauthenticated visitors)
+  let dbUser: User | null = null
+  if (clerkUser) {
+    const { data } = await serviceSupabase
+      .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
+    dbUser = data
+  }
 
-  const isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
+  const isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
 
-  const courseBaseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
   const { data: course } = await (isInstructor
-    ? courseBaseQuery
-    : courseBaseQuery.eq('is_published', true)
+    ? courseQuery
+    : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
 
-  if (!isInstructor) {
-    const isFree = course.price_cents === 0
-    if (!isFree) {
-      const { data: enrollment } = await serviceSupabase
-        .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
-      if (!enrollment) redirect(`/courses/${slug}`)
+  // Auth gate
+  if (!dbUser) {
+    if (!course.is_public || course.price_cents > 0) {
+      redirect(`/sign-in?redirect=/courses/${slug}/pages/${pageSlug}`)
     }
   }
 
-  const pageBaseQuery = serviceSupabase.from('course_pages').select('*')
+  // Enrollment check for paid courses
+  if (dbUser && !isInstructor && course.price_cents > 0) {
+    const { data: enrollment } = await serviceSupabase
+      .from('enrollments').select('id').eq('user_id', dbUser.id).eq('course_id', course.id).single()
+    if (!enrollment) redirect(`/courses/${slug}`)
+  }
+
+  const pageQuery = serviceSupabase.from('course_pages').select('*')
     .eq('slug', pageSlug).eq('course_id', course.id)
   const { data: page } = await (isInstructor
-    ? pageBaseQuery
-    : pageBaseQuery.eq('is_published', true)
+    ? pageQuery
+    : pageQuery.eq('is_published', true)
   ).single<CoursePage>()
   if (!page) notFound()
 
@@ -86,12 +92,13 @@ export default async function CoursePageViewer({
   const modules = modulesRes.data ?? []
   const assessments = (assessmentsRes.data ?? []) as Assessment[]
 
-  // Canonical sequence
   const sequence = buildCourseSequence({ modules, lessons: allLessons, assessments, pages: allPages })
 
   const currentIndex = sequence.findIndex((s) => s.type === 'page' && s.id === page.id)
   const prevItem = currentIndex > 0 ? sequence[currentIndex - 1] : null
   const nextItem = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null
+
+  const currentPath = `/courses/${slug}/pages/${pageSlug}`
 
   return (
     <>
@@ -132,8 +139,29 @@ export default async function CoursePageViewer({
             </div>
 
             <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              {/* Read toggle for authenticated users; sign-in nudge for guests */}
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <CoursePageReadToggle pageId={page.id} courseId={course.id} />
+                {dbUser ? (
+                  <CoursePageReadToggle pageId={page.id} courseId={course.id} />
+                ) : (
+                  <Link
+                    href={`/sign-in?redirect=${encodeURIComponent(currentPath)}`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 8,
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius)',
+                      border: '2px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text-3)',
+                      fontSize: 13, fontWeight: 500,
+                    }}>
+                      → Sign in to track your progress
+                    </div>
+                  </Link>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

@@ -8,6 +8,7 @@ interface Props {
   description: string
   slug: string
   priceCents: number
+  isPublic: boolean
   thumbnailUrl: string | null
   introDescription: string | null
   conclusionDescription: string | null
@@ -23,10 +24,14 @@ const TOOL_OPTIONS = [
   { value: 'lang-select', label: 'Language selector',    description: 'Per-block language dropdown on code blocks',                   requires: 'code' },
 ]
 
-export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl, introDescription, conclusionDescription, editorTools }: Props) {
+export default function CourseSettings({
+  courseId, title, description, slug, priceCents, isPublic,
+  thumbnailUrl, introDescription, conclusionDescription, editorTools,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
     title, description, slug, priceCents,
+    isPublic,
     introDescription: introDescription ?? '',
     conclusionDescription: conclusionDescription ?? '',
     editorTools: editorTools ?? [],
@@ -39,7 +44,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function set(field: string, value: string | number | string[]) {
+  function set(field: string, value: string | number | string[] | boolean) {
     setForm((f) => ({ ...f, [field]: value }))
     setSaved(false)
     setError('')
@@ -69,6 +74,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
           description: form.description,
           slug: form.slug,
           price_cents: form.priceCents,
+          is_public: form.priceCents === 0 ? form.isPublic : false,
           thumbnail_url: thumbnail,
           intro_description: form.introDescription || null,
           conclusion_description: form.conclusionDescription || null,
@@ -90,6 +96,8 @@ export default function CourseSettings({ courseId, title, description, slug, pri
       setSaving(false)
     }
   }
+
+  const isFree = form.priceCents === 0
 
   return (
     <>
@@ -179,7 +187,6 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                             const next = e.target.checked
                               ? [...form.editorTools, tool.value]
                               : form.editorTools.filter((t) => t !== tool.value)
-                            // If unchecking 'code', also remove dependent tools
                             const cleaned = tool.value === 'code' && !e.target.checked
                               ? next.filter((t) => TOOL_OPTIONS.find((o) => o.value === t)?.requires !== 'code')
                               : next
@@ -210,7 +217,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                 </span>
               </label>
 
-              <label>
+              <div>
                 <span style={labelStyle}>Price (USD)</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ color: 'var(--text-2)', fontSize: 14 }}>$</span>
@@ -219,12 +226,45 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                     min={0}
                     step={0.01}
                     value={(form.priceCents / 100).toFixed(2)}
-                    onChange={(e) => set('priceCents', Math.round(parseFloat(e.target.value || '0') * 100))}
+                    onChange={(e) => {
+                      const cents = Math.round(parseFloat(e.target.value || '0') * 100)
+                      set('priceCents', cents)
+                      // If switching to paid, turn off public access
+                      if (cents > 0) set('isPublic', false)
+                    }}
                     style={{ ...inputStyle, width: 100 }}
                   />
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Enter 0 for free</span>
                 </div>
-              </label>
+              </div>
+
+              {/* Public access — only shown for free courses */}
+              {isFree && (
+                <div style={{
+                  padding: '0.875rem 1rem',
+                  background: form.isPublic ? 'var(--indigo-muted)' : 'var(--surface-2)',
+                  border: `1px solid ${form.isPublic ? 'var(--indigo)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius)',
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.isPublic}
+                      onChange={(e) => set('isPublic', e.target.checked)}
+                      style={{ marginTop: 2, flexShrink: 0, accentColor: 'var(--indigo)' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                        Public access (no login required)
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, lineHeight: 1.5 }}>
+                        Anyone can read lessons and pages without signing in. Login is still required to track progress and take assessments.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {/* Thumbnail */}
               <div>
@@ -271,7 +311,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                   <p style={{ fontSize: 12, color: 'var(--danger)', margin: '4px 0 0' }}>{uploadError}</p>
                 )}
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>
-                  Recommended: 1280×640px (2:1 ratio). Images are cropped to fit — keep the subject centred. JPEG, PNG, WebP or GIF.
+                  Recommended: 1280×640px (2:1 ratio). JPEG, PNG, WebP or GIF.
                 </p>
               </div>
             </div>

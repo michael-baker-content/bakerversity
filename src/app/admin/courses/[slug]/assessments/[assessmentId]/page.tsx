@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import type { AssessmentType } from '@/lib/types'
+import { LatexInput } from '@/components/editor/NodeViews'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
@@ -76,7 +77,7 @@ interface QuestionFormState {
   content: Record<string, unknown>
   options: string[]
   correct_answer: string
-  accepted_answers: string[]   // for short_answer
+  accepted_answers: string[]
   explanation_content: Record<string, unknown>
 }
 
@@ -221,37 +222,39 @@ function QuestionForm({
           </div>
         </div>
 
-        {/* Multiple choice options */}
+        {/* Multiple choice options — LatexInput for each option */}
         {form.question_type === 'multiple_choice' && (
           <div>
-            <label style={labelStyle}>Answer choices</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={labelStyle}>
+              Answer choices
+              {hasMath && <span style={optStyle}> ($x^2$ for inline math)</span>}
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {form.options.map((opt, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <input
                     type="radio"
                     name="correct_answer"
                     checked={form.correct_answer === String(i)}
                     onChange={() => set('correct_answer', String(i))}
                     title="Mark as correct"
-                    style={{ accentColor: 'var(--indigo)', flexShrink: 0 }}
+                    style={{ accentColor: 'var(--indigo)', flexShrink: 0, marginTop: 9 }}
                   />
-                  <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 18 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 18, paddingTop: 8 }}>
                     {String.fromCharCode(65 + i)}.
                   </span>
-                  <input
-                    className="input"
-                    type="text"
-                    value={opt}
-                    onChange={(e) => setOption(i, e.target.value)}
-                    placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                    style={{ flex: 1 }}
-                  />
+                  <div style={{ flex: 1 }}>
+                    <LatexInput
+                      value={opt}
+                      onChange={(val) => setOption(i, val)}
+                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                    />
+                  </div>
                   {form.options.length > 2 && (
                     <button
                       type="button"
                       onClick={() => removeOption(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 16, padding: '0 4px', lineHeight: 1, marginTop: 6, flexShrink: 0 }}
                       title="Remove option"
                     >×</button>
                   )}
@@ -291,29 +294,31 @@ function QuestionForm({
           </div>
         )}
 
-        {/* Short answer — accepted answers */}
+        {/* Short answer — accepted answers with LatexInput */}
         {form.question_type === 'short_answer' && (
           <div>
-            <label style={labelStyle}>Accepted answers</label>
+            <label style={labelStyle}>
+              Accepted answers
+              {hasMath && <span style={optStyle}> ($x^2$ for inline math)</span>}
+            </label>
             <p style={{ ...hintStyle, marginBottom: 8 }}>
-              All values are compared case-insensitively after trimming whitespace. Add multiple entries if several phrasings should be accepted (e.g. "4", "four", "4.0").
+              All values are compared case-insensitively after trimming. Add multiple entries for alternative phrasings (e.g. "4", "four", "4.0").
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {form.accepted_answers.map((ans, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    className="input"
-                    type="text"
-                    value={ans}
-                    onChange={(e) => setAccepted(i, e.target.value)}
-                    placeholder={i === 0 ? 'e.g. 4' : 'Alternative answer…'}
-                    style={{ flex: 1 }}
-                  />
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <LatexInput
+                      value={ans}
+                      onChange={(val) => setAccepted(i, val)}
+                      placeholder={i === 0 ? 'e.g. 4' : 'Alternative answer…'}
+                    />
+                  </div>
                   {form.accepted_answers.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeAccepted(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 16, padding: '0 4px', lineHeight: 1, marginTop: 6, flexShrink: 0 }}
                     >×</button>
                   )}
                 </div>
@@ -379,7 +384,7 @@ function QuestionForm({
   )
 }
 
-// ── QuestionRow — collapsed view of a saved question ─────────────────────────
+// ── QuestionRow ───────────────────────────────────────────────────────────────
 
 function QuestionRow({
   question,
@@ -442,7 +447,6 @@ function QuestionRow({
     onDeleted()
   }
 
-  // Build a plain-text preview from the content doc or question_text fallback
   const preview = (() => {
     if (question.question_text) return question.question_text
     if (!question.content) return '(no question body)'
@@ -453,13 +457,8 @@ function QuestionRow({
       if (!firstPara) return '(rich content)'
       const children = firstPara.content as Array<Record<string, unknown>> | undefined
       if (!children) return '(empty)'
-      return children
-        .filter((n) => n.type === 'text')
-        .map((n) => n.text as string)
-        .join('') || '(rich content)'
-    } catch {
-      return '(rich content)'
-    }
+      return children.filter((n) => n.type === 'text').map((n) => n.text as string).join('') || '(rich content)'
+    } catch { return '(rich content)' }
   })()
 
   const initialForm: QuestionFormState = {
@@ -472,11 +471,7 @@ function QuestionRow({
   }
 
   return (
-    <div style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      overflow: 'hidden',
-    }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
       {editing ? (
         <div style={{ padding: '1rem' }}>
           <p style={{ margin: '0 0 1rem', fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
@@ -494,17 +489,10 @@ function QuestionRow({
         </div>
       ) : (
         <div style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20, paddingTop: 2 }}>
-            {index + 1}.
-          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20, paddingTop: 2 }}>{index + 1}.</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 7px',
-                borderRadius: 'var(--radius-full)',
-                background: bg, color,
-                textTransform: 'uppercase', letterSpacing: '0.04em',
-              }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 'var(--radius-full)', background: bg, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 {TYPE_LABELS[question.question_type]}
               </span>
             </div>
@@ -529,11 +517,7 @@ function QuestionRow({
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button onClick={() => setEditing(true)} className="btn btn-ghost btn-sm">Edit</button>
-            <button
-              onClick={handleDelete}
-              className="btn btn-sm"
-              style={{ background: 'none', color: 'var(--danger)', border: 'none', cursor: 'pointer', fontSize: 13 }}
-            >
+            <button onClick={handleDelete} className="btn btn-sm" style={{ background: 'none', color: 'var(--danger)', border: 'none', cursor: 'pointer', fontSize: 13 }}>
               Delete
             </button>
           </div>
@@ -563,15 +547,12 @@ export default function EditAssessmentPage() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
-  // Assessment settings fields
   const [title, setTitle] = useState('')
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('quiz')
   const [passingScore, setPassingScore] = useState(70)
   const [isGraded, setIsGraded] = useState(true)
   const [isPublished, setIsPublished] = useState(false)
   const [moduleId, setModuleId] = useState<string | null>(null)
-
-  // Intro content TipTap
   const [introContent, setIntroContent] = useState<Record<string, unknown>>(emptyDoc())
   const [ready, setReady] = useState(false)
   const insertLatexIntroRef = useRef<((latex: string, display: boolean) => void) | null>(null)
@@ -700,7 +681,6 @@ export default function EditAssessmentPage() {
 
   return (
     <main className="page">
-      {/* Breadcrumb */}
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: '1.25rem' }}>
         <Link href="/admin/courses" style={{ color: 'var(--text-3)' }}>My courses</Link>
         <span style={{ margin: '0 6px' }}>›</span>
@@ -711,39 +691,23 @@ export default function EditAssessmentPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>Edit {typeLabel.toLowerCase()}</h1>
 
-      {/* ── Settings form ────────────────────────────────────── */}
       <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* Title */}
         <div>
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
-          <input
-            className="input"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
+          <input className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
 
-        {/* Module */}
         {modules.length > 0 && (
           <div>
             <label style={labelStyle}>Module</label>
-            <select
-              className="input"
-              value={moduleId ?? ''}
-              onChange={(e) => setModuleId(e.target.value || null)}
-            >
+            <select className="input" value={moduleId ?? ''} onChange={(e) => setModuleId(e.target.value || null)}>
               <option value="">— No module (course-level) —</option>
-              {modules.map((m) => (
-                <option key={m.id} value={m.id}>{m.title}</option>
-              ))}
+              {modules.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
           </div>
         )}
 
-        {/* Assessment type */}
         <div>
           <label style={labelStyle}>Type</label>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -751,11 +715,7 @@ export default function EditAssessmentPage() {
               <button
                 key={t}
                 type="button"
-                onClick={() => {
-                  setAssessmentType(t)
-                  if (t === 'practice') setIsGraded(false)
-                  else setIsGraded(true)
-                }}
+                onClick={() => { setAssessmentType(t); setIsGraded(t !== 'practice') }}
                 className={`btn btn-sm ${assessmentType === t ? 'btn-secondary' : 'btn-ghost'}`}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -764,41 +724,23 @@ export default function EditAssessmentPage() {
           </div>
         </div>
 
-        {/* Passing score */}
         {isGraded && (
           <div>
-            <label style={labelStyle}>
-              Passing score: <strong>{passingScore}%</strong>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={passingScore}
-              onChange={(e) => setPassingScore(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--indigo)' }}
-            />
+            <label style={labelStyle}>Passing score: <strong>{passingScore}%</strong></label>
+            <input type="range" min={0} max={100} step={5} value={passingScore} onChange={(e) => setPassingScore(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--indigo)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)' }}>
               <span>0%</span><span>100%</span>
             </div>
           </div>
         )}
 
-        {/* Intro content */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>
               Introduction <span style={optStyle}>(shown before questions, optional)</span>
             </label>
             {editorPacks.includes('math') && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setShowLatexIntro(true)}
-              >
-                ∑ Math
-              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowLatexIntro(true)}>∑ Math</button>
             )}
           </div>
           {ready && (
@@ -815,13 +757,8 @@ export default function EditAssessmentPage() {
           )}
         </div>
 
-        {/* Published */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-          <input
-            type="checkbox"
-            checked={isPublished}
-            onChange={(e) => setIsPublished(e.target.checked)}
-          />
+          <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} />
           Published (visible to enrolled students)
         </label>
 
@@ -837,36 +774,25 @@ export default function EditAssessmentPage() {
         </div>
       </form>
 
-      {/* ── Questions section ────────────────────────────────── */}
+      {/* Questions section */}
       <div style={{ marginTop: '3rem', borderTop: '1px solid var(--border)', paddingTop: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
-            <h2 style={{ margin: '0 0 2px', fontSize: '1.1rem', fontFamily: 'var(--font-serif)' }}>
-              Questions
-            </h2>
+            <h2 style={{ margin: '0 0 2px', fontSize: '1.1rem', fontFamily: 'var(--font-serif)' }}>Questions</h2>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
               {questions.length} question{questions.length !== 1 ? 's' : ''}
               {isGraded && questions.length > 0 && ` · ${passingScore}% to pass`}
             </p>
           </div>
           {!addingQuestion && (
-            <button
-              type="button"
-              onClick={() => setAddingQuestion(true)}
-              className="btn btn-ghost btn-sm"
-            >
+            <button type="button" onClick={() => setAddingQuestion(true)} className="btn btn-ghost btn-sm">
               + Add question
             </button>
           )}
         </div>
 
-        {/* Question list */}
         {questions.length === 0 && !addingQuestion && (
-          <div style={{
-            padding: '2rem', textAlign: 'center',
-            border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-lg)',
-            color: 'var(--text-3)', fontSize: 14,
-          }}>
+          <div style={{ padding: '2rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-lg)', color: 'var(--text-3)', fontSize: 14 }}>
             No questions yet. Add your first question above.
           </div>
         )}
@@ -886,17 +812,9 @@ export default function EditAssessmentPage() {
           ))}
         </div>
 
-        {/* Add question form */}
         {addingQuestion && (
-          <div style={{
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.25rem',
-            background: 'var(--surface)',
-          }}>
-            <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700 }}>
-              New question
-            </h3>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', background: 'var(--surface)' }}>
+            <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700 }}>New question</h3>
             <QuestionForm
               initial={emptyForm()}
               assessmentId={assessmentId}
@@ -910,7 +828,7 @@ export default function EditAssessmentPage() {
         )}
       </div>
 
-      {/* ── Danger zone ──────────────────────────────────────── */}
+      {/* Danger zone */}
       <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <h3 style={{ margin: '0 0 0.5rem', fontSize: 15, color: 'var(--danger)' }}>Danger zone</h3>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1rem' }}>
@@ -927,13 +845,9 @@ export default function EditAssessmentPage() {
         </button>
       </div>
 
-      {/* Latex modal for intro content */}
       {showLatexIntro && editorPacks.includes('math') && (
         <LatexModal
-          onInsert={(latex, displayMode) => {
-            insertLatexIntroRef.current?.(latex, displayMode)
-            setShowLatexIntro(false)
-          }}
+          onInsert={(latex, displayMode) => { insertLatexIntroRef.current?.(latex, displayMode); setShowLatexIntro(false) }}
           onClose={() => setShowLatexIntro(false)}
           showDisplayToggle
         />

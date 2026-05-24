@@ -37,19 +37,19 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
 }
 
 const PAGE_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
-  overview: { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  introduction: { bg: 'var(--amber-muted)', color: 'var(--amber-hover)' },
-  syllabus: { bg: 'var(--surface-2)', color: 'var(--text-2)' },
-  requirements: { bg: 'var(--surface-2)', color: 'var(--text-2)' },
-  resources: { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  conclusion: { bg: 'var(--amber-muted)', color: 'var(--amber-hover)' },
-  custom: { bg: 'var(--surface-2)', color: 'var(--text-2)' },
+  overview:      { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
+  introduction:  { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
+  syllabus:      { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
+  requirements:  { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
+  resources:     { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
+  conclusion:    { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
+  custom:        { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
 }
 
 const ASSESSMENT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
-  quiz: { bg: 'var(--amber-muted)', color: 'var(--amber-hover)' },
-  exam: { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  practice: { bg: 'var(--surface-2)', color: 'var(--text-3)' },
+  quiz:     { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
+  exam:     { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
+  practice: { bg: 'var(--surface-2)',    color: 'var(--text-3)' },
 }
 
 const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
@@ -291,7 +291,7 @@ export default async function CourseDetailPage({
 
           {/* Module groups — interleaved lessons and assessments */}
           {(unassignedLessons.length > 0 || moduleGroups.length > 0) && (
-            <div style={sectionHeader}>Lessons</div>
+            <div style={sectionHeader}>Modules</div>
           )}
 
           {unassignedLessons.map((lesson) => {
@@ -301,51 +301,48 @@ export default async function CourseDetailPage({
                 key={lesson.id}
                 href={canAccess ? lessonHref(lesson) : undefined}
                 locked={!canAccess}
-                index={itemCounter}
+                label={`Lesson ${itemCounter}`}
+                labelColors={{ bg: 'var(--surface-2)', color: 'var(--text-3)' }}
                 title={lesson.title}
               />
             )
           })}
 
-          {moduleGroups.map(({ module, sequence }) => {
-            itemCounter = 0
-            return (
-              <div key={module.id}>
-                <div style={moduleHeader}>{module.title}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {sequence.map((entry) => {
-                    if (entry.kind === 'lesson') {
-                      itemCounter++
-                      return (
-                        <ContentRow
-                          key={entry.item.id}
-                          href={canAccess ? lessonHref(entry.item) : undefined}
-                          locked={!canAccess}
-                          index={itemCounter}
-                          title={entry.item.title}
-                          indented
-                        />
-                      )
-                    }
-                    // Assessment
-                    const a = entry.item
-                    const href = assessmentHref(a)
+          {moduleGroups.map(({ module, sequence }) => (
+            <div key={module.id}>
+              <div style={moduleHeader}>{module.title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {sequence.map((entry) => {
+                  if (entry.kind === 'lesson') {
+                    itemCounter++
                     return (
                       <ContentRow
-                        key={a.id}
-                        href={canAccess && href ? href : undefined}
-                        locked={!canAccess || !href}
-                        label={ASSESSMENT_TYPE_LABELS[a.assessment_type]}
-                        labelColors={ASSESSMENT_TYPE_COLORS[a.assessment_type]}
-                        title={a.title}
-                        indented
+                        key={entry.item.id}
+                        href={canAccess ? lessonHref(entry.item) : undefined}
+                        locked={!canAccess}
+                        label={`Lesson ${itemCounter}`}
+                        labelColors={{ bg: 'var(--surface-2)', color: 'var(--text-3)' }}
+                        title={entry.item.title}
                       />
                     )
-                  })}
-                </div>
+                  }
+                  // Assessment
+                  const a = entry.item
+                  const href = assessmentHref(a)
+                  return (
+                    <ContentRow
+                      key={a.id}
+                      href={canAccess && href ? href : undefined}
+                      locked={!canAccess || !href}
+                      label={ASSESSMENT_TYPE_LABELS[a.assessment_type]}
+                      labelColors={ASSESSMENT_TYPE_COLORS[a.assessment_type]}
+                      title={a.title}
+                    />
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          ))}
 
           {/* After pages */}
           {afterPages.length > 0 && (
