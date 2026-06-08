@@ -16,6 +16,13 @@ export interface User {
   updated_at: string
 }
 
+export interface ThumbnailAttribution {
+  photographer_name: string
+  photographer_url: string   // https://unsplash.com/@username?utm_source=...
+  unsplash_url: string       // https://unsplash.com/?utm_source=...
+  photo_id: string           // Unsplash photo ID
+}
+
 export interface Course {
   id: string
   instructor_id: string
@@ -27,6 +34,7 @@ export interface Course {
   is_published: boolean
   is_public: boolean
   thumbnail_url: string | null
+  thumbnail_attribution: ThumbnailAttribution | null
   created_at: string
   updated_at: string
 }

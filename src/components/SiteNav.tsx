@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 import SiteNavClient from './SiteNavClient'
 
 interface SiteNavProps {
-  active?: 'courses' | 'dashboard'
+  active?: 'courses' | 'dashboard' | 'about'
 }
 
 export default async function SiteNav({ active }: SiteNavProps) {

@@ -55,7 +55,7 @@ export default function NewCoursePage() {
 
   return (
     <main style={{ maxWidth: 600, margin: '0 auto', padding: '2rem 1rem' }}>
-      <Link href="/admin/courses" style={{ fontSize: 14, color: '#666' }}>← My courses</Link>
+      <Link href="/admin/courses" style={{ fontSize: 14, color: 'var(--text-3)', textDecoration: 'none' }}>← My courses</Link>
       <h1 style={{ margin: '0.5rem 0 2rem' }}>New course</h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -103,18 +103,18 @@ export default function NewCoursePage() {
           />
         </Field>
 
-        {error && <p style={{ color: 'red', fontSize: 14 }}>{error}</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="submit"
             disabled={loading}
-            style={{ padding: '8px 20px', background: '#111', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+            className="btn btn-primary"
           >
             {loading ? 'Creating...' : 'Create course'}
           </button>
           <Link href="/admin/courses">
-            <button type="button" style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
+            <button type="button" className="btn btn-ghost">
               Cancel
             </button>
           </Link>
@@ -128,9 +128,11 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
   fontSize: 14,
-  border: '1px solid #ddd',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   boxSizing: 'border-box',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 }
 
 function Field({ label, hint, required, children }: {
@@ -141,10 +143,10 @@ function Field({ label, hint, required, children }: {
 }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-        {label}{required && <span style={{ color: 'red' }}> *</span>}
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4, color: 'var(--text)' }}>
+        {label}{required && <span style={{ color: 'var(--danger)' }}> *</span>}
       </label>
-      {hint && <p style={{ fontSize: 12, color: '#888', margin: '0 0 4px' }}>{hint}</p>}
+      {hint && <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 4px' }}>{hint}</p>}
       {children}
     </div>
   )

@@ -2,8 +2,46 @@ import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
 import SiteNav from '@/components/SiteNav'
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'bakerversity'
+
+interface UnsplashPhoto {
+  id: string
+  urls: { regular: string }
+  user: { name: string; username: string }
+}
+
+async function fetchHeroPhoto(): Promise<UnsplashPhoto | null> {
+  const key = process.env.UNSPLASH_ACCESS_KEY
+  if (!key) return null
+  try {
+    const res = await fetch(
+      'https://api.unsplash.com/photos/random?query=people+learning&orientation=landscape&content_filter=high&count=1',
+      {
+        headers: { Authorization: `Client-ID ${key}` },
+        // Revalidate once per hour so the image changes but doesn't
+        // hammer the API on every page load
+        next: { revalidate: 3600 },
+      }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    // count=1 returns an array
+    return Array.isArray(data) ? data[0] : data
+  } catch {
+    return null
+  }
+}
+
 export default async function HomePage() {
-  const clerkUser = await currentUser()
+  const [clerkUser, heroPhoto] = await Promise.all([
+    currentUser(),
+    fetchHeroPhoto(),
+  ])
+
+  const photographerUrl = heroPhoto
+    ? `https://unsplash.com/@${heroPhoto.user.username}?utm_source=${APP_NAME}&utm_medium=referral`
+    : null
+  const unsplashUrl = `https://unsplash.com/?utm_source=${APP_NAME}&utm_medium=referral`
 
   return (
     <>
@@ -13,19 +51,42 @@ export default async function HomePage() {
         <section style={{
           padding: 'clamp(4rem, 10vw, 8rem) 1.5rem',
           textAlign: 'center',
-          background: 'var(--bg)',
+          position: 'relative',
+          overflow: 'hidden',
+          // Fall back to plain bg if no photo
+          background: heroPhoto ? 'none' : 'var(--bg)',
         }}>
-          <div style={{ maxWidth: 680, margin: '0 auto' }}>
+          {/* Background image */}
+          {heroPhoto && (
+            <>
+              <div style={{
+                position: 'absolute', inset: 0,
+                backgroundImage: `url(${heroPhoto.urls.regular})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                zIndex: 0,
+              }} />
+              {/* Dark overlay so text stays readable */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'rgba(0,0,0,0.52)',
+                zIndex: 1,
+              }} />
+            </>
+          )}
+
+          {/* Content — above overlay */}
+          <div style={{ maxWidth: 680, margin: '0 auto', position: 'relative', zIndex: 2 }}>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
               padding: '4px 12px',
-              background: 'var(--amber-muted)',
+              background: heroPhoto ? 'rgba(255,255,255,0.15)' : 'var(--amber-muted)',
               borderRadius: 'var(--radius-full)',
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--amber-hover)',
+              color: heroPhoto ? 'rgba(255,255,255,0.9)' : 'var(--amber-hover)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
               marginBottom: '1.5rem',
@@ -38,16 +99,17 @@ export default async function HomePage() {
               fontSize: 'clamp(2.5rem, 6vw, 4rem)',
               lineHeight: 1.1,
               margin: '0 0 1.25rem',
-              color: 'var(--text)',
+              color: heroPhoto ? '#fff' : 'var(--text)',
+              textShadow: heroPhoto ? '0 2px 12px rgba(0,0,0,0.4)' : 'none',
             }}>
               Learn to think
               <br />
-              <span style={{ color: 'var(--amber)' }}>mathematically.</span>
+              <span style={{ color: heroPhoto ? 'var(--amber)' : 'var(--amber)' }}>mathematically.</span>
             </h1>
 
             <p style={{
               fontSize: 'clamp(1rem, 2.5vw, 1.2rem)',
-              color: 'var(--text-2)',
+              color: heroPhoto ? 'rgba(255,255,255,0.88)' : 'var(--text-2)',
               lineHeight: 1.7,
               margin: '0 0 2.5rem',
               maxWidth: 520,
@@ -64,16 +126,42 @@ export default async function HomePage() {
               </Link>
               {!clerkUser && (
                 <Link href="/sign-up">
-                  <button className="btn btn-outline btn-lg">Create account</button>
+                  <button className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
+                    Create account
+                  </button>
                 </Link>
               )}
               {clerkUser && (
                 <Link href="/dashboard">
-                  <button className="btn btn-outline btn-lg">My dashboard</button>
+                  <button className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
+                    My dashboard
+                  </button>
                 </Link>
               )}
             </div>
           </div>
+
+          {/* Attribution — bottom-right corner, above overlay */}
+          {heroPhoto && photographerUrl && (
+            <p style={{
+              position: 'absolute', bottom: 8, right: 12,
+              margin: 0, fontSize: 10,
+              color: 'rgba(255,255,255,0.6)',
+              zIndex: 2,
+              lineHeight: 1.4,
+            }}>
+              Photo by{' '}
+              <a href={photographerUrl} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'underline' }}>
+                {heroPhoto.user.name}
+              </a>
+              {' '}on{' '}
+              <a href={unsplashUrl} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'underline' }}>
+                Unsplash
+              </a>
+            </p>
+          )}
         </section>
 
         {/* Features */}
@@ -116,7 +204,6 @@ export default async function HomePage() {
                 },
               ].map((f) => (
                 <div key={f.title}>
-                  {/* Icon + title on one line */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -136,7 +223,6 @@ export default async function HomePage() {
                     </div>
                     <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', margin: 0 }}>{f.title}</h3>
                   </div>
-                  {/* Description indented to align with title */}
                   <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0, paddingLeft: 46, lineHeight: 1.6 }}>{f.body}</p>
                 </div>
               ))}

@@ -1,6 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import type { ThumbnailAttribution } from '@/lib/types'
+
+const UnsplashPicker = dynamic(() => import('./UnsplashPicker'), { ssr: false })
 
 interface Props {
   courseId: string
@@ -10,6 +14,7 @@ interface Props {
   priceCents: number
   isPublic: boolean
   thumbnailUrl: string | null
+  thumbnailAttribution: ThumbnailAttribution | null
   introDescription: string | null
   conclusionDescription: string | null
   editorTools: string[]
@@ -26,7 +31,8 @@ const TOOL_OPTIONS = [
 
 export default function CourseSettings({
   courseId, title, description, slug, priceCents, isPublic,
-  thumbnailUrl, introDescription, conclusionDescription, editorTools,
+  thumbnailUrl, thumbnailAttribution,
+  introDescription, conclusionDescription, editorTools,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
@@ -37,6 +43,8 @@ export default function CourseSettings({
     editorTools: editorTools ?? [],
   })
   const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl)
+  const [attribution, setAttribution] = useState<ThumbnailAttribution | null>(thumbnailAttribution)
+  const [showUnsplash, setShowUnsplash] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -58,7 +66,10 @@ export default function CourseSettings({
     const res = await fetch('/api/admin/upload-thumbnail', { method: 'POST', body: fd })
     const data = await res.json()
     if (!res.ok) setUploadError(data.error ?? 'Upload failed')
-    else setThumbnail(data.url)
+    else {
+      setThumbnail(data.url)
+      setAttribution(null)  // uploaded photos have no Unsplash attribution
+    }
     setUploading(false)
   }
 
@@ -76,6 +87,7 @@ export default function CourseSettings({
           price_cents: form.priceCents,
           is_public: form.priceCents === 0 ? form.isPublic : false,
           thumbnail_url: thumbnail,
+          thumbnail_attribution: attribution ?? null,
           intro_description: form.introDescription || null,
           conclusion_description: form.conclusionDescription || null,
           editor_tools: form.editorTools,
@@ -277,7 +289,7 @@ export default function CourseSettings({
                       style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 'var(--radius)', display: 'block' }}
                     />
                     <button
-                      onClick={() => setThumbnail(null)}
+                      onClick={() => { setThumbnail(null); setAttribution(null) }}
                       style={{
                         position: 'absolute', top: 6, right: 6,
                         background: 'rgba(0,0,0,0.6)', color: '#fff',
@@ -286,16 +298,36 @@ export default function CourseSettings({
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >×</button>
+                    {attribution && (
+                      <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                        Photo by{' '}
+                        <a href={attribution.photographer_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-3)' }}>
+                          {attribution.photographer_name}
+                        </a>{' '}on{' '}
+                        <a href={attribution.unsplash_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-3)' }}>
+                          Unsplash
+                        </a>
+                      </p>
+                    )}
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="btn btn-ghost btn-sm"
-                >
-                  {uploading ? 'Uploading…' : thumbnail ? 'Replace image' : 'Upload image'}
-                </button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    {uploading ? 'Uploading…' : thumbnail ? 'Replace (upload)' : '↑ Upload image'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowUnsplash(true)}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    🔍 Search Unsplash
+                  </button>
+                </div>
                 <input
                   ref={fileRef}
                   type="file"
@@ -311,7 +343,7 @@ export default function CourseSettings({
                   <p style={{ fontSize: 12, color: 'var(--danger)', margin: '4px 0 0' }}>{uploadError}</p>
                 )}
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>
-                  Recommended: 1280×640px (2:1 ratio). JPEG, PNG, WebP or GIF.
+                  Recommended: 1280×640px (2:1 ratio). Upload JPEG, PNG, WebP or GIF, or search Unsplash.
                 </p>
               </div>
             </div>
@@ -339,6 +371,21 @@ export default function CourseSettings({
             </div>
           </div>
         </div>
+      )}
+      {showUnsplash && (
+        <UnsplashPicker
+          onSelect={(photo) => {
+            setThumbnail(photo.regular)
+            setAttribution({
+              photographer_name: photo.photographer_name,
+              photographer_url: photo.photographer_url,
+              unsplash_url: photo.unsplash_url,
+              photo_id: photo.id,
+            })
+            setShowUnsplash(false)
+          }}
+          onClose={() => setShowUnsplash(false)}
+        />
       )}
     </>
   )

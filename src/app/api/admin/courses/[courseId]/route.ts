@@ -18,7 +18,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
+    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, thumbnail_attribution, intro_description, conclusion_description, editor_tools')
     .eq('id', courseId)
     .single()
 
@@ -50,7 +50,8 @@ export async function PATCH(
 
   const allowed = [
     'title', 'description', 'price_cents', 'is_published', 'is_public',
-    'slug', 'thumbnail_url', 'intro_description', 'conclusion_description', 'editor_tools',
+    'slug', 'thumbnail_url', 'thumbnail_attribution', 'intro_description',
+    'conclusion_description', 'editor_tools',
   ]
   const updates = Object.fromEntries(
     Object.entries(body).filter(([key]) => allowed.includes(key))

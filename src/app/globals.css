@@ -307,6 +307,12 @@ textarea.input { resize: vertical; min-height: 80px; }
   width: 100%;
 }
 
+/* About page */
+
+
+.about-project-card > div { transition: border-color 0.15s; }
+.about-project-card:hover > div { border-color: var(--indigo) !important; }
+
 /* ── Lesson viewer layout ───────────────────────────────────────────────────── */
 .lesson-viewer-layout {
   min-height: 100vh;

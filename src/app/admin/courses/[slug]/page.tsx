@@ -35,7 +35,7 @@ export default async function AdminCourseDetailPage({
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, intro_description, conclusion_description, editor_tools')
+    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, thumbnail_attribution, intro_description, conclusion_description, editor_tools')
     .eq('slug', slug)
     .single()
 
@@ -109,6 +109,7 @@ export default async function AdminCourseDetailPage({
             priceCents={course.price_cents ?? 0}
             isPublic={course.is_public ?? false}
             thumbnailUrl={course.thumbnail_url ?? null}
+            thumbnailAttribution={course.thumbnail_attribution ?? null}
             introDescription={course.intro_description ?? null}
             conclusionDescription={course.conclusion_description ?? null}
             editorTools={course.editor_tools ?? []}

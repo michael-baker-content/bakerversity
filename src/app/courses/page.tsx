@@ -39,73 +39,88 @@ export default async function CoursesPage() {
         ) : (
           <div className="course-grid">
             {courses.map((course) => (
-              <Link key={course.id} href={`/courses/${course.slug}`} style={{ textDecoration: 'none' }}>
-                <div className="card card-hover" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {/* Thumbnail or gradient fallback */}
-                  {course.thumbnail_url ? (
-                    <div style={{
-                      height: 160, margin: '-1.25rem -1.25rem 0',
-                      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
-                      overflow: 'hidden',
-                    }}>
-                      <img
-                        src={course.thumbnail_url}
-                        alt={course.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    </div>
-                  ) : (
-                    <div style={{
-                      height: 160, margin: '-1.25rem -1.25rem 0',
-                      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
-                      background: 'linear-gradient(135deg, var(--amber), var(--indigo))',
-                    }} />
-                  )}
+              <div key={course.id}>
+                <Link href={`/courses/${course.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <div className="card card-hover" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* Thumbnail or gradient fallback */}
+                    {course.thumbnail_url ? (
+                      <div style={{
+                        height: 160, margin: '-1.25rem -1.25rem 0',
+                        borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                        overflow: 'hidden',
+                      }}>
+                        <img
+                          src={course.thumbnail_url}
+                          alt={course.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{
+                        height: 160, margin: '-1.25rem -1.25rem 0',
+                        borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                        background: 'linear-gradient(135deg, var(--amber), var(--indigo))',
+                      }} />
+                    )}
 
-                  <h2 style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: '1.2rem',
-                    margin: 0,
-                    color: 'var(--text)',
-                  }}>
-                    {course.title}
-                  </h2>
-
-                  {course.description && (
-                    <p style={{
-                      fontSize: 14,
-                      color: 'var(--text-2)',
+                    <h2 style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '1.2rem',
                       margin: 0,
-                      lineHeight: 1.55,
-                      flex: 1,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    } as React.CSSProperties}>
-                      {course.description}
-                    </p>
-                  )}
-
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginTop: 'auto',
-                    paddingTop: '0.5rem',
-                    borderTop: '1px solid var(--border)',
-                  }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Instructor</span>
-                    <span style={{
-                      fontWeight: 600,
-                      fontSize: 14,
-                      color: course.price_cents === 0 ? 'var(--success)' : 'var(--text)',
+                      color: 'var(--text)',
                     }}>
-                      {course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
-                    </span>
+                      {course.title}
+                    </h2>
+
+                    {course.description && (
+                      <p style={{
+                        fontSize: 14,
+                        color: 'var(--text-2)',
+                        margin: 0,
+                        lineHeight: 1.55,
+                        flex: 1,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      } as React.CSSProperties}>
+                        {course.description}
+                      </p>
+                    )}
+
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: 'auto',
+                      paddingTop: '0.5rem',
+                      borderTop: '1px solid var(--border)',
+                    }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Instructor</span>
+                      <span style={{
+                        fontWeight: 600,
+                        fontSize: 14,
+                        color: course.price_cents === 0 ? 'var(--success)' : 'var(--text)',
+                      }}>
+                        {course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {/* Unsplash attribution sits outside Link to avoid nested <a> tags */}
+                {course.thumbnail_attribution && (
+                  <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '4px 0 0', textAlign: 'right', lineHeight: 1.4 }}>
+                    Photo by{' '}
+                    <a href={course.thumbnail_attribution.photographer_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-3)' }}>
+                      {course.thumbnail_attribution.photographer_name}
+                    </a>
+                    {' '}on{' '}
+                    <a href={course.thumbnail_attribution.unsplash_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-3)' }}>
+                      Unsplash
+                    </a>
+                  </p>
+                )}
+              </div>
             ))}
           </div>
         )}

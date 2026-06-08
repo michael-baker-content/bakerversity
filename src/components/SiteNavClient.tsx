@@ -8,7 +8,7 @@ import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/nextjs'
 import ThemeToggle from './ThemeToggle'
 
 interface SiteNavClientProps {
-  active?: 'courses' | 'dashboard'
+  active?: 'courses' | 'dashboard' | 'about'
   isSignedIn: boolean
   isAdmin: boolean
 }
@@ -56,6 +56,7 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
           {/* Group 2 — Nav links (desktop only) */}
           <nav className="sitenav-desktop" style={{ display: 'flex', gap: 2 }}>
             <NavLink href="/courses" active={active === 'courses'}>Courses</NavLink>
+            <NavLink href="/about" active={active === 'about'}>About</NavLink>
             {isSignedIn && (
               <>
                 <NavLink href="/dashboard" active={active === 'dashboard'}>Dashboard</NavLink>
@@ -150,6 +151,9 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
           }}>
             <MobileLink href="/courses" active={active === 'courses'} onClick={() => setMenuOpen(false)}>
               Courses
+            </MobileLink>
+            <MobileLink href="/about" active={active === 'about'} onClick={() => setMenuOpen(false)}>
+              About
             </MobileLink>
             {isSignedIn && (
               <>
