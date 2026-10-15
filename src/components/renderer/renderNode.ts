@@ -41,6 +41,7 @@ const CALLOUT_STYLES: Record<string, {
   info:    { icon: 'ℹ️', label: 'Did you know?',   border: 'var(--indigo)',  bg: 'var(--indigo-muted)',        labelColor: 'var(--indigo)' },
   warning: { icon: '⚠️', label: 'Warning',         border: 'var(--amber)',   bg: 'var(--amber-muted)',         labelColor: 'var(--amber)' },
   note:    { icon: '📝', label: 'Note',            border: 'var(--text-2)',  bg: 'var(--surface-2)',           labelColor: 'var(--text-2)' },
+  objectives: { icon: '🎯', label: 'Objectives', border: 'var(--indigo)', bg: 'var(--indigo-muted)', labelColor: 'var(--indigo)' },
   reading: { icon: '📚', label: 'Further reading', border: 'var(--indigo)',  bg: 'var(--indigo-muted)',        labelColor: 'var(--indigo)' },
   alert:   { icon: '🚨', label: 'Alert',           border: 'var(--danger)',  bg: 'var(--danger-bg, #fee2e2)', labelColor: 'var(--danger)' },
 }
