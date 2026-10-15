@@ -15,10 +15,7 @@ import {
 } from './editor/nodes'
 import type { LintDiagnostic } from './editor/nodes'
 import { Toolbar } from './editor/Toolbar'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
@@ -142,7 +139,7 @@ export default function TipTapEditor({
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
-    StarterKit.configure({ codeBlock: false }),
+    StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
     NoInputRules,
     Image.configure({ inline: false, allowBase64: false }),
     CalloutNode,
@@ -160,6 +157,9 @@ export default function TipTapEditor({
 
   // ── Editor ─────────────────────────────────────────────────────────────────
   const editor = useEditor({
+    immediatelyRender: false,
+    // Toolbar state follows cursor/selection changes as it did in Tiptap 2.
+    shouldRerenderOnTransaction: true,
     extensions,
     content: content ?? '',
     editable,
@@ -283,7 +283,7 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor || !hasPythonLint) return
     const update = () => {
-      const storage = (editor.extensionStorage as Record<string, unknown>).pythonLint as { diagnostics: LintDiagnostic[] } | undefined
+      const storage = (editor.extensionStorage as unknown as Record<string, unknown>).pythonLint as { diagnostics: LintDiagnostic[] } | undefined
       setLintDiagnostics(storage?.diagnostics ?? [])
     }
     editor.on('update', update)

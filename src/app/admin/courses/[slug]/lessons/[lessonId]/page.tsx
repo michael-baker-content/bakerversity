@@ -59,6 +59,7 @@ export default function EditLessonPage() {
   const [isPublished, setIsPublished] = useState(false)
   const [editorKey, setEditorKey] = useState(0)
   const [saveAction, setSaveAction] = useState('draft')
+  const [hasSaved, setHasSaved] = useState(false)
   const [resources, setResources] = useState<ResourceSelection[]>([])
   const [metadata, setMetadata] = useState(() => itemMetadata({}, 'lesson'))
   const [slidesUrl, setSlidesUrl] = useState('')
@@ -80,7 +81,7 @@ export default function EditLessonPage() {
   useEffect(() => {
     const controller = new AbortController()
     const signal = controller.signal
-    setLoading(true); setReady(false); setLoadError(''); setError('')
+    setLoading(true); setReady(false); setLoadError(''); setError(''); setHasSaved(false)
     async function load() {
       try {
         const courseRef = await requestJson<{ id: string }>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`, { signal })
@@ -136,6 +137,7 @@ export default function EditLessonPage() {
       slides_meta: (slidesTitle || slidesDescription) ? { title: slidesTitle || undefined, filename: slidesUrl ? slidesUrl.split('/').pop() : undefined, description: slidesDescription || undefined } : null,
     })
     if (saved) {
+      setHasSaved(true)
       if (action !== 'draft') setIsPublished(action === 'publish')
       setSaveAction('draft')
     }
@@ -329,13 +331,21 @@ export default function EditLessonPage() {
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: 8, paddingTop: '0.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: '0.5rem' }}>
           <button type="submit" disabled={!session.canSave || deleting || slidesUploading || !title.trim() || !courseId} className="btn btn-primary">
             {saving ? 'Saving…' : saveAction === 'publish' ? 'Publish changes' : saveAction === 'unpublish' ? 'Save and unpublish' : 'Save draft'}
           </button>
-          <Link href={`/admin/courses/${slug}`}>
-            <button type="button" className="btn btn-ghost">Cancel</button>
-          </Link>
+          {hasSaved && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={session.needsProtection || slidesUploading || deleting}
+              onClick={() => router.push(`/admin/courses/${slug}`)}
+            >
+              Back to course overview
+            </button>
+          )}
+          <Link href={`/admin/courses/${slug}`} className="btn btn-ghost">Cancel</Link>
         </div>
       </form>
 
