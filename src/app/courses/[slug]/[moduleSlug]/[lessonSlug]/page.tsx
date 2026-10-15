@@ -1,3 +1,4 @@
+import LessonAssets from '@/components/LessonAssets'
 import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
@@ -38,15 +39,17 @@ export default async function LessonViewerPage({
     dbUser = data
   }
 
-  const isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
+  let isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
 
   // Load course
-  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug).is('archived_at', null)
   const { data: course } = await (isInstructor
     ? courseQuery
     : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
+  isInstructor = dbUser?.role === 'admin' || (dbUser?.role === 'instructor' && course.instructor_id === dbUser.id)
+  if (!isInstructor && !course.is_published) notFound()
 
   // Auth gate: unauthenticated visitors can only proceed on public free courses
   if (!dbUser) {
@@ -73,14 +76,14 @@ export default async function LessonViewerPage({
   let lesson: Lesson | null = null
 
   if (module_) {
-    const q = serviceSupabase.from('lessons').select('*')
+    const q = serviceSupabase.from('lessons').select('*').is('archived_at', null)
       .eq('slug', lessonSlug).eq('module_id', module_.id)
     const { data } = await (isInstructor ? q : q.eq('is_published', true)).single<Lesson>()
     lesson = data
   }
 
   if (!lesson) {
-    const q = serviceSupabase.from('lessons').select('*')
+    const q = serviceSupabase.from('lessons').select('*').is('archived_at', null)
       .eq('slug', lessonSlug).eq('course_id', course.id)
     const { data } = await (isInstructor ? q : q.eq('is_published', true)).single<Lesson>()
     lesson = data
@@ -100,7 +103,7 @@ export default async function LessonViewerPage({
   // Load sidebar/sequence data — always published-only
   const [lessonsRes, modulesRes, pagesRes, assessmentsRes] = await Promise.all([
     serviceSupabase.from('lessons')
-      .select('id, slug, title, position, module_id')
+      .select('id, slug, title, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
     serviceSupabase.from('modules')
@@ -108,10 +111,10 @@ export default async function LessonViewerPage({
       .eq('course_id', course.id).order('position', { ascending: true })
       .returns<Module[]>(),
     serviceSupabase.from('course_pages')
-      .select('id, slug, title, page_type, module_id, position')
+      .select('id, slug, title, page_type, module_id, position, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
     serviceSupabase.from('assessments')
-      .select('id, slug, title, assessment_type, position, module_id')
+      .select('id, slug, title, assessment_type, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
   ])
 
@@ -212,6 +215,7 @@ export default async function LessonViewerPage({
               }
             </div>
 
+            <LessonAssets itemId={lesson.id} />
             {/* Progress tracking — authenticated users get the button; guests get a sign-in nudge */}
             <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
               {dbUser ? (

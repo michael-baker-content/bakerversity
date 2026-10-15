@@ -27,10 +27,11 @@ export default function CoursePageReadToggle({
     const res = await fetch('/api/course-pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageId }),
+      body: JSON.stringify({ pageId, read: !read }),
     })
     const data = await res.json()
-    setRead(data.read)
+    if (res.ok) setRead(data.read)
+    else alert(data.error ?? 'Unable to save read status')
     setSaving(false)
   }
 

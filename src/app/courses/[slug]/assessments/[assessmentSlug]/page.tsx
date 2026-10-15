@@ -1,3 +1,4 @@
+import LessonAssets from '@/components/LessonAssets'
 import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
@@ -35,7 +36,7 @@ export async function generateMetadata({
 }) {
   const { assessmentSlug } = await params
   const supabase = createServiceClient()
-  const { data } = await supabase.from('assessments').select('title').eq('slug', assessmentSlug).single()
+  const { data } = await supabase.from('assessments').select('title').is('archived_at', null).eq('slug', assessmentSlug).single()
   return { title: data?.title ?? 'Assessment' }
 }
 
@@ -59,14 +60,16 @@ export default async function AssessmentPage({
     .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
   if (!dbUser) redirect('/sign-in')
 
-  const isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
+  let isInstructor = dbUser.role === 'instructor' || dbUser.role === 'admin'
 
-  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug).is('archived_at', null)
   const { data: course } = await (isInstructor
     ? courseQuery
     : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
+  isInstructor = dbUser?.role === 'admin' || (dbUser?.role === 'instructor' && course.instructor_id === dbUser.id)
+  if (!isInstructor && !course.is_published) notFound()
 
   // Enrollment check for paid courses
   if (!isInstructor && course.price_cents > 0) {
@@ -77,7 +80,7 @@ export default async function AssessmentPage({
 
   const assessmentQuery = serviceSupabase
     .from('assessments')
-    .select('id, title, slug, assessment_type, is_graded, passing_score, intro_content, module_id, position, is_published')
+    .select('id, title, slug, assessment_type, is_graded, passing_score, intro_content, module_id, position, is_published, placement, is_required, estimated_minutes').is('archived_at', null)
     .eq('course_id', course.id)
     .eq('slug', assessmentSlug)
   const { data: assessment } = await (isInstructor
@@ -96,7 +99,7 @@ export default async function AssessmentPage({
   // Sidebar/sequence data — always published-only
   const [lessonsRes, modulesRes, pagesRes, allAssessmentsRes] = await Promise.all([
     serviceSupabase.from('lessons')
-      .select('id, slug, title, position, module_id')
+      .select('id, slug, title, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
     serviceSupabase.from('modules')
@@ -104,17 +107,17 @@ export default async function AssessmentPage({
       .eq('course_id', course.id).order('position', { ascending: true })
       .returns<Module[]>(),
     serviceSupabase.from('course_pages')
-      .select('id, slug, title, page_type, module_id, position')
+      .select('id, slug, title, page_type, module_id, position, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
     serviceSupabase.from('assessments')
-      .select('id, slug, title, assessment_type, position, module_id')
+      .select('id, slug, title, assessment_type, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
   ])
 
   const allLessons = lessonsRes.data ?? []
   const modules = modulesRes.data ?? []
   const coursePages = (pagesRes.data ?? []) as CoursePage[]
-  const allAssessments = (allAssessmentsRes.data ?? []) as Assessment[]
+  const allAssessments = (allAssessmentsRes.data ?? []) as import('@/lib/courseSequence').SeqAssessment[]
 
   const sequence = buildCourseSequence({
     modules, lessons: allLessons, assessments: allAssessments, pages: coursePages,
@@ -155,6 +158,7 @@ export default async function AssessmentPage({
               questions={(questions ?? []) as Question[]}
             />
 
+            <LessonAssets itemId={assessment.id} />
             {/* Prev / Next */}
             <div style={{
               display: 'flex', justifyContent: 'space-between',

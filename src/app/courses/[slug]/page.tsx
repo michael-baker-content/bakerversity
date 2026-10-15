@@ -1,10 +1,11 @@
-import { createServerClient, createServiceClient } from '@/lib/supabase'
+import CourseOutline from '@/components/CourseOutline'
+import { buildCourseSequence, sequenceItemHref } from '@/lib/courseSequence'
+import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Course, Lesson, User } from '@/lib/types'
 import SiteNav from '@/components/SiteNav'
-import ContentRow from '@/components/ContentRow'
 
 interface CoursePage {
   id: string
@@ -19,6 +20,7 @@ interface Module {
   id: string
   title: string
   position: number
+  slug: string | null
 }
 
 interface Assessment {
@@ -31,35 +33,10 @@ interface Assessment {
   module_id: string | null
 }
 
-const PAGE_TYPE_LABELS: Record<string, string> = {
-  overview: 'Overview', introduction: 'Introduction', syllabus: 'Syllabus',
-  requirements: 'Requirements', resources: 'Resources', conclusion: 'Conclusion', custom: 'Page',
-}
-
-const PAGE_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
-  overview:      { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  introduction:  { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
-  syllabus:      { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
-  requirements:  { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
-  resources:     { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  conclusion:    { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
-  custom:        { bg: 'var(--surface-2)',    color: 'var(--text-2)' },
-}
-
-const ASSESSMENT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
-  quiz:     { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
-  exam:     { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
-  practice: { bg: 'var(--surface-2)',    color: 'var(--text-3)' },
-}
-
-const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
-  quiz: 'Quiz', exam: 'Exam', practice: 'Practice',
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const supabase = createServerClient()
-  const { data: course } = await supabase.from('courses').select('title, description').eq('slug', slug).single()
+  const supabase = createServiceClient()
+  const { data: course } = await supabase.from('courses').select('title, description').eq('slug', slug).eq('is_published', true).single()
   return { title: course?.title ?? 'Course', description: course?.description }
 }
 
@@ -69,7 +46,7 @@ export default async function CourseDetailPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
   const clerkUser = await currentUser()
 
   const { data: course } = await supabase
@@ -78,20 +55,20 @@ export default async function CourseDetailPage({
 
   const [lessonsRes, pagesRes, modulesRes, assessmentsRes] = await Promise.all([
     supabase.from('lessons')
-      .select('id, slug, title, position, is_published, module_id')
+      .select('id, slug, title, position, is_published, module_id, placement, is_required, estimated_minutes')
       .eq('course_id', course.id).eq('is_published', true)
       .order('position', { ascending: true })
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'is_published' | 'module_id'>[]>(),
     supabase.from('course_pages')
-      .select('id, slug, title, page_type, position, module_id')
+      .select('id, slug, title, page_type, position, module_id, placement, is_required, estimated_minutes')
       .eq('course_id', course.id).eq('is_published', true)
       .order('position', { ascending: true }),
     supabase.from('modules')
-      .select('id, title, position')
+      .select('id, title, position, slug')
       .eq('course_id', course.id).order('position', { ascending: true })
       .returns<Module[]>(),
     supabase.from('assessments')
-      .select('id, slug, title, assessment_type, is_graded, position, module_id')
+      .select('id, slug, title, assessment_type, is_graded, position, module_id, placement, is_required, estimated_minutes')
       .eq('course_id', course.id).eq('is_published', true)
       .order('position', { ascending: true }),
   ])
@@ -118,80 +95,8 @@ export default async function CourseDetailPage({
   const isFree = course.price_cents === 0
   const canAccess = isEnrolled || isFree
 
-  const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
-  const courseLevelPages = coursePages.filter((p) => !p.module_id)
-  const beforePages = courseLevelPages.filter((p) => beforeTypes.includes(p.page_type))
-  const afterPages = courseLevelPages.filter((p) => !beforeTypes.includes(p.page_type))
-
-  // Build module groups with interleaved lessons + assessments sorted by position
-  type SequenceItem =
-    | { kind: 'lesson'; item: typeof lessons[0] }
-    | { kind: 'assessment'; item: Assessment }
-
-  const moduleGroups = modules.map((m) => {
-    const modLessons = lessons.filter((l) => l.module_id === m.id)
-    const modAssessments = assessments.filter((a) => a.module_id === m.id)
-    const sequence: SequenceItem[] = [
-      ...modLessons.map((l): SequenceItem => ({ kind: 'lesson', item: l })),
-      ...modAssessments.map((a): SequenceItem => ({ kind: 'assessment', item: a })),
-    ].sort((a, b) => a.item.position - b.item.position)
-    return { module: m, sequence }
-  }).filter((g) => g.sequence.length > 0)
-
-  const unassignedLessons = lessons.filter((l) => !l.module_id)
-
-  // Total item count for the header
-  const totalItems = lessons.length + assessments.length
-
-  // First content for "Start learning" button
-  const firstHref = (() => {
-    if (beforePages[0]) {
-      const p = beforePages[0]
-      return p.slug ? `/courses/${slug}/pages/${p.slug}` : `/courses/${slug}/pages/${p.id}`
-    }
-    // First item in module sequence
-    for (const { sequence } of moduleGroups) {
-      if (sequence.length > 0) {
-        const first = sequence[0]
-        if (first.kind === 'lesson') {
-          return first.item.slug
-            ? `/courses/${slug}/lessons/${first.item.slug}`
-            : `/courses/${slug}/lessons/${first.item.id}`
-        } else {
-          return first.item.slug
-            ? `/courses/${slug}/assessments/${first.item.slug}`
-            : null
-        }
-      }
-    }
-    if (unassignedLessons[0]) {
-      const l = unassignedLessons[0]
-      return l.slug ? `/courses/${slug}/lessons/${l.slug}` : `/courses/${slug}/lessons/${l.id}`
-    }
-    return null
-  })()
-
-  const lessonHref = (l: typeof lessons[0]) =>
-    l.slug ? `/courses/${slug}/lessons/${l.slug}` : `/courses/${slug}/lessons/${l.id}`
-  const pageHref = (p: CoursePage) =>
-    p.slug ? `/courses/${slug}/pages/${p.slug}` : `/courses/${slug}/pages/${p.id}`
-  const assessmentHref = (a: Assessment) =>
-    a.slug ? `/courses/${slug}/assessments/${a.slug}` : null
-
-  const sectionHeader: React.CSSProperties = {
-    fontSize: 11, fontWeight: 700, color: 'var(--text-3)',
-    textTransform: 'uppercase', letterSpacing: '0.07em',
-    padding: '14px 0 6px', borderTop: '1px solid var(--border)',
-    marginTop: 4,
-  }
-  const moduleHeader: React.CSSProperties = {
-    fontSize: 11, fontWeight: 600, color: 'var(--text-3)',
-    textTransform: 'uppercase', letterSpacing: '0.05em',
-    padding: '10px 0 5px', borderTop: '1px solid var(--border)',
-    marginTop: 2, paddingLeft: 4,
-  }
-
-  let itemCounter = 0
+  const first = buildCourseSequence({ modules, lessons, pages: coursePages, assessments })[0]
+  const firstHref = first ? sequenceItemHref(slug, first) : null
 
   return (
     <>
@@ -271,96 +176,7 @@ export default async function CourseDetailPage({
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {/* Before pages */}
-          {beforePages.length > 0 && (
-            <>
-              <div style={sectionHeader}>Introduction</div>
-              {beforePages.map((page) => (
-                <ContentRow
-                  key={page.id}
-                  href={canAccess ? pageHref(page) : undefined}
-                  locked={!canAccess}
-                  label={PAGE_TYPE_LABELS[page.page_type]}
-                  labelColors={PAGE_TYPE_COLORS[page.page_type]}
-                  title={page.title}
-                />
-              ))}
-            </>
-          )}
-
-          {/* Module groups — interleaved lessons and assessments */}
-          {(unassignedLessons.length > 0 || moduleGroups.length > 0) && (
-            <div style={sectionHeader}>Modules</div>
-          )}
-
-          {unassignedLessons.map((lesson) => {
-            itemCounter++
-            return (
-              <ContentRow
-                key={lesson.id}
-                href={canAccess ? lessonHref(lesson) : undefined}
-                locked={!canAccess}
-                label={`Lesson ${itemCounter}`}
-                labelColors={{ bg: 'var(--surface-2)', color: 'var(--text-3)' }}
-                title={lesson.title}
-              />
-            )
-          })}
-
-          {moduleGroups.map(({ module, sequence }) => (
-            <div key={module.id}>
-              <div style={moduleHeader}>{module.title}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {sequence.map((entry) => {
-                  if (entry.kind === 'lesson') {
-                    itemCounter++
-                    return (
-                      <ContentRow
-                        key={entry.item.id}
-                        href={canAccess ? lessonHref(entry.item) : undefined}
-                        locked={!canAccess}
-                        label={`Lesson ${itemCounter}`}
-                        labelColors={{ bg: 'var(--surface-2)', color: 'var(--text-3)' }}
-                        title={entry.item.title}
-                      />
-                    )
-                  }
-                  // Assessment
-                  const a = entry.item
-                  const href = assessmentHref(a)
-                  return (
-                    <ContentRow
-                      key={a.id}
-                      href={canAccess && href ? href : undefined}
-                      locked={!canAccess || !href}
-                      label={ASSESSMENT_TYPE_LABELS[a.assessment_type]}
-                      labelColors={ASSESSMENT_TYPE_COLORS[a.assessment_type]}
-                      title={a.title}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-
-          {/* After pages */}
-          {afterPages.length > 0 && (
-            <>
-              <div style={{ ...sectionHeader, marginTop: 8 }}>Conclusion</div>
-              {afterPages.map((page) => (
-                <ContentRow
-                  key={page.id}
-                  href={canAccess ? pageHref(page) : undefined}
-                  locked={!canAccess}
-                  label={PAGE_TYPE_LABELS[page.page_type]}
-                  labelColors={PAGE_TYPE_COLORS[page.page_type]}
-                  title={page.title}
-                />
-              ))}
-            </>
-          )}
-        </div>
+        <CourseOutline courseSlug={slug} modules={modules} lessons={lessons} pages={coursePages} assessments={assessments} canAccess={canAccess} />
       </main>
     </>
   )

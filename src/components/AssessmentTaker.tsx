@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import LessonRenderer from '@/components/LessonRenderer'
 
@@ -28,7 +28,7 @@ interface QuestionResult {
 }
 
 interface SubmitResponse {
-  score: number
+  score: number | null
   passed: boolean
   passing_score: number
   assessment_type: string
@@ -100,6 +100,7 @@ export default function AssessmentTaker({
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<SubmitResponse | null>(null)
   const [error, setError] = useState('')
+  const submission = useRef<{ payload: string; id: string } | null>(null)
 
   const setAnswer = (questionId: string, value: string) =>
     setAnswers((a) => ({ ...a, [questionId]: value }))
@@ -112,10 +113,12 @@ export default function AssessmentTaker({
     setSubmitting(true)
     setError('')
 
+    const payload = JSON.stringify(answers)
+    if (!submission.current || submission.current.payload !== payload) submission.current = { payload, id: crypto.randomUUID() }
     const res = await fetch(`/api/students/assessments/${assessmentId}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, request_id: submission.current.id }),
     })
 
     if (!res.ok) {
@@ -135,6 +138,7 @@ export default function AssessmentTaker({
   }
 
   const handleRetake = () => {
+    submission.current = null
     setResult(null)
     setAnswers({})
     setError('')

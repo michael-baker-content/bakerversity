@@ -1,5 +1,5 @@
 // ============================================================
-// Database types — mirrors the Supabase schema exactly.
+// UI/domain shapes. Database queries use generated database.types.ts.
 // Use these throughout the app instead of writing inline types.
 // ============================================================
 
@@ -92,7 +92,7 @@ export type QuestionType =
   | 'multiple_choice'
   | 'true_false'
   | 'short_answer'   // auto-graded exact-match (case/whitespace normalised)
-  | 'text_response'  // instructor-graded free response
+  | 'text_response'  // ungraded reflection with optional feedback
 
 export interface AssessmentQuestion {
   id: string
@@ -101,9 +101,9 @@ export interface AssessmentQuestion {
   // Rich TipTap JSON body for the question (preferred).
   // question_text is the legacy plain-text field kept for backward compat.
   content: Record<string, unknown> | null
-  question_text: string              // legacy — kept until full migration
+  question_text: string | null       // legacy — kept until full migration
   options: string[] | null           // choices for multiple_choice
-  correct_answer: string             // index string or 'true'/'false' or exact match
+  correct_answer: string | null      // index string or 'true'/'false' or exact match
   // short_answer only: all accepted answers after normalisation.
   // At least one entry required for short_answer questions.
   // Values are stored normalised (trimmed, lowercased) at write time.

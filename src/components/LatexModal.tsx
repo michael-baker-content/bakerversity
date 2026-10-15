@@ -150,7 +150,7 @@ export default function LatexModal({
           flexShrink: 0,
         }}>
           <h3 style={{ margin: 0, fontSize: '1rem' }}>Insert formula</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', lineHeight: 1 }}>×</button>
         </div>
 
         {/* Category tabs */}

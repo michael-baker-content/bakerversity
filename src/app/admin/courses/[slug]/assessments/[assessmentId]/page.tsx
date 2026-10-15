@@ -3,6 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
+import AssetLibrary from '@/components/AssetLibrary'
+import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
+import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
 import type { AssessmentType } from '@/lib/types'
 import { LatexInput } from '@/components/editor/NodeViews'
@@ -425,7 +429,7 @@ function QuestionRow({
       payload.accepted_answers = form.accepted_answers.filter((a) => a.trim())
     }
 
-    await fetch(
+    const response = await fetch(
       `/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`,
       {
         method: 'PATCH',
@@ -434,16 +438,18 @@ function QuestionRow({
       }
     )
     setSaving(false)
+    if (!response.ok) { alert((await response.json()).error ?? 'Unable to save question'); return }
     setEditing(false)
     onUpdated()
   }
 
   const handleDelete = async () => {
     if (!confirm('Delete this question? This cannot be undone.')) return
-    await fetch(
+    const response = await fetch(
       `/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`,
       { method: 'DELETE' }
     )
+    if (!response.ok) { alert((await response.json()).error ?? 'Unable to delete question'); return }
     onDeleted()
   }
 
@@ -552,6 +558,11 @@ export default function EditAssessmentPage() {
   const [passingScore, setPassingScore] = useState(70)
   const [isGraded, setIsGraded] = useState(true)
   const [isPublished, setIsPublished] = useState(false)
+  const [editorKey, setEditorKey] = useState(0)
+  const [version, setVersion] = useState(1)
+  const [saveAction, setSaveAction] = useState('draft')
+  const [resources, setResources] = useState<ResourceSelection[]>([])
+  const [metadata, setMetadata] = useState(() => itemMetadata({}, 'assessment'))
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [introContent, setIntroContent] = useState<Record<string, unknown>>(emptyDoc())
   const [ready, setReady] = useState(false)
@@ -580,6 +591,9 @@ export default function EditAssessmentPage() {
 
         setAssessment(assessmentRes)
         setTitle(assessmentRes.title ?? '')
+        setVersion(assessmentRes.version)
+        setResources(resourceSelection(assessmentRes.resources ?? []))
+        setMetadata(itemMetadata(assessmentRes, 'assessment'))
         setAssessmentType(assessmentRes.assessment_type ?? 'quiz')
         setPassingScore(assessmentRes.passing_score ?? 70)
         setIsGraded(assessmentRes.is_graded ?? true)
@@ -610,7 +624,7 @@ export default function EditAssessmentPage() {
         is_graded: isGraded,
         passing_score: passingScore,
         intro_content: docIsEmpty(introContent) ? null : introContent,
-        is_published: isPublished,
+        version, action: saveAction, resources, ...metadata,
       }),
     })
 
@@ -643,24 +657,23 @@ export default function EditAssessmentPage() {
       payload.accepted_answers = form.accepted_answers.filter((a) => a.trim())
     }
 
-    const res = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Unable to add question')
       setAddingQuestion(false)
       await loadQuestions(courseId)
-    }
-    setSavingQuestion(false)
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to add question. Your form is still here.') }
+    finally { setSavingQuestion(false) }
   }
 
   const handleDelete = async () => {
     if (!courseId) return
-    if (!confirm(`Delete "${title}"? This will also delete all its questions and cannot be undone.`)) return
+    if (!confirm(`Archive "${title}"? Its questions, history and learning records will be preserved.`)) return
     setDeleting(true)
-    await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}`, { method: 'DELETE' })
+    const deletion = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}`, { method: 'DELETE' })
+    if (!deletion.ok) { setError((await deletion.json()).error ?? 'Unable to archive'); setDeleting(false); return }
     router.push(`/admin/courses/${courseSlug}`)
   }
 
@@ -691,6 +704,7 @@ export default function EditAssessmentPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>Edit {typeLabel.toLowerCase()}</h1>
 
+      <p>To edit questions, first save and unpublish this assessment. Saved attempts retain the original questions. Revision history below covers assessment settings and introduction.</p>
       <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         <div>
@@ -757,10 +771,11 @@ export default function EditAssessmentPage() {
           )}
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-          <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} />
-          Published (visible to enrolled students)
-        </label>
+        {assessmentId && <RevisionHistory itemId={assessmentId} onRestore={v => { setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroContent((v.intro_content ?? {}) as Record<string, unknown>); setAssessmentType(v.assessment_type as AssessmentType); setIsGraded(Boolean(v.is_graded)); setPassingScore(Number(v.passing_score ?? 70)); setModuleId(v.module_id as string | null); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'assessment')); setSaveAction('draft'); }} />}
+        {assessmentId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
+        <ItemMetadataFields value={metadata} onChange={setMetadata} />
+        <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
+        <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 

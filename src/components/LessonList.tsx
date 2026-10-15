@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { lessonHref, buildModuleSlugMap } from '@/lib/lessonUrl'
@@ -25,119 +25,6 @@ interface LessonListProps {
   modules: Module[]
   courseId: string
   courseSlug: string
-}
-
-function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
-  lessonId: string
-  currentModuleId: string | null
-  modules: Module[]
-  onAssign: (lessonId: string, moduleId: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
-  const [dropLeft, setDropLeft] = useState(0)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const current = modules.find((m) => m.id === currentModuleId)
-
-  const handleOpen = () => {
-    if (!btnRef.current) { setOpen((o) => !o); return }
-    const rect = btnRef.current.getBoundingClientRect()
-    const dropdownHeight = (modules.length + 1) * 41 // approx height per option
-    const spaceBelow = window.innerHeight - rect.bottom
-    const spaceAbove = rect.top
-    setDropUp(spaceBelow < dropdownHeight && spaceAbove > spaceBelow)
-
-    // Constrain left edge so dropdown doesn't overflow viewport
-    const maxLeft = window.innerWidth - 260 - 8 // 260 = maxWidth, 8 = margin
-    setDropLeft(Math.min(rect.left, maxLeft))
-    setOpen((o) => !o)
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <button
-        ref={btnRef}
-        onClick={handleOpen}
-        className="module-dropdown-btn"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '4px 8px',
-          fontSize: 11,
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          background: 'var(--surface)',
-          cursor: 'pointer',
-          color: 'var(--text-2)',
-        }}
-        title="Assign to module"
-      >
-        <span style={{
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          textAlign: 'left',
-        }}>
-          {current?.title ?? 'No module'}
-        </span>
-        <span style={{ flexShrink: 0, fontSize: 9, opacity: 0.5 }}>▼</span>
-      </button>
-
-      {open && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 49 }}
-            onClick={() => setOpen(false)}
-          />
-          <div style={{
-            position: 'fixed',
-            top: dropUp ? undefined : (btnRef.current?.getBoundingClientRect().bottom ?? 0) + 2,
-            bottom: dropUp ? window.innerHeight - (btnRef.current?.getBoundingClientRect().top ?? 0) + 2 : undefined,
-            left: dropLeft,
-            zIndex: 50,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            minWidth: 180,
-            maxWidth: Math.min(260, window.innerWidth - 16),
-            maxHeight: Math.min(320, window.innerHeight - 32),
-            overflowY: 'auto',
-          }}>
-            {[{ id: 'none', title: 'No module' }, ...modules].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { onAssign(lessonId, m.id); setOpen(false) }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '8px 12px',
-                  fontSize: 13,
-                  background: m.id === (currentModuleId ?? 'none') ? 'var(--surface-2)' : 'var(--surface)',
-                  border: 'none',
-                  borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  whiteSpace: 'normal',
-                  lineHeight: 1.4,
-                  color: 'var(--text)',
-                }}
-              >
-                {m.title}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    <style>{`
-      @media (max-width: 540px) {
-        .lessonlist-meta { display: none !important; }
-      }
-    `}</style>
-    </div>
-  )
 }
 
 export default function LessonList({ lessons: initialLessons, modules, courseId, courseSlug }: LessonListProps) {
@@ -169,19 +56,6 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
     })
 
     setMoving(null)
-    router.refresh()
-  }
-
-  const assignModule = async (lessonId: string, moduleId: string) => {
-    await fetch(`/api/admin/courses/${courseId}/lessons/${lessonId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ module_id: moduleId === 'none' ? null : moduleId }),
-    })
-    setLessons((ls) => ls.map((l) => l.id === lessonId
-      ? { ...l, module_id: moduleId === 'none' ? null : moduleId }
-      : l
-    ))
     router.refresh()
   }
 
@@ -238,14 +112,7 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
 
           {/* Bottom row: module dropdown + edit + preview — wraps naturally at narrow widths */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', alignItems: 'center', paddingLeft: 28 }}>
-            {modules.length > 0 && (
-              <ModuleDropdown
-                lessonId={lesson.id}
-                currentModuleId={lesson.module_id}
-                modules={modules}
-                onAssign={assignModule}
-              />
-            )}
+            <span style={{ fontSize: 12 }}>{modules.find(m => m.id === lesson.module_id)?.title ?? 'No module'}</span>
             <Link href={`/admin/courses/${courseSlug}/lessons/${lesson.slug ?? lesson.id}`}>
               <button className="btn btn-ghost btn-sm">Edit</button>
             </Link>

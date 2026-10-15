@@ -33,7 +33,9 @@ function ToolbarButton({ onClick, active, children }: {
   return (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); onClick() }}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      aria-pressed={active}
       style={{
         padding: '3px 8px', fontSize: 12,
         fontWeight: active ? 600 : 400,
@@ -89,7 +91,7 @@ export function Toolbar({
               minWidth: 170, marginTop: 4, overflow: 'hidden',
             }}>
               {CALLOUT_TYPES.map((t) => (
-                <button
+                <button type="button"
                   key={t.value}
                   onClick={() => {
                     editor.chain().focus().insertContent({
@@ -236,8 +238,8 @@ export function Toolbar({
               <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>Enter terminal output exactly as it should appear.</p>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowTerminalModal(false)} className="btn btn-ghost btn-sm">Cancel</button>
-              <button onClick={() => onInsertTerminal(terminalContent)} className="btn btn-primary btn-sm">Insert</button>
+              <button type="button" onClick={() => setShowTerminalModal(false)} className="btn btn-ghost btn-sm">Cancel</button>
+              <button type="button" onClick={() => onInsertTerminal(terminalContent)} className="btn btn-primary btn-sm">Insert</button>
             </div>
           </div>
         </div>

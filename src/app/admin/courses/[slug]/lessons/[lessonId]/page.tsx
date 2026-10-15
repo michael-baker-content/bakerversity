@@ -1,10 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
+import AssetLibrary from '@/components/AssetLibrary'
+import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
+import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
-import QuizEditor from '@/components/QuizEditor'
+import { requestJson } from '@/lib/authoring/request'
+import { useAuthoringSession } from '@/lib/authoring/useAuthoringSession'
+import { useUnsavedChanges, discardMessage } from '@/lib/authoring/useUnsavedChanges'
 import MarkdownImport from '@/components/MarkdownImport'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
 
@@ -12,7 +18,16 @@ const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: f
 const MafsGraphEditor = dynamic(() => import('@/components/MafsGraphEditor'), { ssr: false })
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
-const INTRO_TYPES = ['introduction', 'conclusion']
+type LessonData = {
+  title: string; slug: string | null; introduction: string | null; content: Record<string, unknown> | null;
+  module_id: string | null; slides_url: string | null; slides_meta: { title?: string; description?: string } | null;
+  resources?: ResourceSelection[]; version: number; is_published: boolean; is_required?: boolean; estimated_minutes?: number | null; activity_type?: string; placement?: string;
+}
+function lessonValues(lesson: LessonData) {
+  return { title: lesson.title ?? '', lessonSlug: lesson.slug ?? '', introduction: lesson.introduction ?? '',
+    content: lesson.content ?? {}, moduleId: lesson.module_id ?? null, metadata: itemMetadata(lesson, 'lesson'),
+    slidesUrl: lesson.slides_url ?? '', slidesTitle: lesson.slides_meta?.title ?? '', slidesDescription: lesson.slides_meta?.description ?? '', resources: resourceSelection(lesson.resources ?? []) }
+}
 
 export default function EditLessonPage() {
   const router = useRouter()
@@ -36,13 +51,16 @@ export default function EditLessonPage() {
   const exportRef = useRef<((format: 'html' | 'markdown' | 'txt') => void) | null>(null)
   const [showGraphEditor, setShowGraphEditor] = useState(false)
   const [showLatexModal, setShowLatexModal] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
   const [lessonSlug, setLessonSlug] = useState('')
   const [introduction, setIntroduction] = useState('')
   const [content, setContent] = useState<Record<string, unknown>>({})
   const [isPublished, setIsPublished] = useState(false)
+  const [editorKey, setEditorKey] = useState(0)
+  const [saveAction, setSaveAction] = useState('draft')
+  const [resources, setResources] = useState<ResourceSelection[]>([])
+  const [metadata, setMetadata] = useState(() => itemMetadata({}, 'lesson'))
   const [slidesUrl, setSlidesUrl] = useState('')
   const [slidesType, setSlidesType] = useState<'pdf' | 'google-slides' | 'none'>('none')
   const [slidesTitle, setSlidesTitle] = useState('')
@@ -51,92 +69,87 @@ export default function EditLessonPage() {
   const [slidesError, setSlidesError] = useState('')
   const slidesFileRef = useRef<HTMLInputElement>(null)
 
+  const [loadError, setLoadError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const snapshot = JSON.stringify({ title, lessonSlug, introduction, content, moduleId, metadata, slidesUrl, slidesTitle, slidesDescription, resources })
+  const session = useAuthoringSession(snapshot, `${slug}/${lessonParam}`)
+  const { initialize } = session
+  const saving = session.state.status === 'saving'
+  useUnsavedChanges(ready && (session.needsProtection || slidesUploading))
+
   useEffect(() => {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonParam)
+    const controller = new AbortController()
+    const signal = controller.signal
+    setLoading(true); setReady(false); setLoadError(''); setError('')
+    async function load() {
+      try {
+        const courseRef = await requestJson<{ id: string }>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`, { signal })
+        if (!courseRef.id) throw new Error('Course not found.')
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonParam)
+        const lessonRef = isUuid ? { id: lessonParam } : await requestJson<{ id: string }>(`/api/admin/lesson-id-by-slug?courseId=${courseRef.id}&slug=${encodeURIComponent(lessonParam)}`, { signal })
+        if (!lessonRef.id) throw new Error('Lesson not found.')
+        const [lesson, mods, course] = await Promise.all([
+          requestJson<LessonData>(`/api/admin/courses/${courseRef.id}/lessons/${lessonRef.id}`, { signal }),
+          requestJson<{ id: string; title: string }[]>(`/api/admin/courses/${courseRef.id}/modules`, { signal }),
+          requestJson<{ editor_tools: string[] }>(`/api/admin/courses/${courseRef.id}`, { signal }),
+        ])
+        if (signal.aborted) return
+        if (!Number.isInteger(lesson.version) || lesson.version < 1 || typeof lesson.title !== 'string' || !Array.isArray(mods)) throw new Error('The lesson could not be loaded safely. Please retry.')
+        const value = lessonValues(lesson)
+        setCourseId(courseRef.id); setLessonUuid(lessonRef.id)
+        setTitle(value.title); setLessonSlug(value.lessonSlug); setIntroduction(value.introduction); setContent(value.content)
+        setModuleId(value.moduleId); setMetadata(value.metadata); setSlidesUrl(value.slidesUrl)
+        setSlidesTitle(value.slidesTitle); setSlidesDescription(value.slidesDescription); setResources(value.resources)
+        setSlidesType(value.slidesUrl.includes('docs.google.com') ? 'google-slides' : value.slidesUrl ? 'pdf' : 'none')
+        setIsPublished(lesson.is_published); setModules(mods); setEditorTools(Array.isArray(course.editor_tools) ? course.editor_tools : [])
+        initialize(JSON.stringify(value), lesson.version)
+        setSaveAction('draft'); setEditorKey(k => k + 1); setReady(true)
+      } catch (failure) {
+        if (!signal.aborted) setLoadError(failure instanceof Error ? failure.message : 'Unable to load lesson.')
+      } finally { if (!signal.aborted) setLoading(false) }
+    }
+    void load()
+    return () => controller.abort()
+  }, [slug, lessonParam, loadAttempt, initialize])
 
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
-      .then(async (data) => {
-        if (!data.id) return
-        setCourseId(data.id)
+  function reloadLatest() {
+    if (saving || slidesUploading) return
+    if (session.needsProtection && !window.confirm(discardMessage)) return
+    setLoadAttempt(n => n + 1)
+  }
 
-        let resolvedLessonId = lessonParam
-        if (!isUuid) {
-          const res = await fetch(`/api/admin/lesson-id-by-slug?courseId=${data.id}&slug=${encodeURIComponent(lessonParam)}`)
-          const lessonData = await res.json()
-          if (!lessonData.id) return
-          resolvedLessonId = lessonData.id
-          setLessonUuid(resolvedLessonId)
-        } else {
-          setLessonUuid(resolvedLessonId)
-        }
-
-        return Promise.all([
-          fetch(`/api/admin/courses/${data.id}/lessons/${resolvedLessonId}`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}/modules`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}`).then((r) => r.json()),
-        ]).then(([lesson, mods, course]) => {
-            setTitle(lesson.title ?? '')
-            setLessonSlug(lesson.slug ?? '')
-            setIntroduction(lesson.introduction ?? '')
-            setContent(lesson.content ?? {})
-            setIsPublished(lesson.is_published ?? false)
-            setModuleId(lesson.module_id ?? null)
-            setModules(Array.isArray(mods) ? mods : [])
-            setEditorTools(Array.isArray(course.editor_tools) ? course.editor_tools : [])
-            setSlidesTitle(lesson.slides_meta?.title ?? '')
-            setSlidesDescription(lesson.slides_meta?.description ?? '')
-            const url = lesson.slides_url ?? ''
-            setSlidesUrl(url)
-            if (url.includes('docs.google.com')) setSlidesType('google-slides')
-            else if (url) setSlidesType('pdf')
-            else setSlidesType('none')
-            setReady(true)
-          })
-      })
-      .finally(() => setLoading(false))
-  }, [slug, lessonParam])
+  function downloadRecovery() {
+    const blob = new Blob([JSON.stringify({ format: 'bakerversity-lesson-recovery', formatVersion: 1, courseId, lessonId: lessonUuid, basedOnVersion: session.state.version, fields: JSON.parse(snapshot) }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'lesson-recovery.json'; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId || !lessonUuid) return
-    setSaving(true)
+    if (!ready || !courseId || !lessonUuid || slidesUploading || deleting) return
     setError('')
-
-    const res = await fetch(`/api/admin/courses/${courseId}/lessons/${lessonUuid}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        slug: lessonSlug || undefined,
-        introduction: introduction || null,
-        content,
-        is_published: isPublished,
-        module_id: moduleId ?? null,
-        slides_url: slidesUrl || null,
-        slides_meta: (slidesTitle || slidesDescription) ? {
-          title: slidesTitle || undefined,
-          filename: slidesUrl ? slidesUrl.split('/').pop() : undefined,
-          description: slidesDescription || undefined,
-        } : null,
-      }),
+    const action = saveAction
+    const saved = await session.save(`/api/admin/courses/${courseId}/lessons/${lessonUuid}`, {
+      title, slug: lessonSlug || undefined, introduction: introduction || null, content,
+      action, resources, ...metadata, module_id: moduleId ?? null, slides_url: slidesUrl || null,
+      slides_meta: (slidesTitle || slidesDescription) ? { title: slidesTitle || undefined, filename: slidesUrl ? slidesUrl.split('/').pop() : undefined, description: slidesDescription || undefined } : null,
     })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to save lesson')
-      setSaving(false)
-      return
+    if (saved) {
+      if (action !== 'draft') setIsPublished(action === 'publish')
+      setSaveAction('draft')
     }
-    router.push(`/admin/courses/${slug}`)
   }
 
   const handleDelete = async () => {
-    if (!courseId || !lessonUuid) return
-    if (!confirm('Delete this lesson? This cannot be undone.')) return
-    setDeleting(true)
-    await fetch(`/api/admin/courses/${courseId}/lessons/${lessonUuid}`, { method: 'DELETE' })
-    router.push(`/admin/courses/${slug}`)
+    if (!courseId || !lessonUuid || saving || deleting) return
+    if (!confirm('Archive this lesson? Its history will be preserved. Any unsaved editor changes will be discarded.')) return
+    setDeleting(true); setError('')
+    try {
+      await requestJson(`/api/admin/courses/${courseId}/lessons/${lessonUuid}`, { method: 'DELETE' })
+      router.push(`/admin/courses/${slug}`)
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to archive.') }
+    finally { setDeleting(false) }
   }
 
   if (loading) return (
@@ -144,6 +157,8 @@ export default function EditLessonPage() {
       Loading…
     </div>
   )
+
+  if (loadError || !ready) return <main className="page"><h1>Unable to open lesson</h1><p role="alert">{loadError || 'The lesson is not available.'}</p><button type="button" className="btn btn-primary" onClick={() => setLoadAttempt(n => n + 1)}>Retry loading</button> <Link href={`/admin/courses/${slug}`}>Back to course</Link></main>
 
   return (
     <main className="page">
@@ -155,13 +170,15 @@ export default function EditLessonPage() {
         <span style={{ color: 'var(--text-2)' }}>Edit lesson</span>
       </div>
 
-      <h1 style={{ margin: '0 0 2rem' }}>Edit lesson</h1>
+      <h1 style={{ margin: '0 0 1rem' }}>Edit lesson</h1>
+      <p role="status" aria-live="polite">{saving ? 'Saving… You can continue editing.' : session.dirty ? 'You have unsaved changes.' : session.state.status === 'saved' ? 'Changes saved.' : 'No unsaved changes.'}</p>
+      {session.state.message && ['failed', 'conflict', 'uncertain'].includes(session.state.status) && <div role="alert"><p>{session.state.message}</p>{['conflict', 'uncertain'].includes(session.state.status) && <p>Further saves are paused until you reload. The recovery file contains your current fields for reference; automatic import is not available.</p>}<button type="button" className="btn btn-ghost" onClick={downloadRecovery}>Download recovery copy</button> <button type="button" className="btn btn-ghost" onClick={reloadLatest}>Reload latest version</button></div>}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Title */}
         <div>
-          <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
-          <input className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <label htmlFor="lesson-title" style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+          <input id="lesson-title" className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
 
         {/* Slug */}
@@ -216,7 +233,7 @@ export default function EditLessonPage() {
           </div>
           {ready && (
             <TipTapEditor
-              key="lesson-editor"
+              key={editorKey}
               packs={(editorTools as import('@/components/TipTapEditor').EditorPack[])}
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
@@ -268,11 +285,13 @@ export default function EditLessonPage() {
                   if (!file) return
                   setSlidesUploading(true); setSlidesError('')
                   const fd = new FormData(); fd.append('file', file)
-                  const res = await fetch('/api/admin/upload-slides', { method: 'POST', body: fd })
-                  const data = await res.json()
-                  if (!res.ok) setSlidesError(data.error ?? 'Upload failed')
-                  else setSlidesUrl(data.url)
-                  setSlidesUploading(false); e.target.value = ''
+                  const input = e.target
+                  try {
+                    const data = await requestJson<{ url: string }>('/api/admin/upload-slides', { method: 'POST', body: fd })
+                    setSlidesUrl(data.url)
+                  } catch (failure) { setSlidesError(failure instanceof Error ? failure.message : 'Upload failed') }
+                  finally { setSlidesUploading(false); input.value = '' }
+
                 }} />
               {slidesError && <p style={{ fontSize: 12, color: 'var(--danger)', margin: '6px 0 0' }}>{slidesError}</p>}
             </div>
@@ -302,16 +321,17 @@ export default function EditLessonPage() {
         </div>
 
         {/* Published */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-          <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} />
-          Published (visible to enrolled students)
-        </label>
+        {lessonUuid && <RevisionHistory key={session.state.version} itemId={lessonUuid} onRestore={v => { if (saving || (session.needsProtection && !window.confirm('Replace your local edits with this revision? This does not publish it.'))) return; setSlidesType(String(v.slides_url ?? '').includes('docs.google.com') ? 'google-slides' : v.slides_url ? 'pdf' : 'none'); setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setLessonSlug(String(v.slug ?? '')); setModuleId(v.module_id as string | null); setSlidesUrl(String(v.slides_url ?? '')); const sm = v.slides_meta as { title?: string; description?: string } | null; setSlidesTitle(sm?.title ?? ''); setSlidesDescription(sm?.description ?? ''); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'lesson')); setSaveAction('draft'); }} />}
+        {lessonUuid && <AssetLibrary value={resources} onChange={setResources} disabled={!session.canSave || deleting} />}
+        <ItemMetadataFields value={metadata} onChange={setMetadata} />
+        <label>When saving<select className="input" value={saveAction} disabled={saving || deleting} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
+        <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 8, paddingTop: '0.5rem' }}>
-          <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
-            {saving ? 'Saving…' : 'Save lesson'}
+          <button type="submit" disabled={!session.canSave || deleting || slidesUploading || !title.trim() || !courseId} className="btn btn-primary">
+            {saving ? 'Saving…' : saveAction === 'publish' ? 'Publish changes' : saveAction === 'unpublish' ? 'Save and unpublish' : 'Save draft'}
           </button>
           <Link href={`/admin/courses/${slug}`}>
             <button type="button" className="btn btn-ghost">Cancel</button>
@@ -319,23 +339,21 @@ export default function EditLessonPage() {
         </div>
       </form>
 
-      {ready && courseId && lessonUuid && (
-        <QuizEditor courseId={courseId} lessonId={lessonUuid} />
-      )}
+
 
       {/* Delete */}
       <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <h3 style={{ margin: '0 0 0.5rem', fontSize: 15, color: 'var(--danger)' }}>Danger zone</h3>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1rem' }}>
-          Permanently delete this lesson and all its quiz questions.
+          Archive this lesson while preserving its revisions and learning records.
         </p>
         <button
           onClick={handleDelete}
-          disabled={deleting}
+          disabled={deleting || saving || slidesUploading || ['conflict', 'uncertain'].includes(session.state.status)}
           className="btn btn-sm"
           style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
         >
-          {deleting ? 'Deleting…' : 'Delete lesson'}
+          {deleting ? 'Archiving…' : 'Archive lesson'}
         </button>
       </div>
       {/* Latex modal — lives at page level to avoid re-render instability */}

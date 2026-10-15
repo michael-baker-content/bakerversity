@@ -103,7 +103,7 @@ export async function POST(
       title: title.trim(),
       slug,
       assessment_type: type,
-      is_graded: is_graded ?? true,
+      is_graded: type === 'practice' ? false : (is_graded ?? true),
       passing_score: passing_score ?? 70,
       intro_content: intro_content ?? null,
       position: count ?? 0,

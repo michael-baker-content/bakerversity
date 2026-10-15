@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase'
+import { createServiceClient } from '@/lib/supabase'
 import { notFound, redirect } from 'next/navigation'
 
 export default async function ModuleLandingPage({
@@ -7,7 +7,7 @@ export default async function ModuleLandingPage({
   params: Promise<{ slug: string; moduleSlug: string }>
 }) {
   const { slug, moduleSlug } = await params
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
 
   const { data: course } = await supabase
     .from('courses').select('id').eq('slug', slug).eq('is_published', true).single()

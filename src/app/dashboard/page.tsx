@@ -23,6 +23,7 @@ export default async function DashboardPage() {
     .single()
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin'
+  if (!user) return <main className="page"><p>Your account is still being synchronized. Please try again shortly.</p></main>
 
   const { data: enrollments } = await supabase
     .from('enrollments')

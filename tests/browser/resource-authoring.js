@@ -1,0 +1,35 @@
+// Run only against a freshly started isolated authoring harness, on its course page.
+async page => {
+  const ensure = (ok, message) => { if (!ok) throw new Error(message) }
+  ensure(new URL(page.url()).origin === 'http://localhost:3101', 'Use the isolated harness')
+  ensure(await page.getByText('ISOLATED TEST HARNESS — simulated API, no live accounts').count() === 1, 'Missing harness banner')
+  await page.getByRole('link', { name: 'Open lesson', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Title *', exact: true }).waitFor()
+  const fixture = async () => (await page.request.get('http://localhost:3101/api/harness')).json()
+  const before = (await fixture()).writes
+  await page.getByText('Resource library', { exact: true }).click()
+  await page.getByRole('button', { name: 'Select resource', exact: true }).click()
+  ensure((await fixture()).writes === before, 'Selecting a resource caused a server mutation')
+  ensure(await page.getByRole('status').filter({ hasText: 'You have unsaved changes.' }).count() === 1, 'Resource selection is missing from dirty state')
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Changes saved.' }).waitFor()
+  ensure((await fixture()).lesson.resources.length === 1, 'Draft payload omitted resources')
+  ensure((await fixture()).publishedResources.length === 0, 'Draft published resource selections')
+  await page.reload()
+  await page.getByRole('textbox', { name: 'Title *', exact: true }).waitFor()
+  await page.getByText('Resource library', { exact: true }).click()
+  ensure(await page.getByRole('button', { name: 'Remove from item', exact: true }).count() === 1, 'Saved resource selection did not reopen')
+  await page.getByRole('combobox', { name: 'When saving', exact: true }).selectOption('publish')
+  await page.getByRole('button', { name: 'Publish changes', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Changes saved.' }).waitFor()
+  ensure((await fixture()).publishedResources.length === 1, 'Publish omitted resource selection')
+  await page.getByRole('button', { name: 'Remove from item', exact: true }).click()
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Changes saved.' }).waitFor()
+  ensure((await fixture()).lesson.resources.length === 0 && (await fixture()).publishedResources.length === 1, 'Draft removal changed publication')
+  await page.getByRole('combobox', { name: 'When saving', exact: true }).selectOption('publish')
+  await page.getByRole('button', { name: 'Publish changes', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Changes saved.' }).waitFor()
+  ensure((await fixture()).publishedResources.length === 0, 'Publishing removal retained attachment')
+  return 'PASS: resource selection stays local, participates in dirty/save state, reopens from draft and follows publication/removal actions. Database tests independently verify the real transaction.'
+}
