@@ -1,57 +1,22 @@
-import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
-
-// GET — fetch read status for pages in a course
-// ?courseId=xxx
+import { learnerAccess } from '@/lib/adminAccess'
 export async function GET(req: Request) {
-  const clerkUser = await currentUser()
-  if (!clerkUser) return NextResponse.json({ read: [] })
-
-  const { searchParams } = new URL(req.url)
-  const courseId = searchParams.get('courseId')
+  const ctx = await learnerAccess()
+  if (!ctx) return NextResponse.json({ read: [] })
+  const courseId = new URL(req.url).searchParams.get('courseId')
   if (!courseId) return NextResponse.json({ read: [] })
-
-  const supabase = createServiceClient()
-  const { data: user } = await supabase.from('users').select('id').eq('clerk_id', clerkUser.id).single()
-  if (!user) return NextResponse.json({ read: [] })
-
-  const { data } = await supabase
-    .from('course_page_views')
-    .select('course_page_id')
-    .eq('user_id', user.id)
-
-  return NextResponse.json({ read: (data ?? []).map((r) => r.course_page_id) })
+  const { data, error } = await ctx.db.from('course_page_views').select('course_page_id, course_pages!inner(course_id)').eq('user_id', ctx.user.id).eq('course_pages.course_id', courseId)
+  return error ? NextResponse.json({ error: error.message }, { status: 500 }) : NextResponse.json({ read: (data ?? []).map(x => x.course_page_id) })
 }
-
-// POST — toggle read/unread
-// Body: { pageId: string }
 export async function POST(req: Request) {
-  const clerkUser = await currentUser()
-  if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { pageId } = await req.json()
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase.from('users').select('id').eq('clerk_id', clerkUser.id).single()
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-  // Check if already read
-  const { data: existing } = await supabase
-    .from('course_page_views')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('course_page_id', pageId)
-    .single()
-
-  if (existing) {
-    // Unmark as read
-    await supabase.from('course_page_views').delete()
-      .eq('user_id', user.id).eq('course_page_id', pageId)
-    return NextResponse.json({ read: false })
-  } else {
-    // Mark as read
-    await supabase.from('course_page_views').insert({ user_id: user.id, course_page_id: pageId })
-    return NextResponse.json({ read: true })
-  }
+  const ctx = await learnerAccess()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { pageId, read } = await req.json()
+  const { data: item } = await ctx.db.from('course_items').select('kind').eq('id', pageId).single()
+  if (item?.kind !== 'page') return NextResponse.json({ error: 'Page not found' }, { status: 404 })
+  const { data: existing, error: lookupError } = await ctx.db.from('course_page_views').select('id').eq('user_id', ctx.user.id).eq('course_page_id', pageId).maybeSingle()
+  if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 })
+  const value = typeof read === 'boolean' ? read : !existing
+  const { error } = await ctx.db.rpc('set_item_completion', { p_user: ctx.user.id, p_item: pageId, p_complete: value })
+  return error ? NextResponse.json({ error: error.message }, { status: 400 }) : NextResponse.json({ read: value })
 }

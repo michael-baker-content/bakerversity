@@ -15,7 +15,10 @@ import {
 } from './editor/nodes'
 import type { LintDiagnostic } from './editor/nodes'
 import { Toolbar } from './editor/Toolbar'
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
 
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
@@ -172,20 +175,19 @@ export default function TipTapEditor({
     editorProps: {
       handleDOMEvents: {
         dblclick: (view, event) => {
-          if (!hasMath) return false
           const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })
           if (!pos) return false
           const node = view.state.doc.nodeAt(pos.pos)
           if (!node) {
             // Try one position back (cursor may be after the node)
             const nodeBefore = view.state.doc.nodeAt(pos.pos - 1)
-            if (nodeBefore && (nodeBefore.type.name === 'inlineMath' || nodeBefore.type.name === 'blockMath')) {
+            if (hasMath && nodeBefore && (nodeBefore.type.name === 'inlineMath' || nodeBefore.type.name === 'blockMath')) {
               setEditingLatex({ latex: nodeBefore.attrs.latex, displayMode: nodeBefore.type.name === 'blockMath', pos: pos.pos - 1 })
               return true
             }
             return false
           }
-          if (node.type.name === 'inlineMath' || node.type.name === 'blockMath') {
+          if (hasMath && (node.type.name === 'inlineMath' || node.type.name === 'blockMath')) {
             setEditingLatex({ latex: node.attrs.latex, displayMode: node.type.name === 'blockMath', pos: pos.pos })
             return true
           }
@@ -241,7 +243,8 @@ export default function TipTapEditor({
       const { url } = await res.json()
       // Show modal to set alt text and caption before inserting
       setImageModal({ src: url, alt: '', title: '', pos: null })
-    } finally { setUploading(false) }
+    } catch { alert('Upload failed. Check your connection and try again.') }
+    finally { setUploading(false) }
   }, [editor])
 
   // ── LaTeX insert ───────────────────────────────────────────────────────────
@@ -423,7 +426,7 @@ export default function TipTapEditor({
               />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
+              <button type="button"
                 className="btn btn-primary btn-sm"
                 onClick={() => {
                   if (!editor) return
@@ -432,7 +435,7 @@ export default function TipTapEditor({
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node) {
-                      editor.chain()
+                      editor.chain().focus().setNodeSelection(imageModal.pos)
                         .updateAttributes('image', { alt: imageModal.alt, title: imageModal.title })
                         .run()
                     }
@@ -442,7 +445,7 @@ export default function TipTapEditor({
               >
                 {imageModal.pos === null ? 'Insert image' : 'Update'}
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setImageModal(null)}>Cancel</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setImageModal(null)}>Cancel</button>
             </div>
           </div>
         </div>

@@ -5,6 +5,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import PublishToggle from './PublishToggle'
 import EnrollSelfButton from '@/components/EnrollSelfButton'
+import CourseClassification from '@/components/CourseClassification'
+import AssetLibrary from '@/components/AssetLibrary'
+import CourseItemManager from '@/components/CourseItemManager'
 import CourseSettings from '@/components/CourseSettings'
 import CourseDetailLayout from './CourseDetailLayout'
 
@@ -54,15 +57,15 @@ export default async function AdminCourseDetailPage({
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('course_pages')
-      .select('id, title, slug, page_type, module_id, is_published, position, introduction')
+      .select('id, title, slug, page_type, module_id, is_published, position, introduction').is('archived_at', null)
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('lessons')
-      .select('id, title, slug, position, is_published, module_id')
+      .select('id, title, slug, position, is_published, module_id').is('archived_at', null)
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('assessments')
-      .select('id, title, slug, assessment_type, is_graded, is_published, module_id, position')
+      .select('id, title, slug, assessment_type, is_graded, is_published, module_id, position').is('archived_at', null)
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('enrollments')
@@ -109,7 +112,7 @@ export default async function AdminCourseDetailPage({
             priceCents={course.price_cents ?? 0}
             isPublic={course.is_public ?? false}
             thumbnailUrl={course.thumbnail_url ?? null}
-            thumbnailAttribution={course.thumbnail_attribution ?? null}
+            thumbnailAttribution={course.thumbnail_attribution as import('@/lib/types').ThumbnailAttribution | null}
             introDescription={course.intro_description ?? null}
             conclusionDescription={course.conclusion_description ?? null}
             editorTools={course.editor_tools ?? []}
@@ -123,6 +126,9 @@ export default async function AdminCourseDetailPage({
         </div>
       </div>
 
+      <CourseClassification courseId={course.id} />
+      <AssetLibrary />
+      <CourseItemManager courseId={course.id} courseSlug={course.slug} />
       {/* Course content */}
       <div>
         <h2 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>
@@ -141,7 +147,7 @@ export default async function AdminCourseDetailPage({
           modules={modules ?? []}
           pages={coursePages ?? []}
           lessons={allLessons ?? []}
-          assessments={allAssessments ?? []}
+          assessments={(allAssessments ?? []).map(a => ({ ...a, assessment_type: a.assessment_type as import('@/lib/types').AssessmentType }))}
         />
       </div>
     </main>

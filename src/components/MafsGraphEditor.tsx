@@ -101,7 +101,7 @@ export default function MafsGraphEditor({ initial, onSave, onClose }: Props) {
           flexShrink: 0,
         }}>
           <h2 style={{ margin: 0, fontSize: 17 }}>Graph editor</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text-2)', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text-2)', lineHeight: 1 }}>×</button>
         </div>
 
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -111,7 +111,7 @@ export default function MafsGraphEditor({ initial, onSave, onClose }: Props) {
             <label style={labelStyle}>Presets</label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {PRESETS.map((p) => (
-                <button key={p.label} onClick={() => applyPreset(p)} className="btn btn-ghost btn-sm">
+                <button type="button" key={p.label} onClick={() => applyPreset(p)} className="btn btn-ghost btn-sm">
                   {p.label}
                 </button>
               ))}
@@ -123,7 +123,7 @@ export default function MafsGraphEditor({ initial, onSave, onClose }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ ...labelStyle, margin: 0 }}>Functions</label>
               {attrs.functions.length < 4 && (
-                <button onClick={addFunction} className="btn btn-ghost btn-sm">+ Add function</button>
+                <button type="button" onClick={addFunction} className="btn btn-ghost btn-sm">+ Add function</button>
               )}
             </div>
 
@@ -172,7 +172,7 @@ export default function MafsGraphEditor({ initial, onSave, onClose }: Props) {
                       ))}
                     </select>
                     {attrs.functions.length > 1 && (
-                      <button
+                      <button type="button"
                         onClick={() => removeFunction(i)}
                         className="btn btn-sm"
                         style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', padding: '6px 8px' }}
@@ -273,8 +273,8 @@ export default function MafsGraphEditor({ initial, onSave, onClose }: Props) {
           borderTop: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          <button onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
-          <button onClick={() => onSave(attrs)} className="btn btn-primary btn-sm">Insert graph</button>
+          <button type="button" onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
+          <button type="button" onClick={() => onSave(attrs)} className="btn btn-primary btn-sm">Insert graph</button>
         </div>
       </div>
     </div>

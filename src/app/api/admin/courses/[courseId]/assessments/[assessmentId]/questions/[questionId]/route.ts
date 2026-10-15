@@ -10,7 +10,7 @@ function normaliseAnswer(raw: string): string {
 }
 
 function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]*>/g, '').trim()
+  return raw.trim()
 }
 
 async function authorise(courseId: string, clerkId: string) {
@@ -35,6 +35,8 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const ctx = await authorise(courseId, clerkUser.id)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: scopedAssessment } = await ctx.supabase.from('assessments').select('id').eq('id', assessmentId).eq('course_id', courseId).single()
+  if (!scopedAssessment) return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
 
   // Confirm question belongs to this assessment
   const { data: existing } = await ctx.supabase
@@ -92,7 +94,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const { error } = await ctx.supabase
     .from('assessment_questions')
-    .update(updates)
+    .update(updates as import('@/lib/database.types').Database['public']['Tables']['assessment_questions']['Update'])
     .eq('id', questionId)
     .eq('assessment_id', assessmentId)
 
@@ -109,6 +111,8 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   const ctx = await authorise(courseId, clerkUser.id)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: scopedAssessment } = await ctx.supabase.from('assessments').select('id').eq('id', assessmentId).eq('course_id', courseId).single()
+  if (!scopedAssessment) return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
 
   const { error } = await ctx.supabase
     .from('assessment_questions')

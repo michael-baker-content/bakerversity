@@ -16,7 +16,7 @@ function normaliseAnswer(raw: string): string {
 // before storing plain-text fields so no markup survives even if the
 // caller skips sanitisation on the client side.
 function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]*>/g, '').trim()
+  return raw.trim()
 }
 
 async function authorise(courseId: string, clerkId: string) {
@@ -41,6 +41,8 @@ export async function GET(_req: Request, { params }: Params) {
 
   const ctx = await authorise(courseId, clerkUser.id)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: scopedAssessment } = await ctx.supabase.from('assessments').select('id').eq('id', assessmentId).eq('course_id', courseId).single()
+  if (!scopedAssessment) return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
 
   const { data, error } = await ctx.supabase
     .from('assessment_questions')
@@ -70,6 +72,8 @@ export async function POST(req: Request, { params }: Params) {
 
   const ctx = await authorise(courseId, clerkUser.id)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: scopedAssessment } = await ctx.supabase.from('assessments').select('id').eq('id', assessmentId).eq('course_id', courseId).single()
+  if (!scopedAssessment) return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
 
   // Confirm assessment belongs to this course
   const { data: assessment } = await ctx.supabase

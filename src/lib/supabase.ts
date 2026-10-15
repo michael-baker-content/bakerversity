@@ -1,3 +1,4 @@
+import type { Database } from './database.types'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,14 +9,14 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 // Uses the anon key. Safe to use in Client Components.
 // RLS policies enforce row-level access.
 function createBrowserClient() {
-  return createClient(supabaseUrl, supabaseAnonKey)
+  return createClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
 // ── Server client (anon) ──────────────────────────────────────────────────────
 // Uses the anon key. Use in Server Components for public data
 // (e.g. published course catalogue). RLS still applies.
 export function createServerClient() {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false },
   })
 }
@@ -26,7 +27,7 @@ export function createServerClient() {
 //   - API route handlers (webhook endpoints, server actions)
 //   - Never import this in Client Components or expose to the browser
 export function createServiceClient() {
-  return createClient(supabaseUrl, supabaseServiceKey, {
+  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false },
   })
 }

@@ -117,7 +117,7 @@ export async function GET() {
       .filter((q) => answers[q.id]?.trim())
       .map((q) => {
         // Extract plain text preview from TipTap content for display
-        const questionPreview = q.question_text ?? extractPlainText(q.content)
+        const questionPreview = q.question_text ?? extractPlainText(q.content as Record<string, unknown> | null)
         return {
           question_id: q.id,
           question_text: questionPreview,

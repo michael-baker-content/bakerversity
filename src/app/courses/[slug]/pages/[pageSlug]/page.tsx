@@ -1,3 +1,4 @@
+import LessonAssets from '@/components/LessonAssets'
 import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
@@ -39,14 +40,16 @@ export default async function CoursePageViewer({
     dbUser = data
   }
 
-  const isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
+  let isInstructor = dbUser?.role === 'instructor' || dbUser?.role === 'admin'
 
-  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug)
+  const courseQuery = serviceSupabase.from('courses').select('*').eq('slug', slug).is('archived_at', null)
   const { data: course } = await (isInstructor
     ? courseQuery
     : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
+  isInstructor = dbUser?.role === 'admin' || (dbUser?.role === 'instructor' && course.instructor_id === dbUser.id)
+  if (!isInstructor && !course.is_published) notFound()
 
   // Auth gate
   if (!dbUser) {
@@ -62,7 +65,7 @@ export default async function CoursePageViewer({
     if (!enrollment) redirect(`/courses/${slug}`)
   }
 
-  const pageQuery = serviceSupabase.from('course_pages').select('*')
+  const pageQuery = serviceSupabase.from('course_pages').select('*').is('archived_at', null)
     .eq('slug', pageSlug).eq('course_id', course.id)
   const { data: page } = await (isInstructor
     ? pageQuery
@@ -72,10 +75,10 @@ export default async function CoursePageViewer({
 
   const [allPagesRes, lessonsRes, modulesRes, assessmentsRes] = await Promise.all([
     serviceSupabase.from('course_pages')
-      .select('id, slug, title, page_type, module_id, position')
+      .select('id, slug, title, page_type, module_id, position, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
     serviceSupabase.from('lessons')
-      .select('id, slug, title, position, module_id')
+      .select('id, slug, title, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
     serviceSupabase.from('modules')
@@ -83,11 +86,11 @@ export default async function CoursePageViewer({
       .eq('course_id', course.id).order('position', { ascending: true })
       .returns<Module[]>(),
     serviceSupabase.from('assessments')
-      .select('id, slug, title, assessment_type, position, module_id')
+      .select('id, slug, title, assessment_type, position, module_id, placement, is_required, estimated_minutes').is('archived_at', null)
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
   ])
 
-  const allPages = (allPagesRes.data ?? []) as CoursePage[]
+  const allPages = (allPagesRes.data ?? []) as import('@/lib/courseSequence').SeqPage[]
   const allLessons = lessonsRes.data ?? []
   const modules = modulesRes.data ?? []
   const assessments = (assessmentsRes.data ?? []) as Assessment[]
@@ -138,6 +141,7 @@ export default async function CoursePageViewer({
               }
             </div>
 
+            <LessonAssets itemId={page.id} />
             <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
               {/* Read toggle for authenticated users; sign-in nudge for guests */}

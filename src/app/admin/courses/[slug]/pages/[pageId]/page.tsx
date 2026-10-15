@@ -3,6 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
+import AssetLibrary from '@/components/AssetLibrary'
+import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
+import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
 import MarkdownImport from '@/components/MarkdownImport'
 
@@ -38,6 +42,11 @@ export default function EditCoursePage() {
   const [introduction, setIntroduction] = useState('')
   const [content, setContent] = useState<Record<string, unknown>>({})
   const [isPublished, setIsPublished] = useState(false)
+  const [editorKey, setEditorKey] = useState(0)
+  const [version, setVersion] = useState(1)
+  const [saveAction, setSaveAction] = useState('draft')
+  const [resources, setResources] = useState<ResourceSelection[]>([])
+  const [metadata, setMetadata] = useState(() => itemMetadata({}, 'page'))
 
   useEffect(() => {
     fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
@@ -49,6 +58,9 @@ export default function EditCoursePage() {
           fetch(`/api/admin/courses/${data.id}/pages/${pageId}`).then((r) => r.json()),
         ])
         setTitle(pageRes.title ?? '')
+        setVersion(pageRes.version)
+        setResources(resourceSelection(pageRes.resources ?? []))
+        setMetadata(itemMetadata(pageRes, 'page'))
         setPageType(pageRes.page_type ?? 'custom')
         setIntroduction(pageRes.introduction ?? '')
         setContent(pageRes.content ?? {})
@@ -72,7 +84,7 @@ export default function EditCoursePage() {
         page_type: pageType,
         introduction: introduction || null,
         content,
-        is_published: isPublished,
+        version, action: saveAction, resources, ...metadata,
       }),
     })
 
@@ -86,9 +98,10 @@ export default function EditCoursePage() {
   }
 
   const handleDelete = async () => {
-    if (!courseId || !confirm('Delete this page? This cannot be undone.')) return
+    if (!courseId || !confirm('Archive this page? Its history will be preserved.')) return
     setDeleting(true)
-    await fetch(`/api/admin/courses/${courseId}/pages/${pageId}`, { method: 'DELETE' })
+    const deletion = await fetch(`/api/admin/courses/${courseId}/pages/${pageId}`, { method: 'DELETE' })
+    if (!deletion.ok) { setError((await deletion.json()).error ?? 'Unable to archive'); setDeleting(false); return }
     router.push(`/admin/courses/${slug}`)
   }
 
@@ -161,7 +174,7 @@ export default function EditCoursePage() {
           </div>
           {ready && (
             <TipTapEditor
-              key="page-editor"
+              key={editorKey}
               packs={['code']}
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
@@ -171,10 +184,11 @@ export default function EditCoursePage() {
         </div>
 
         {/* Published */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-          <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} />
-          Published (visible to students)
-        </label>
+        {pageId && <RevisionHistory itemId={pageId} onRestore={v => { setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}
+        {pageId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
+        <ItemMetadataFields value={metadata} onChange={setMetadata} />
+        <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
+        <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 
@@ -192,7 +206,7 @@ export default function EditCoursePage() {
       <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <h3 style={{ margin: '0 0 0.5rem', fontSize: 15, color: 'var(--danger)' }}>Danger zone</h3>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1rem' }}>
-          Permanently delete this page.
+          Archive this page while preserving its revisions and learning records.
         </p>
         <button
           onClick={handleDelete}
@@ -200,7 +214,7 @@ export default function EditCoursePage() {
           className="btn btn-sm"
           style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
         >
-          {deleting ? 'Deleting…' : 'Delete page'}
+          {deleting ? 'Archiving…' : 'Archive page'}
         </button>
       </div>
     </main>

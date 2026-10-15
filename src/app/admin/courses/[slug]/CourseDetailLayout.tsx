@@ -122,30 +122,10 @@ function CollapsibleSection({
     })) as SequenceItem[]
     setSequence(withPositions)
 
-    // Persist lessons and assessments separately — each has its own endpoint
-    const lessons = withPositions
-      .filter((s): s is { kind: 'lesson'; item: Lesson } => s.kind === 'lesson')
-      .map(({ item }) => ({ id: item.id, position: item.position }))
-
-    const assessments = withPositions
-      .filter((s): s is { kind: 'assessment'; item: Assessment } => s.kind === 'assessment')
-      .map(({ item }) => ({ id: item.id, position: item.position }))
-
-    await Promise.all([
-      lessons.length > 0 &&
-        fetch(`/api/admin/courses/${courseId}/lessons/reorder`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lessons }),
-        }),
-      assessments.length > 0 &&
-        fetch(`/api/admin/courses/${courseId}/assessments/reorder`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assessments }),
-        }),
-    ])
-
+    try {
+      const res = await fetch(`/api/admin/courses/${courseId}/items/reorder`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:withPositions.map(({item})=>({id:item.id,position:item.position}))})})
+      if(!res.ok)throw new Error((await res.json()).error ?? 'Unable to reorder')
+    } catch(error) { setSequence(sequence); alert(error instanceof Error ? error.message : 'Unable to reorder') }
     setMoving(null)
     router.refresh()
   }

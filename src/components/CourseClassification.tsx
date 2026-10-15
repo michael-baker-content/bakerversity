@@ -1,0 +1,13 @@
+'use client'
+import { useEffect, useState } from 'react'
+export default function CourseClassification({courseId}:{courseId:string}) {
+  const [language,setLanguage]=useState('en')
+  const [difficulty,setDifficulty]=useState('introductory')
+  const [objectives,setObjectives]=useState('')
+  const [terms,setTerms]=useState({category:'',topic:'',tool:''})
+  const [message,setMessage]=useState('')
+  const [ready,setReady]=useState(false)
+  useEffect(()=>{fetch(`/api/admin/courses/${courseId}/classification`).then(async res=>{if(!res.ok)throw Error('Unable to load course classification');const d=await res.json();setLanguage(d.language_code);setDifficulty(d.difficulty);setObjectives(d.learning_objectives.join('\n'));setTerms(Object.fromEntries(['category','topic','tool'].map(kind=>[kind,d.terms.filter((t:{kind:string})=>t.kind===kind).map((t:{name:string})=>t.name).join(', ')])) as typeof terms);setReady(true)}).catch(e=>setMessage(e.message))},[courseId])
+  async function save(){try{const res=await fetch(`/api/admin/courses/${courseId}/classification`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({language_code:language,difficulty,learning_objectives:objectives.split('\n').map(s=>s.trim()).filter(Boolean),terms:Object.entries(terms).flatMap(([kind,value])=>value.split(',').map(s=>s.trim()).filter(Boolean).map(name=>({kind,name})))})});const d=await res.json();setMessage(res.ok?'Course classification saved.':d.error)}catch{setMessage('Unable to save. Please retry.')}}
+  return <details style={{padding:16,border:'1px solid var(--border)',borderRadius:8,marginBottom:16}}><summary>Course classification and learning objectives</summary><div style={{display:'grid',gap:12,marginTop:16}}><label>Language code<input className="input" value={language} onChange={e=>setLanguage(e.target.value)} /></label><label>Difficulty<select className="input" value={difficulty} onChange={e=>setDifficulty(e.target.value)}>{['introductory','intermediate','advanced'].map(x=><option key={x}>{x}</option>)}</select></label>{(['category','topic','tool'] as const).map(kind=><label key={kind}>{kind === 'category' ? 'Subject categories' : kind === 'topic' ? 'Topics' : 'Tools covered'} (separate with commas)<input className="input" value={terms[kind]} onChange={e=>setTerms({...terms,[kind]:e.target.value})}/></label>)}<label>Learning objectives (one per line)<textarea className="input" rows={4} value={objectives} onChange={e=>setObjectives(e.target.value)}/></label><button type="button" className="btn btn-primary" disabled={!ready} onClick={save}>Save classification</button><p role="status">{message}</p></div></details>
+}

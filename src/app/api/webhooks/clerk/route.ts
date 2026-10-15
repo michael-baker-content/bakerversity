@@ -69,13 +69,13 @@ export async function POST(req: Request) {
         return new Response('No email found on user', { status: 400 })
       }
 
-      const { error } = await supabase.from('users').insert({
+      const { error } = await supabase.from('users').upsert({
         clerk_id: data.id,
         email,
         full_name: [data.first_name, data.last_name].filter(Boolean).join(' ') || null,
         avatar_url: data.image_url ?? null,
-        role: 'student', // default role; promote to instructor manually in Supabase
-      })
+        role: 'student', // Existing accounts are not overwritten on redelivery.
+      }, { onConflict: 'clerk_id', ignoreDuplicates: true })
 
       if (error) {
         console.error('Failed to create user:', error)
