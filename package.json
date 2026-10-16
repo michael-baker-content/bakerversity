@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "db:generate": "node scripts/generate-database.mjs",
     "db:check": "node scripts/generate-database.mjs --check",
-    "test": "node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs",
+    "test": "node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs && node tests/writing-tools.mjs",
     "test:authoring:harness": "node scripts/authoring-harness.cjs"
   },
   "dependencies": {
@@ -18,7 +18,10 @@
     "@supabase/supabase-js": "^2.45.0",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-code-block-lowlight": "3.32.0",
+    "@tiptap/extension-find-and-replace": "3.32.0",
+    "@tiptap/extension-highlight": "3.32.0",
     "@tiptap/extension-image": "3.32.0",
+    "@tiptap/extension-invisible-characters": "3.32.0",
     "@tiptap/extension-table": "3.32.0",
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",
@@ -38,13 +41,13 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/katex": "^0.16.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^8",
     "eslint-config-next": "^15.3.0",
-    "typescript": "^5",
-    "@electric-sql/pglite": "^0.5.10"
+    "typescript": "^5"
   }
 }

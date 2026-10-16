@@ -4,6 +4,11 @@ import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { useEditor, EditorContent, Extension } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import Highlight from '@tiptap/extension-highlight'
+import FindAndReplace from '@tiptap/extension-find-and-replace'
+import InvisibleCharacters, { SpaceCharacter, HardBreakNode, ParagraphNode, InvisibleCharacter } from '@tiptap/extension-invisible-characters'
+import { TextLanguage } from './editor/TextLanguage'
+import WritingTools from './editor/WritingTools'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import dynamic from 'next/dynamic'
@@ -141,6 +146,13 @@ export default function TipTapEditor({
   const extensions = [
     StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
     NoInputRules,
+    Highlight.configure({ HTMLAttributes: { style: 'background-color:#fef08a;color:#1f2937' } }),
+    TextLanguage,
+    FindAndReplace.configure({ searchDebounceMs: 0 }),
+    InvisibleCharacters.configure({ visible: false, builders: [
+      new SpaceCharacter(), new HardBreakNode(), new ParagraphNode(),
+      new InvisibleCharacter({ type: 'nonbreaking-space', predicate: value => value === '\u00a0' }),
+    ] }),
     Image.configure({ inline: false, allowBase64: false }),
     CalloutNode,
     Table.configure({ resizable: false, HTMLAttributes: { style: 'width: auto; min-width: 0;' } }),
@@ -356,6 +368,7 @@ export default function TipTapEditor({
               setTerminalContent={setTerminalContent}
               setFilenameInput={setFilenameInput}
             />
+            <WritingTools editor={editor} />
           </div>
         </>
       )}
@@ -472,6 +485,7 @@ export default function TipTapEditor({
         .tiptap table { border-collapse: collapse; width: auto; min-width: 120px; margin: 1rem 0; }
         .tiptap th, .tiptap td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 14px; }
         .tiptap th { background: var(--surface-2); font-weight: 600; }
+        .tiptap .tiptap-invisible-character--nonbreaking-space::before { content: '°'; }
         .tiptap .selectedCell { background: var(--indigo-muted); }
         .tiptap pre[data-terminal-pre] { color: #e6edf3 !important; background: none !important; border: none !important; padding: 0 !important; }
         .tiptap .ProseMirror-selectednode [data-terminal-inner] { outline: 3px solid var(--amber); }

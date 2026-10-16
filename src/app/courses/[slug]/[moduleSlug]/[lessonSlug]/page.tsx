@@ -1,3 +1,4 @@
+import { LessonHeading, LessonPager } from '@/components/LessonPresentation'
 import LessonAssets from '@/components/LessonAssets'
 import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
@@ -162,24 +163,8 @@ export default async function LessonViewerPage({
             currentLessonSlug={lesson.slug ?? null}
           />
 
-          <main className="lesson-main">
-            {/* Header */}
-            <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
-              <div style={{
-                fontSize: 11, color: 'var(--text-3)', marginBottom: '0.5rem',
-                fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
-                display: 'flex', gap: '0.75rem', flexWrap: 'wrap',
-              }}>
-                {module_ && <span>{module_.title} · </span>}
-                <span>Lesson {lessonIndex + 1} of {lessonTotal}</span>
-              </div>
-              <h1 style={{ margin: 0, fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>{lesson.title}</h1>
-              {lesson.introduction && (
-                <p style={{ margin: '0.75rem 0 0', fontSize: 16, color: 'var(--text-2)', lineHeight: 1.7, fontStyle: 'italic' }}>
-                  {lesson.introduction}
-                </p>
-              )}
-            </div>
+          <main className="lesson-main lesson-reading-page">
+            <LessonHeading title={lesson.title} introduction={lesson.introduction} moduleTitle={modules.find(m => m.id === lesson.module_id)?.title} index={lessonIndex} total={lessonTotal} />
 
             {/* YouTube */}
             {lesson.youtube_url && (
@@ -217,7 +202,8 @@ export default async function LessonViewerPage({
 
             <LessonAssets itemId={lesson.id} />
             {/* Progress tracking — authenticated users get the button; guests get a sign-in nudge */}
-            <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+            <div className="lesson-completion-panel">
+              <div><h2>Ready to move on?</h2><p>Mark this lesson complete when you’re ready.</p></div>
               {dbUser ? (
                 <MarkCompleteButton
                   lessonId={lesson.id}
@@ -245,43 +231,7 @@ export default async function LessonViewerPage({
               )}
             </div>
 
-            {/* Prev / Next */}
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              marginTop: '3rem', paddingTop: '1.5rem',
-              borderTop: '1px solid var(--border)',
-              gap: 8,
-            }}>
-              {prevHref ? (
-                <Link href={prevHref} style={{ minWidth: 0, maxWidth: '45vw' }}>
-                  <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'left' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ flexShrink: 0 }}>←</span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {prevItem!.title}
-                      </span>
-                    </span>
-                  </button>
-                </Link>
-              ) : <div />}
-
-              {nextHref ? (
-                <Link href={nextHref} style={{ minWidth: 0, maxWidth: '45vw' }}>
-                  <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'right' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {nextItem!.title}
-                      </span>
-                      <span style={{ flexShrink: 0 }}>→</span>
-                    </span>
-                  </button>
-                </Link>
-              ) : (
-                <Link href={`/courses/${slug}`}>
-                  <button className="btn btn-primary">Back to course</button>
-                </Link>
-              )}
-            </div>
+            <LessonPager previous={prevHref && prevItem ? { href: prevHref, title: prevItem.title } : null} next={nextHref && nextItem ? { href: nextHref, title: nextItem.title } : null} courseHref={`/courses/${slug}`} />
           </main>
         </div>
       </div>

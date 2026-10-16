@@ -1,3 +1,4 @@
+> **October 2026 foundation update:** Read [the foundation guide](docs/foundation.md) and [migration instructions](supabase/MIGRATIONS.md) before using this checkout. The application and four migrations must be released together. Generated database types, isolated migration tests, explicit drafts, resource inventory and required-item progress are now included. The original prototype notes below are historical where superseded by that guide.
 # Bakerversity
 
 A custom online course platform built with Next.js, Supabase, and Clerk. Designed for a single instructor offering structured courses with modules, lessons, rich content, and assessments.

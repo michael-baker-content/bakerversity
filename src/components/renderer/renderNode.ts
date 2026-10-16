@@ -128,6 +128,10 @@ export function renderNode(node: Record<string, unknown>): string {
       const marks = (node.marks as { type: string; attrs?: Record<string, unknown> }[]) ?? []
       let text = escapeHtml((node.text as string) ?? '')
       for (const mark of marks) {
+        if (mark.type === 'highlight') text = `<mark style="background-color:#fef08a;color:#1f2937">${text}</mark>`
+        if (mark.type === 'textLanguage' && (mark.attrs?.language === 'en' || mark.attrs?.language === 'pl')) {
+          text = `<span lang="${mark.attrs.language}">${text}</span>`
+        }
         if (mark.type === 'bold')   text = `<strong>${text}</strong>`
         if (mark.type === 'italic') text = `<em>${text}</em>`
         if (mark.type === 'code')   text = `<code>${text}</code>`
