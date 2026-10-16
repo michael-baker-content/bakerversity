@@ -1,9 +1,11 @@
+import { publicMetadata } from '@/lib/publicMetadata'
 import { createServerClient } from '@/lib/supabase'
 import Link from 'next/link'
 import type { Course } from '@/lib/types'
 import SiteNav from '@/components/SiteNav'
+import { publicSite } from '@/lib/publicSite'
 
-export const metadata = { title: 'Courses' }
+export const metadata = publicMetadata('Courses', 'Explore Practical Localization Engineering. Current course content is free to read, with no login required.', '/courses')
 
 export default async function CoursesPage() {
   const supabase = createServerClient()
@@ -17,12 +19,13 @@ export default async function CoursesPage() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteNav active="courses" />
-      <main className="page">
+      <main id="main-content" tabIndex={-1} className="page">
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ margin: '0 0 0.4rem' }}>Courses</h1>
           <p style={{ color: 'var(--text-2)', margin: 0 }}>
-            {courses?.length ?? 0} course{courses?.length !== 1 ? 's' : ''} available
+            {courses?.length ?? 0} course{courses?.length !== 1 ? 's' : ''} available. {publicSite.access}
           </p>
         </div>
 

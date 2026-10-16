@@ -3,6 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { DM_Sans, DM_Serif_Display } from 'next/font/google'
 import ThemeProvider from '@/components/ThemeProvider'
 import './globals.css'
+import SiteFooter from '@/components/SiteFooter'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
     default: 'Bakerversity',
     template: '%s · Bakerversity',
   },
-  description: 'Learn algebra and programming with interactive lessons, quizzes, and certificates.',
+  description: 'Free, self-paced courses in technical subjects. Read lessons without an account.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body>
           <ThemeProvider>
             {children}
+            <SiteFooter />
           </ThemeProvider>
         </body>
       </html>

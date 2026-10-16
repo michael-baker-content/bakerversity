@@ -1,6 +1,9 @@
+import { publicMetadata } from '@/lib/publicMetadata'
 import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
 import SiteNav from '@/components/SiteNav'
+
+export const metadata = publicMetadata('Practical learning', 'Explore Practical Localization Engineering through lessons with code, mathematics, and worked examples. Free to read, with no login required.', '/')
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'bakerversity'
 
@@ -45,8 +48,9 @@ export default async function HomePage() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteNav />
-      <main className="site-shell">
+      <main id="main-content" tabIndex={-1} className="site-shell">
         {/* Hero */}
         <section style={{
           padding: 'clamp(4rem, 10vw, 8rem) 1.5rem',
@@ -86,12 +90,12 @@ export default async function HomePage() {
               borderRadius: 'var(--radius-full)',
               fontSize: 12,
               fontWeight: 600,
-              color: heroPhoto ? 'rgba(255,255,255,0.9)' : 'var(--amber-hover)',
+              color: heroPhoto ? 'rgba(255,255,255,0.9)' : 'var(--amber-ink)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
               marginBottom: '1.5rem',
             }}>
-              ✦ Now enrolling
+              ✦ Free & open to explore
             </div>
 
             <h1 style={{
@@ -102,9 +106,9 @@ export default async function HomePage() {
               color: heroPhoto ? '#fff' : 'var(--text)',
               textShadow: heroPhoto ? '0 2px 12px rgba(0,0,0,0.4)' : 'none',
             }}>
-              Learn to think
+              Build practical
               <br />
-              <span style={{ color: heroPhoto ? 'var(--amber)' : 'var(--amber)' }}>mathematically.</span>
+              <span style={{ color: heroPhoto ? 'var(--amber)' : 'var(--amber-ink)' }}>understanding.</span>
             </h1>
 
             <p style={{
@@ -116,27 +120,21 @@ export default async function HomePage() {
               marginLeft: 'auto',
               marginRight: 'auto',
             }}>
-              Structured courses in algebra and programming with interactive lessons,
-              exercises, and certificates.
+              Explore technical ideas through practical, self-paced courses. Start with Practical Localization Engineering.
+              Explore lessons with code, mathematics, and worked examples—free to read, with no login required.
             </p>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="/courses">
-                <button className="btn btn-primary btn-lg">Browse courses</button>
-              </Link>
+              <Link href="/courses" className="btn btn-primary btn-lg">Explore courses</Link>
               {!clerkUser && (
-                <Link href="/sign-up">
-                  <button className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
-                    Create account
-                  </button>
-                </Link>
+                <Link href="/help" className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
+                    How learning works
+                  </Link>
               )}
               {clerkUser && (
-                <Link href="/dashboard">
-                  <button className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
+                <Link href="/dashboard" className="btn btn-outline btn-lg" style={heroPhoto ? { borderColor: 'rgba(255,255,255,0.6)', color: '#fff' } : undefined}>
                     My dashboard
-                  </button>
-                </Link>
+                  </Link>
               )}
             </div>
           </div>
@@ -179,6 +177,18 @@ export default async function HomePage() {
             }}>
               {[
                 {
+                  icon: '</>',
+                  title: 'Code in context',
+                  body: 'Syntax-highlighted code alongside the explanation, connecting localization concepts with implementation details.',
+                  color: 'var(--indigo)',
+                },
+                {
+                  icon: '語',
+                  title: 'Multilingual text',
+                  body: 'English and Polish passages with language labels, bringing language-specific characters and writing into technical lessons.',
+                  color: 'var(--amber)',
+                },
+                {
                   icon: '∑',
                   title: 'LaTeX math rendering',
                   body: 'Equations and formulas rendered beautifully inline and as display math.',
@@ -187,13 +197,13 @@ export default async function HomePage() {
                 {
                   icon: '◈',
                   title: 'Structured lessons',
-                  body: 'Organized into modules with quizzes, exercises, and progress tracking.',
+                  body: 'Organized into modules with examples and exercises to work through at your own pace.',
                   color: 'var(--indigo)',
                 },
                 {
                   icon: '✦',
-                  title: 'Certificates',
-                  body: 'Earn a certificate when you complete a course and pass its assessments.',
+                  title: 'Open access',
+                  body: 'Explore freely available lessons. No account or enrollment needed to start reading.',
                   color: 'var(--amber)',
                 },
                 {
@@ -210,18 +220,18 @@ export default async function HomePage() {
                     gap: 10,
                     marginBottom: '0.4rem',
                   }}>
-                    <div style={{
+                    <div aria-hidden="true" style={{
                       width: 36, height: 36, flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: f.color === 'var(--amber)' ? 'var(--amber-muted)' : 'var(--indigo-muted)',
                       borderRadius: 'var(--radius)',
                       fontSize: 16,
-                      color: f.color,
+                      color: f.color === 'var(--amber)' ? 'var(--amber-ink)' : f.color,
                       fontFamily: 'var(--font-serif)',
                     }}>
                       {f.icon}
                     </div>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', margin: 0 }}>{f.title}</h3>
+                    <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', margin: 0 }}>{f.title}</h2>
                   </div>
                   <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0, paddingLeft: 46, lineHeight: 1.6 }}>{f.body}</p>
                 </div>
@@ -237,11 +247,9 @@ export default async function HomePage() {
               Ready to start?
             </h2>
             <p style={{ color: 'var(--text-2)', margin: '0 0 1.75rem' }}>
-              Browse the course catalogue and enroll for free.
+              Find a subject to explore and work through the lessons at your own pace. No login required.
             </p>
-            <Link href="/courses">
-              <button className="btn btn-primary btn-lg">See all courses</button>
-            </Link>
+            <Link href="/courses" className="btn btn-primary btn-lg">Explore courses</Link>
           </div>
         </section>
       </main>

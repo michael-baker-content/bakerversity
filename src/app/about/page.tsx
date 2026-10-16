@@ -1,22 +1,24 @@
+import { publicMetadata } from '@/lib/publicMetadata'
 import SiteNav from '@/components/SiteNav'
 import Link from 'next/link'
 
-export const metadata = {
-  title: 'About — Bakerversity',
-  description: 'About Bakerversity, the instructor behind it, and related projects.',
-}
+export const metadata = publicMetadata('About', 'Technical lessons with room for code, mathematics, and practical examples. Learn about Bakerversity, Practical Localization Engineering, and Michael Baker.', '/about')
 
 export default function AboutPage() {
   return (
     <>
-      <SiteNav />
-      <main className="site-shell">
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <SiteNav active="about" />
+      <main id="main-content" tabIndex={-1} className="site-shell">
 
         {/* Hero */}
         <section style={{
           padding: 'clamp(3rem, 8vw, 5rem) 1.5rem',
           borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
+          backgroundColor: '#18231b',
+          backgroundImage: 'linear-gradient(rgba(12, 22, 15, 0.72), rgba(12, 22, 15, 0.72)), url(https://images.unsplash.com/photo-1583264636244-65f8345ad308?auto=format&fit=crop&w=2000&q=85)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
             <div style={{
@@ -28,7 +30,7 @@ export default function AboutPage() {
               borderRadius: 'var(--radius-full)',
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--amber-hover)',
+              color: 'var(--amber-ink)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
               marginBottom: '1.5rem',
@@ -40,18 +42,24 @@ export default function AboutPage() {
               fontSize: 'clamp(2rem, 5vw, 3rem)',
               lineHeight: 1.15,
               margin: '0 0 1.25rem',
-              color: 'var(--text)',
+              color: '#fff',
             }}>
-              A Learning Platform for Everyone
+              Technical ideas deserve room to unfold.
             </h1>
             <p style={{
               fontSize: 'clamp(1rem, 2.5vw, 1.15rem)',
-              color: 'var(--text-2)',
+              color: '#f3f4ee',
               lineHeight: 1.75,
               margin: 0,
             }}>
-              If you're looking to learn more about subjects like algebra and programming, you've come to the right place.
-              Bakerversity offers structured coursework with interactive lessons, exercises, and certificates.
+              Bakerversity is Michael Baker’s independent learning platform, built to bring explanations, code, mathematics, and practice together in the same lesson.
+              Its first and currently only course is Practical Localization Engineering, free to read with no login required.
+            </p>
+            <p style={{ fontSize: 12, color: '#f3f4ee', margin: '2rem 0 0' }}>
+              Photo by{' '}
+              <a href="https://unsplash.com/@christina_winter?utm_source=bakerversity&utm_medium=referral" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Christina Winter</a>
+              {' '}on{' '}
+              <a href="https://unsplash.com/photos/green-fruit-on-brown-tree-branch-BZ3zysdFn9A?utm_source=bakerversity&utm_medium=referral" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Unsplash</a>
             </p>
           </div>
         </section>
@@ -71,22 +79,53 @@ export default function AboutPage() {
             </h2>
             <div style={{ fontSize: 16, color: 'var(--text-2)', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <p style={{ margin: 0 }}>
-                Not long ago, I had the idea of assembling course materials for algebra students.
-                As I studied popular online learning platforms, I found that they generally do not offer support for LaTeX,
-                which is a must when presenting algebra formulas on the web.
-                Rather than try to build around existing platforms, I decided to create my own.
+                I started Bakerversity while exploring how to create an algebra course. I wanted mathematical notation to feel
+                at home in a lesson, with the same care given to the writing around it. That became a broader goal:
+                give course authors room to explain a subject in the forms it needs.
               </p>
               <p style={{ margin: 0 }}>
-                The core of this platform is its editorial interface.
-                It's built on <a href="https://tiptap.dev/" target="_blank">Tiptap</a>, a popular open source editor framework.
-                Thanks to Tiptap and Next.js, I've been able to add features to the editor that make it easier to teach technical topics.
-                I've also added support to properly highlight code samples, which is a must for the Python class I'm developing here.
+                A technical lesson may need a code sample, a formula, a diagram, and a worked example before an idea clicks.
+                Bakerversity brings those pieces into the authoring experience, alongside structured explanations and practice questions.
+                The lesson can follow the subject, without forcing every explanation into the same format.
               </p>
               <p style={{ margin: 0 }}>
-                I've completed most of the work for the first stage — finalizing the basic structure and functions of the platform.
-                The next phase is building out course content, activating a certificate system, and allowing in-platform payments.
+                Practical Localization Engineering puts that approach to work. Making software work across languages connects
+                human choices with technical details. Code examples and mathematical notation belong alongside the discussion,
+                where readers can connect an implementation to the reasoning behind it.
+              </p>
+              <p style={{ margin: 0 }}>
+                I’m currently building out course content and refining the learning experience. Before a commercial launch, I plan to develop a more complete progress-tracking system for enrolled students. For now, the focus is on useful, freely accessible lessons.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* Authoring approach */}
+        <section style={{ padding: 'clamp(3rem, 8vw, 5rem) 1.5rem', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ maxWidth: 680, margin: '0 auto' }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(1.4rem, 3vw, 1.9rem)', margin: '0 0 1.25rem' }}>
+              Built for the details that make a lesson useful
+            </h2>
+            <dl style={{ margin: 0, display: 'grid', gap: '1.5rem', color: 'var(--text-2)', lineHeight: 1.8 }}>
+              {[
+                { title: 'Explain with code and mathematics', text: 'Use syntax-highlighted code, inline and display LaTeX, and mathematical graphs to connect an idea with a worked example.' },
+                { title: 'Give the writing structure', text: 'Bring objectives, notes, tables, images, and supporting resources into the lesson. Language labels support passages in English and Polish.' },
+                { title: 'Make room for practice and revision', text: 'Include practice quizzes and refine lessons as drafts before publishing updates. Good course content develops through revision.' },
+              ].map((feature) => (
+                <div key={feature.title}>
+                  <dt style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{feature.title}</dt>
+                  <dd style={{ margin: 0 }}>{feature.text}</dd>
+                </div>
+              ))}
+            </dl>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', margin: '2.5rem 0 1rem' }}>
+              Where this approach can go
+            </h3>
+            <p style={{ color: 'var(--text-2)', lineHeight: 1.8, margin: 0 }}>
+              Accessibility engineering, search evaluation, and software reliability all connect implementation with interpretation:
+              understanding a contrast calculation, measuring whether search results are useful, or explaining what a latency percentile means.
+              These are examples of subjects this toolset could support, not additional courses currently offered.
+            </p>
           </div>
         </section>
 
@@ -134,9 +173,10 @@ export default function AboutPage() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
+                { name: 'sketchlet', url: 'https://sketchlet.app', description: 'A daily drawing app I’m working on.' },
+                { name: 'Baker Parks', url: 'https://bakerparks.vercel.app', description: 'My public works tool for SF Bay Area parkgoers.' },
                 { name: 'BakerLinks', url: 'https://bakerlinks.com', description: 'My link-in-bio platform.' },
-                { name: `Mike's List`, url: 'https://mikeslist.xyz', description: 'My SF Bay area events calendar.' },
-                { name: 'My Portfolio', url: 'https://michaelbaker.vercel.app', description: 'Case studies about my current projects.' },
+                { name: 'My Creative Portfolio', url: 'https://michaelbaker.vercel.app', description: 'Case studies about my current projects.' },
               ].map((project) => (
                 <a
                   key={project.name}
@@ -175,11 +215,9 @@ export default function AboutPage() {
               Ready to start learning?
             </h2>
             <p style={{ color: 'var(--text-2)', margin: '0 0 1.75rem' }}>
-              Browse the course catalogue and enroll for free.
+              Explore Practical Localization Engineering. Free to read, with no login required.
             </p>
-            <Link href="/courses">
-              <button className="btn btn-primary btn-lg">See all courses</button>
-            </Link>
+            <Link href="/courses" className="btn btn-primary btn-lg">Explore the course</Link>
           </div>
         </section>
 

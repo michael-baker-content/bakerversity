@@ -63,7 +63,7 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
 }
 
 const ASSESSMENT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
-  quiz:     { bg: 'var(--amber-muted)',  color: 'var(--amber-hover)' },
+  quiz:     { bg: 'var(--amber-muted)',  color: 'var(--amber-ink)' },
   exam:     { bg: 'var(--indigo-muted)', color: 'var(--indigo)' },
   practice: { bg: 'var(--surface-2)',    color: 'var(--text-3)' },
 }

@@ -2,7 +2,7 @@
 
 import BakerversityLogo from '@/components/BakerversityLogo'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/nextjs'
 import ThemeToggle from './ThemeToggle'
@@ -15,6 +15,19 @@ interface SiteNavClientProps {
 
 export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavClientProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+        menuButton.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [menuOpen])
 
   // Close menu on any resize while open
   useEffect(() => {
@@ -54,7 +67,7 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
           </Link>
 
           {/* Group 2 — Nav links (desktop only) */}
-          <nav className="sitenav-desktop" style={{ display: 'flex', gap: 2 }}>
+          <nav aria-label="Primary" className="sitenav-desktop" style={{ display: 'flex', gap: 2 }}>
             <NavLink href="/courses" active={active === 'courses'}>Courses</NavLink>
             <NavLink href="/about" active={active === 'about'}>About</NavLink>
             {isSignedIn && (
@@ -94,6 +107,10 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
             {/* Hamburger — mobile only */}
             <button
               className="sitenav-hamburger"
+              type="button"
+              ref={menuButton}
+              aria-expanded={menuOpen}
+              aria-controls={menuOpen ? "mobile-navigation" : undefined}
               onClick={() => setMenuOpen((o) => !o)}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               style={{
@@ -137,7 +154,7 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
             onClick={() => setMenuOpen(false)}
           />
           {/* Menu panel */}
-          <div style={{
+          <nav id="mobile-navigation" aria-label="Primary mobile" style={{
             position: 'fixed',
             top: 52,
             right: 0,
@@ -193,7 +210,7 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
                 </SignedOut>
               </div>
             )}
-          </div>
+          </nav>
         </>
       )}
 
@@ -217,7 +234,7 @@ function NavLink({ href, active, children }: {
   children: React.ReactNode
 }) {
   return (
-    <Link href={href} style={{
+    <Link href={href} aria-current={active ? 'page' : undefined} style={{
       padding: '5px 12px',
       borderRadius: 'var(--radius)',
       fontSize: 14,
@@ -239,7 +256,7 @@ function MobileLink({ href, active, onClick, children }: {
   children: React.ReactNode
 }) {
   return (
-    <Link href={href} onClick={onClick} style={{
+    <Link href={href} aria-current={active ? 'page' : undefined} onClick={onClick} style={{
       display: 'block',
       padding: '12px 1rem',
       fontSize: 14,

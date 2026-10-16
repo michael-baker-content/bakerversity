@@ -54,7 +54,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
 
 const TYPE_COLORS: Record<QuestionType, { bg: string; color: string }> = {
   multiple_choice: { bg: 'var(--indigo-muted)',  color: 'var(--indigo)' },
-  true_false:      { bg: 'var(--amber-muted)',   color: 'var(--amber-hover)' },
+  true_false:      { bg: 'var(--amber-muted)',   color: 'var(--amber-ink)' },
   short_answer:    { bg: 'var(--surface-2)',      color: 'var(--text-2)' },
   text_response:   { bg: 'var(--surface-2)',      color: 'var(--text-3)' },
 }
