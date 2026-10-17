@@ -1,3 +1,4 @@
+import { imageDelivery } from '@/lib/imageDelivery.mjs'
 import { publicMetadata } from '@/lib/publicMetadata'
 import SiteNav from '@/components/SiteNav'
 import Link from 'next/link'
@@ -16,11 +17,12 @@ export default function AboutPage() {
           padding: 'clamp(3rem, 8vw, 5rem) 1.5rem',
           borderBottom: '1px solid var(--border)',
           backgroundColor: '#18231b',
-          backgroundImage: 'linear-gradient(rgba(12, 22, 15, 0.72), rgba(12, 22, 15, 0.72)), url(https://images.unsplash.com/photo-1583264636244-65f8345ad308?auto=format&fit=crop&w=2000&q=85)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          position: 'relative',
+          overflow: 'hidden',
         }}>
-          <div style={{ maxWidth: 680, margin: '0 auto' }}>
+          <img {...imageDelivery('https://images.unsplash.com/photo-1583264636244-65f8345ad308', '100vw')} alt="" fetchPriority="high" loading="eager" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(12, 22, 15, 0.72)' }} />
+          <div style={{ maxWidth: 680, margin: '0 auto', position: 'relative' }}>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',

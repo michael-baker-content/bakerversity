@@ -1,0 +1,11 @@
+# Image delivery and loading feedback
+
+Published lesson images and course thumbnails use responsive image candidates. Unsplash uses its own image CDN with the original attribution parameters preserved. Public images in this project's Supabase lesson-images bucket use Next.js image optimization and caching; the allowlist is restricted to that storage host and bucket. GIF and SVG URLs bypass optimization, as do other external hosts. Original uploaded files are retained.
+
+Lesson images load lazily and decode asynchronously. The first catalogue thumbnail and decorative hero images load eagerly. The homepage's optional Unsplash API lookup has a three-second timeout so a slow photo service cannot hold up the entire page indefinitely. Hero fallback backgrounds retain readable text. Hero images use responsive sources rather than fixed CSS backgrounds.
+
+Lesson images and course thumbnails show subtle loading placeholders with reduced-motion support. A failed optimized lesson image tries its original URL once; a failed original displays a retry control. Course thumbnails show an unavailable message without nesting buttons inside the course link. New editor uploads retain intrinsic width and height in the image node, reserving their proportions; older images without dimensions can still shift layout when loaded. Newly uploaded unique image URLs receive long-lived storage cache headers. Existing images are not rewritten.
+
+Verification: a real registered JPEG was 48,182 bytes; its tested 960px WebP response was 23,484 bytes (about 51% smaller). This is a sample transfer-size comparison, not a guarantee of faster first-load latency. The first uncached optimized request still needs the storage origin. Loading/success, simulated failure/retry, narrow-screen layout and reduced motion were checked in an isolated browser preview. Pure tests cover responsive sources, host/bucket restrictions, animated-format bypass, saved dimensions, captions and escaping.
+
+No SQL migration or re-upload is required. Production hosting must support the built-in Next.js image optimizer, as Vercel does. Image optimization uses the hosting plan's image-processing allowance. If an optimized lesson request fails, the original remains available as a fallback. No production content was modified during verification.

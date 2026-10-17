@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useId } from 'react'
 import katex from 'katex'
 import { all, createLowlight } from 'lowlight'
 import { hastToHtml } from './renderNode'
@@ -9,6 +9,7 @@ const lowlight = createLowlight(all)
 
 export function HtmlSegment({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null)
+  const tableId = useId()
 
   useEffect(() => {
     if (!ref.current) return
@@ -64,6 +65,76 @@ export function HtmlSegment({ html }: { html: string }) {
       }).join('')
       code.classList.add('with-line-numbers')
     })
+  }, [html])
+
+  useEffect(() => {
+    const root = ref.current
+    if (!root) return
+    const tables = Array.from(root.querySelectorAll<HTMLElement>('.lesson-table')).map((wrapper, index) => {
+      const scroller = wrapper.querySelector<HTMLElement>(':scope > .lesson-table-scroll')
+      const table = scroller?.querySelector('table')
+      const hint = wrapper.querySelector<HTMLElement>(':scope > .lesson-table-hint')
+      if (!scroller || !table || !hint) return null
+      hint.id = `${tableId}-table-hint-${index}`
+      return { scroller, table, hint }
+    }).filter(entry => entry !== null)
+
+    const measure = () => {
+      for (const { scroller, hint } of tables) {
+        const overflowing = scroller.scrollWidth > scroller.clientWidth + 1
+        hint.hidden = !overflowing
+        if (overflowing) {
+          scroller.tabIndex = 0
+          scroller.setAttribute('role', 'region')
+          scroller.setAttribute('aria-label', 'Scrollable table')
+          scroller.setAttribute('aria-describedby', hint.id)
+        } else {
+          scroller.removeAttribute('tabindex')
+          scroller.removeAttribute('role')
+          scroller.removeAttribute('aria-label')
+          scroller.removeAttribute('aria-describedby')
+        }
+      }
+    }
+    // Observe both widths: fonts, images, math and viewport changes can affect overflow.
+    const observer = new ResizeObserver(measure)
+    for (const { scroller, table } of tables) {
+      observer.observe(scroller)
+      observer.observe(table)
+    }
+    measure()
+    return () => observer.disconnect()
+  }, [html, tableId])
+
+  useEffect(() => {
+    const cleanups: (() => void)[] = []
+    ref.current?.querySelectorAll<HTMLElement>('.lesson-image').forEach(wrapper => {
+      const img = wrapper.querySelector('img')
+      const error = wrapper.querySelector<HTMLElement>('.media-image-error')
+      const retry = error?.querySelector('button')
+      if (!img || !error || !retry) return
+      let usedOriginal = false
+      const loaded = () => { wrapper.dataset.state = 'loaded'; error.hidden = true; img.hidden = false }
+      const failed = () => {
+        const original = wrapper.dataset.originalSrc
+        if (!usedOriginal && original && img.getAttribute('src') !== original) {
+          usedOriginal = true
+          img.removeAttribute('srcset'); img.removeAttribute('sizes'); img.src = original
+          return
+        }
+        wrapper.dataset.state = 'error'; error.hidden = false; img.hidden = true
+      }
+      const reload = () => {
+        wrapper.dataset.state = 'loading'; error.hidden = true; img.hidden = false
+        img.src = wrapper.dataset.originalSrc ?? img.src
+      }
+      wrapper.dataset.state = 'loading'
+      img.addEventListener('load', loaded); img.addEventListener('error', failed)
+      retry.addEventListener('click', reload)
+      if (img.complete) { if (img.naturalWidth) loaded(); else failed() }
+      cleanups.push(() => { img.removeEventListener('load', loaded); img.removeEventListener('error', failed); retry.removeEventListener('click', reload) })
+    })
+    return () => cleanups.forEach(cleanup => cleanup())
   }, [html])
 
   return (

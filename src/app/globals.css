@@ -709,3 +709,37 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 #main-content { scroll-margin-top: 68px; }
 .public-information, .site-footer { overflow-wrap: anywhere; }
 .contact-form [role="status"]:empty, .contact-form [role="alert"]:empty { margin: 0; }
+
+/* Wide lesson tables scroll independently; the page retains normal vertical scrolling. */
+.lesson-content { min-width: 0; }
+.lesson-table { max-width: 100%; min-width: 0; margin: 1.25rem 0; }
+.lesson-table-scroll { max-width: 100%; overflow-x: auto; border-radius: var(--radius); }
+.lesson-table-scroll:focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; }
+.lesson-content .lesson-table-hint { margin: 0 0 .5rem; font-size: 13px; color: var(--text-2); }
+.lesson-table table { border-collapse: collapse; width: max-content; margin: 0; table-layout: auto; }
+.lesson-table th, .lesson-table td { min-width: 8rem; max-width: 24rem; border: 1px solid var(--border-strong); padding: 10px 12px; text-align: start; vertical-align: top; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
+.lesson-table th { background: var(--surface-2); font-weight: 600; }
+.lesson-table td { background: var(--surface); }
+.lesson-table th > :last-child, .lesson-table td > :last-child { margin-bottom: 0; }
+@media print {
+  .lesson-table-scroll { overflow: visible; }
+  .lesson-table table { width: 100%; table-layout: fixed; }
+  .lesson-table th, .lesson-table td { min-width: 0; max-width: none; }
+  .lesson-content .lesson-table-hint { display: none; }
+}
+
+/* Image placeholders never hide a successfully loaded image, including without JavaScript. */
+.media-image { position: relative; max-width: 100%; border-radius: var(--radius); background: var(--surface-2); overflow: hidden; }
+.lesson-image { margin: 1rem 0; width: fit-content; }
+.lesson-content .lesson-image img { display: block; max-width: 100%; height: auto; margin: 0; position: relative; }
+.media-image img[hidden] { display: none; }
+.media-image-cover { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; }
+.media-image-cover img { width: 100%; height: 100%; object-fit: cover; position: relative; }
+.lesson-image[data-state="loading"], .lesson-image[data-state="error"] { min-width: min(100%, 280px); min-height: 160px; }
+.media-image[data-state="loading"]::before { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, var(--surface) 50%, transparent 80%); background-size: 200% 100%; animation: image-loading 1.8s ease-in-out infinite; }
+.media-image-error { position: relative; padding: 16px; color: var(--text-2); font-size: 14px; }
+.media-image-error[hidden] { display: none; }
+.media-image-error button { color: var(--indigo); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+@keyframes image-loading { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .media-image[data-state="loading"]::before { animation: none; } }
+@media print { .media-image::before, .media-image-error { display: none; } }

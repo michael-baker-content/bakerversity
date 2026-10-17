@@ -131,6 +131,8 @@ export default function TipTapEditor({
   // Image modal — shown after upload and on double-click of existing image
   const [imageModal, setImageModal] = useState<{
     src: string
+    width?: number
+    height?: number
     alt: string
     title: string
     pos: number | null   // null = newly uploaded (insert), number = existing (update)
@@ -254,7 +256,9 @@ export default function TipTapEditor({
       if (!res.ok) { const d = await res.json(); alert(`Upload failed: ${d.error}`); return }
       const { url } = await res.json()
       // Show modal to set alt text and caption before inserting
-      setImageModal({ src: url, alt: '', title: '', pos: null })
+      let dimensions: { width?: number; height?: number } = {}
+      try { const bitmap = await createImageBitmap(file); dimensions = { width: bitmap.width, height: bitmap.height }; bitmap.close() } catch { /* Older browsers still insert the image. */ }
+      setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
     } catch { alert('Upload failed. Check your connection and try again.') }
     finally { setUploading(false) }
   }, [editor])
@@ -444,7 +448,7 @@ export default function TipTapEditor({
                 onClick={() => {
                   if (!editor) return
                   if (imageModal.pos === null) {
-                    editor.chain().focus().setImage({ src: imageModal.src, alt: imageModal.alt, title: imageModal.title }).run()
+                    editor.chain().focus().setImage({ src: imageModal.src, alt: imageModal.alt, title: imageModal.title, width: imageModal.width, height: imageModal.height }).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node) {

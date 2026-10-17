@@ -20,7 +20,7 @@ export async function uploadAsset(req: Request, kind: 'image' | 'slides' | 'reso
   const bucket = kind === 'image' ? 'lesson-images' : 'lesson-slides'
   const objectPath = `${ctx.user.id}/${crypto.randomUUID()}.${ext}`
   const mime = kind === 'resource' ? 'application/octet-stream' : file.type
-  const { error: uploadError } = await ctx.db.storage.from(bucket).upload(objectPath, await file.arrayBuffer(), { contentType: mime })
+  const { error: uploadError } = await ctx.db.storage.from(bucket).upload(objectPath, await file.arrayBuffer(), { contentType: mime, cacheControl: kind === 'image' ? '31536000' : '3600' })
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
   const { data: asset, error } = await ctx.db.from('assets').insert({ owner_id: ctx.user.id, title: file.name, original_filename: file.name, mime_type: mime, byte_size: file.size, bucket, object_path: objectPath }).select('id').single()
   if (error) {

@@ -1,3 +1,4 @@
+import SiteImage from '@/components/SiteImage'
 import { publicMetadata } from '@/lib/publicMetadata'
 import { createServerClient } from '@/lib/supabase'
 import Link from 'next/link'
@@ -41,26 +42,22 @@ export default async function CoursesPage() {
           </div>
         ) : (
           <div className="course-grid">
-            {courses.map((course) => (
+            {courses.map((course, index) => (
               <div key={course.id}>
                 <Link href={`/courses/${course.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
                   <div className="card card-hover" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {/* Thumbnail or gradient fallback */}
                     {course.thumbnail_url ? (
                       <div style={{
-                        height: 160, margin: '-1.25rem -1.25rem 0',
+                        position: 'relative', height: 160, margin: '-1.25rem -1.25rem 0',
                         borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
                         overflow: 'hidden',
                       }}>
-                        <img
-                          src={course.thumbnail_url}
-                          alt={course.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <SiteImage src={course.thumbnail_url} alt={course.title} sizes="(max-width: 720px) calc(100vw - 48px), 400px" priority={index === 0} cover />
                       </div>
                     ) : (
                       <div style={{
-                        height: 160, margin: '-1.25rem -1.25rem 0',
+                        position: 'relative', height: 160, margin: '-1.25rem -1.25rem 0',
                         borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
                         background: 'linear-gradient(135deg, var(--amber), var(--indigo))',
                       }} />

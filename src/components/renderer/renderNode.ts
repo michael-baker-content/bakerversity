@@ -1,3 +1,4 @@
+import { imageDelivery } from '../../lib/imageDelivery.mjs'
 // Pure functions — no React imports needed
 
 function escapeHtml(str: string) {
@@ -99,14 +100,15 @@ export function renderNode(node: Record<string, unknown>): string {
       </div>`
     }
     case 'image': {
-      const src     = escapeAttr((attrs.src as string) ?? '')
-      const alt     = escapeAttr((attrs.alt as string) ?? '')
+      const original = (attrs.src as string) ?? ''
+      const delivery = imageDelivery(original)
+      const attr = (value: string) => escapeAttr(escapeHtml(value))
+      const width = Number(attrs.width), height = Number(attrs.height)
+      const dimensions = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? ` width="${width}" height="${height}"` : ''
+      const responsive = delivery.srcSet ? ` srcset="${attr(delivery.srcSet)}" sizes="${attr(delivery.sizes ?? '')}"` : ''
+      const img = `<div class="lesson-image media-image" data-original-src="${attr(original)}"><img src="${attr(delivery.src)}"${responsive}${dimensions} alt="${attr((attrs.alt as string) ?? '')}" loading="lazy" decoding="async" /><div class="media-image-error" hidden><span>Image could not be loaded.</span> <button type="button">Retry image</button></div></div>`
       const caption = (attrs.title as string) ?? ''
-      const img = `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:0.5rem 0;display:block;" />`
-      if (caption) {
-        return `<figure style="margin:1rem 0;">${img}<figcaption style="text-align:center;font-size:13px;color:var(--text-3);margin-top:4px;font-style:italic;">${escapeHtml(caption)}</figcaption></figure>`
-      }
-      return img
+      return caption ? `<figure>${img}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : img
     }
     case 'practiceQuiz': {
       // Static placeholder in HTML output — interactive version handled by LessonRenderer
@@ -118,7 +120,7 @@ export function renderNode(node: Record<string, unknown>): string {
         <p style="margin:4px 0 0;font-size:13px;color:var(--text-3);">${questions.length} question${questions.length !== 1 ? 's' : ''}</p>
       </div>`
     }
-    case 'table':     return `<table>${children}</table>`
+    case 'table':     return `<div class="lesson-table"><p class="lesson-table-hint" hidden>Swipe or scroll sideways to see more.</p><div class="lesson-table-scroll"><table>${children}</table></div></div>`
     case 'tableRow':  return `<tr>${children}</tr>`
     case 'tableCell': return `<td>${children}</td>`
     case 'tableHeader': return `<th>${children}</th>`

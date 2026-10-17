@@ -1,3 +1,4 @@
+import { imageDelivery } from '@/lib/imageDelivery.mjs'
 import { publicMetadata } from '@/lib/publicMetadata'
 import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
@@ -21,6 +22,7 @@ async function fetchHeroPhoto(): Promise<UnsplashPhoto | null> {
       'https://api.unsplash.com/photos/random?query=people+learning&orientation=landscape&content_filter=high&count=1',
       {
         headers: { Authorization: `Client-ID ${key}` },
+        signal: AbortSignal.timeout(3000),
         // Revalidate once per hour so the image changes but doesn't
         // hammer the API on every page load
         next: { revalidate: 3600 },
@@ -58,18 +60,12 @@ export default async function HomePage() {
           position: 'relative',
           overflow: 'hidden',
           // Fall back to plain bg if no photo
-          background: heroPhoto ? 'none' : 'var(--bg)',
+          background: heroPhoto ? '#18231b' : 'var(--bg)',
         }}>
           {/* Background image */}
           {heroPhoto && (
             <>
-              <div style={{
-                position: 'absolute', inset: 0,
-                backgroundImage: `url(${heroPhoto.urls.regular})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                zIndex: 0,
-              }} />
+              <img {...imageDelivery(heroPhoto.urls.regular, '100vw')} alt="" fetchPriority="high" loading="eager" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
               {/* Dark overlay so text stays readable */}
               <div style={{
                 position: 'absolute', inset: 0,

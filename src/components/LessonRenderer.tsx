@@ -254,9 +254,6 @@ export default function LessonRenderer({ content }: LessonRendererProps) {
         .lesson-content pre code { background: none; padding: 0; }
         .lesson-content hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
         .lesson-content a { color: var(--indigo); text-decoration: underline; }
-        .lesson-content table { border-collapse: collapse; width: auto; min-width: 120px; margin: 1rem 0; }
-        .lesson-content th, .lesson-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 14px; }
-        .lesson-content th { background: var(--surface-2); font-weight: 600; }
         .lesson-content [data-block-math] { text-align: center; margin: 1.5rem 0; }
         .lesson-content [data-inline-math] { display: inline; }
         .lesson-content figure { margin: 1rem 0; }
