@@ -9,6 +9,7 @@ import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resou
 import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
 import { requestJson } from '@/lib/authoring/request'
+import { uploadLessonPdf } from '@/lib/authoring/uploadPdf'
 import { useAuthoringSession } from '@/lib/authoring/useAuthoringSession'
 import { useUnsavedChanges, discardMessage } from '@/lib/authoring/useUnsavedChanges'
 import MarkdownImport from '@/components/MarkdownImport'
@@ -68,6 +69,7 @@ export default function EditLessonPage() {
   const [slidesDescription, setSlidesDescription] = useState('')
   const [slidesUploading, setSlidesUploading] = useState(false)
   const [slidesError, setSlidesError] = useState('')
+  const [slidesProgress, setSlidesProgress] = useState(0)
   const slidesFileRef = useRef<HTMLInputElement>(null)
 
   const [loadError, setLoadError] = useState('')
@@ -257,6 +259,7 @@ export default function EditLessonPage() {
               <button
                 key={t}
                 type="button"
+                disabled={slidesUploading}
                 onClick={() => { setSlidesType(t); if (t === 'none') setSlidesUrl('') }}
                 className={`btn btn-sm ${slidesType === t ? 'btn-secondary' : 'btn-ghost'}`}
               >
@@ -271,7 +274,7 @@ export default function EditLessonPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: 'var(--success)' }}>✓ PDF uploaded</span>
                   <a href={slidesUrl} target="_blank" style={{ fontSize: 12, color: 'var(--indigo)' }}>View ↗</a>
-                  <button type="button" onClick={() => setSlidesUrl('')}
+                  <button type="button" disabled={slidesUploading} onClick={() => setSlidesUrl('')}
                     style={{ fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     Remove
                   </button>
@@ -279,23 +282,23 @@ export default function EditLessonPage() {
               )}
               <button type="button" onClick={() => slidesFileRef.current?.click()}
                 disabled={slidesUploading} className="btn btn-ghost btn-sm">
-                {slidesUploading ? 'Uploading…' : slidesUrl ? 'Replace PDF' : 'Choose PDF'}
+                {slidesUploading ? (slidesProgress === 100 ? 'Confirming upload…' : `Uploading… ${slidesProgress}%`) : slidesUrl ? 'Replace PDF' : 'Choose PDF'}
               </button>
               <input ref={slidesFileRef} type="file" accept="application/pdf" style={{ display: 'none' }}
                 onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
-                  setSlidesUploading(true); setSlidesError('')
-                  const fd = new FormData(); fd.append('file', file)
+                  setSlidesUploading(true); setSlidesError(''); setSlidesProgress(0)
                   const input = e.target
                   try {
-                    const data = await requestJson<{ url: string }>('/api/admin/upload-slides', { method: 'POST', body: fd })
+                    const data = await uploadLessonPdf(file, setSlidesProgress)
                     setSlidesUrl(data.url)
                   } catch (failure) { setSlidesError(failure instanceof Error ? failure.message : 'Upload failed') }
                   finally { setSlidesUploading(false); input.value = '' }
 
                 }} />
-              {slidesError && <p style={{ fontSize: 12, color: 'var(--danger)', margin: '6px 0 0' }}>{slidesError}</p>}
+              <p style={hintStyle} role="status">{slidesUploading ? (slidesProgress === 100 ? 'Confirming the PDF in storage…' : `Uploading PDF: ${slidesProgress}%`) : 'PDF up to 50 MB. After uploading, save the lesson to attach it.'}</p>
+              {slidesError && <p role="alert" style={{ fontSize: 12, color: 'var(--danger)', margin: '6px 0 0' }}>{slidesError}</p>}
             </div>
           )}
 
