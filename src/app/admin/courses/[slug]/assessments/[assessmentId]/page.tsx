@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
+import ItemMetadataFields, { itemMetadata, type ItemMetadata } from '@/components/ItemMetadataFields'
 import AssetLibrary from '@/components/AssetLibrary'
 import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
+import { requestJson } from '@/lib/authoring/request'
 import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
 import type { AssessmentType } from '@/lib/types'
@@ -31,7 +32,9 @@ interface Question {
   position: number
 }
 
-interface AssessmentData {
+interface AssessmentData extends Partial<ItemMetadata> {
+  version: number
+  resources?: ResourceSelection[]
   id: string
   title: string
   slug: string | null
@@ -242,6 +245,7 @@ function QuestionForm({
                     checked={form.correct_answer === String(i)}
                     onChange={() => set('correct_answer', String(i))}
                     title="Mark as correct"
+                    aria-label={`Mark option ${String.fromCharCode(65 + i)} as correct`}
                     style={{ accentColor: 'var(--indigo)', flexShrink: 0, marginTop: 9 }}
                   />
                   <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 18, paddingTop: 8 }}>
@@ -570,25 +574,25 @@ export default function EditAssessmentPage() {
   const [showLatexIntro, setShowLatexIntro] = useState(false)
 
   const loadQuestions = useCallback(async (cId: string) => {
-    const res = await fetch(`/api/admin/courses/${cId}/assessments/${assessmentId}/questions`)
-    const data = await res.json()
-    setQuestions(Array.isArray(data) ? data : [])
+    const data = await requestJson<Question[]>(`/api/admin/courses/${cId}/assessments/${assessmentId}/questions`)
+    if (!Array.isArray(data)) throw new Error('Unable to load questions: unexpected response.')
+    setQuestions(data)
   }, [assessmentId])
 
   useEffect(() => {
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(courseSlug)}`)
-      .then((r) => r.json())
+    requestJson<{ id: string }>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(courseSlug)}`)
       .then(async (data) => {
-        if (!data.id) return
+        if (!data.id) throw new Error('Course not found.')
         setCourseId(data.id)
 
         const [assessmentRes, modsRes, courseRes, questionsRes] = await Promise.all([
-          fetch(`/api/admin/courses/${data.id}/assessments/${assessmentId}`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}/modules`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}/assessments/${assessmentId}/questions`).then((r) => r.json()),
+          requestJson<AssessmentData>(`/api/admin/courses/${data.id}/assessments/${assessmentId}`),
+          requestJson<{ id: string; title: string }[]>(`/api/admin/courses/${data.id}/modules`),
+          requestJson<{ editor_tools?: string[] }>(`/api/admin/courses/${data.id}`),
+          requestJson<Question[]>(`/api/admin/courses/${data.id}/assessments/${assessmentId}/questions`),
         ])
 
+        if (!assessmentRes.id || !Array.isArray(questionsRes)) throw new Error('Unable to load the assessment and its questions. Please reload.')
         setAssessment(assessmentRes)
         setTitle(assessmentRes.title ?? '')
         setVersion(assessmentRes.version)
@@ -605,6 +609,7 @@ export default function EditAssessmentPage() {
         setQuestions(Array.isArray(questionsRes) ? questionsRes : [])
         setReady(true)
       })
+      .catch(failure => setError(failure instanceof Error ? failure.message : 'Unable to load this assessment.'))
       .finally(() => setLoading(false))
   }, [courseSlug, assessmentId])
 
@@ -685,7 +690,7 @@ export default function EditAssessmentPage() {
 
   if (!assessment) return (
     <main className="page">
-      <p style={{ color: 'var(--danger)' }}>Assessment not found.</p>
+      <p role="alert" style={{ color: 'var(--danger)' }}>{error || 'Assessment not found.'}</p>
       <Link href={`/admin/courses/${courseSlug}`}>← Back to course</Link>
     </main>
   )
@@ -704,7 +709,69 @@ export default function EditAssessmentPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>Edit {typeLabel.toLowerCase()}</h1>
 
-      <p>To edit questions, first save and unpublish this assessment. Saved attempts retain the original questions. Revision history below covers assessment settings and introduction.</p>
+      <p style={{ color: 'var(--text-2)' }}>{title} · {isPublished ? 'Published' : 'Draft'}</p>
+      {error && <p role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
+      {/* Questions section */}
+      <section id="assessment-questions" aria-labelledby="questions-heading" style={{ margin: '1.5rem 0 2.5rem' }}> 
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: '1.25rem' }}>
+          <div>
+            <h2 id="questions-heading" style={{ margin: '0 0 2px', fontSize: '1.1rem', fontFamily: 'var(--font-serif)' }}>Questions</h2>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
+              {questions.length} question{questions.length !== 1 ? 's' : ''}
+              {isGraded && questions.length > 0 && ` · ${passingScore}% to pass`}
+            </p>
+          </div>
+          {!addingQuestion && (
+            <button type="button" disabled={isPublished} onClick={() => setAddingQuestion(true)} className="btn btn-primary">
+              + Add question
+            </button>
+          )}
+        </div>
+
+        <p style={{ color: 'var(--text-2)' }}>Add a question, choose its type, then enter answer choices and mark the correct answer. Questions are saved separately from assessment settings.</p>
+        {isPublished && <p role="status">Question editing is locked while this assessment is published. In <a href="#assessment-settings" style={{ textDecoration: 'underline' }}>settings below</a>, choose “Save and unpublish” and save before editing questions.</p>}
+        <fieldset disabled={isPublished} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>Assessment questions</legend>
+        {questions.length === 0 && !addingQuestion && (
+          <div style={{ padding: '2rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-lg)', color: 'var(--text-3)', fontSize: 14 }}>
+            No questions yet. Add your first question above.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: addingQuestion ? '1.5rem' : 0 }}>
+          {questions.map((q, i) => (
+            <QuestionRow
+              key={q.id}
+              question={q}
+              index={i}
+              courseId={courseId ?? ''}
+              assessmentId={assessmentId}
+              editorPacks={editorPacks}
+              onUpdated={() => loadQuestions(courseId ?? '')}
+              onDeleted={() => loadQuestions(courseId ?? '')}
+            />
+          ))}
+        </div>
+
+        {addingQuestion && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', background: 'var(--surface)' }}>
+            <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700 }}>New question</h3>
+            <QuestionForm
+              initial={emptyForm()}
+              assessmentId={assessmentId}
+              courseId={courseId ?? ''}
+              onSave={handleAddQuestion}
+              onCancel={() => setAddingQuestion(false)}
+              saving={savingQuestion}
+              editorPacks={editorPacks}
+            />
+          </div>
+        )}
+        </fieldset>
+      </section>
+
+      <h2 id="assessment-settings" style={{ scrollMarginTop: 72 }}>Assessment settings &amp; introduction</h2>
+      <p style={{ color: 'var(--text-2)' }}>The introduction is optional text students read before answering. Use the Questions section above to build the quiz or exam.</p>
       <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         <div>
@@ -760,7 +827,7 @@ export default function EditAssessmentPage() {
           {ready && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               <TipTapEditor
-                key="assessment-intro"
+                key={`assessment-intro-${editorKey}`}
                 packs={editorPacks.includes('math') ? ['math'] : []}
                 content={docIsEmpty(introContent) ? undefined : introContent}
                 onChange={setIntroContent}
@@ -777,7 +844,7 @@ export default function EditAssessmentPage() {
         <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
         <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>
 
-        {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
+        
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
@@ -789,65 +856,11 @@ export default function EditAssessmentPage() {
         </div>
       </form>
 
-      {/* Questions section */}
-      <div style={{ marginTop: '3rem', borderTop: '1px solid var(--border)', paddingTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <div>
-            <h2 style={{ margin: '0 0 2px', fontSize: '1.1rem', fontFamily: 'var(--font-serif)' }}>Questions</h2>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
-              {questions.length} question{questions.length !== 1 ? 's' : ''}
-              {isGraded && questions.length > 0 && ` · ${passingScore}% to pass`}
-            </p>
-          </div>
-          {!addingQuestion && (
-            <button type="button" onClick={() => setAddingQuestion(true)} className="btn btn-ghost btn-sm">
-              + Add question
-            </button>
-          )}
-        </div>
-
-        {questions.length === 0 && !addingQuestion && (
-          <div style={{ padding: '2rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-lg)', color: 'var(--text-3)', fontSize: 14 }}>
-            No questions yet. Add your first question above.
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: addingQuestion ? '1.5rem' : 0 }}>
-          {questions.map((q, i) => (
-            <QuestionRow
-              key={q.id}
-              question={q}
-              index={i}
-              courseId={courseId ?? ''}
-              assessmentId={assessmentId}
-              editorPacks={editorPacks}
-              onUpdated={() => loadQuestions(courseId ?? '')}
-              onDeleted={() => loadQuestions(courseId ?? '')}
-            />
-          ))}
-        </div>
-
-        {addingQuestion && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', background: 'var(--surface)' }}>
-            <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700 }}>New question</h3>
-            <QuestionForm
-              initial={emptyForm()}
-              assessmentId={assessmentId}
-              courseId={courseId ?? ''}
-              onSave={handleAddQuestion}
-              onCancel={() => setAddingQuestion(false)}
-              saving={savingQuestion}
-              editorPacks={editorPacks}
-            />
-          </div>
-        )}
-      </div>
-
       {/* Danger zone */}
       <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <h3 style={{ margin: '0 0 0.5rem', fontSize: 15, color: 'var(--danger)' }}>Danger zone</h3>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1rem' }}>
-          Permanently delete this {typeLabel.toLowerCase()} and all its questions.
+          Archive this {typeLabel.toLowerCase()}. Its questions, history, and learning records will be preserved.
         </p>
         <button
           type="button"
@@ -856,7 +869,7 @@ export default function EditAssessmentPage() {
           className="btn btn-sm"
           style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
         >
-          {deleting ? 'Deleting…' : `Delete ${typeLabel.toLowerCase()}`}
+          {deleting ? 'Archiving…' : `Archive ${typeLabel.toLowerCase()}`}
         </button>
       </div>
 

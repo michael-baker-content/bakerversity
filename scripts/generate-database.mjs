@@ -4,8 +4,10 @@ const { PGlite } = await import(process.env.PGLITE_MODULE ?? '@electric-sql/pgli
 import fs from 'node:fs'
 import path from 'node:path'
 const root=path.resolve(import.meta.dirname,'..')
-const baseline=fs.readFileSync(path.join(root,'supabase/baseline.sql'),'utf8')
-const migrations=fs.readdirSync(path.join(root,'supabase/migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'))
+// Git checkouts may use CRLF on Windows and LF on CI; compare SQL content consistently.
+const normalizeNewlines=text=>text.replace(/\r\n/g,'\n')
+const baseline=normalizeNewlines(fs.readFileSync(path.join(root,'supabase/baseline.sql'),'utf8'))
+const migrations=fs.readdirSync(path.join(root,'supabase/migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>normalizeNewlines(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8')))
 const schema='-- GENERATED: fresh installations only. Existing projects apply supabase/migrations in order.\n-- Regenerate with npm run db:generate.\n'+baseline+'\n'+migrations.join('\n')
 const db=new PGlite()
 await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create function auth.uid() returns uuid language sql as 'select null::uuid';")
@@ -36,7 +38,7 @@ for(const f of functions)output+=`${f.proname}: { Args: { ${f.proargnames.map((n
 output+='}; Enums: {}; CompositeTypes: {} } }\n'
 const artifacts={'supabase/schema.sql':schema,'src/lib/database.types.ts':output}
 for(const [file,text] of Object.entries(artifacts)){
- if(process.argv.includes('--check')){if(fs.readFileSync(path.join(root,file),'utf8')!==text)throw Error(file+' is stale. Run npm run db:generate.')}
+ if(process.argv.includes('--check')){if(normalizeNewlines(fs.readFileSync(path.join(root,file),'utf8'))!==text)throw Error(file+' is stale. Run npm run db:generate.')}
  else fs.writeFileSync(path.join(root,file),text)
 }
 await db.close()
