@@ -1,8 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useId, useState } from 'react'
+import { createPortal } from 'react-dom'
+import WritingTools from './WritingTools'
+import './toolbar.css'
 import type { Editor } from '@tiptap/react'
-import type { MafsGraphAttrs } from '@/components/MafsGraph'
 import { CALLOUT_TYPES, LANGUAGES, LANG_EXTENSIONS } from './constants'
 
 interface ToolbarProps {
@@ -15,6 +17,7 @@ interface ToolbarProps {
   filenameInput: string
   lintDiagnostics: { line: number; message: string; severity: 'error' | 'warning' }[]
   onFileClick: () => void
+  onActivateLatex?: () => void
   onLatexButtonClick?: () => void
   onGraphButtonClick?: () => void
   onInsertTerminal: (content: string) => void
@@ -25,39 +28,19 @@ interface ToolbarProps {
   setFilenameInput: (v: string) => void
 }
 
-function ToolbarButton({ onClick, active, children }: {
-  onClick: () => void
-  active: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
-      aria-pressed={active}
-      style={{
-        padding: '3px 8px', fontSize: 12,
-        fontWeight: active ? 600 : 400,
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        background: active ? 'var(--surface-3, var(--border))' : 'var(--surface)',
-        color: active ? 'var(--text)' : 'var(--text-2)',
-        cursor: 'pointer',
-      }}
-    >
-      {children}
-    </button>
-  )
+function ToolbarButton({ onClick, active, children, label }: { onClick: () => void; active: boolean; children: React.ReactNode; label?: string }) {
+  return <button type="button" className="editor-tool" title={label} aria-label={label} aria-pressed={active} onMouseDown={e => e.preventDefault()} onClick={onClick}>{children}</button>
 }
 
 export function Toolbar({
   editor, packs, uploading, showCalloutPicker, showTerminalModal,
   terminalContent, filenameInput, lintDiagnostics,
-  onFileClick, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
+  onFileClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
   onInsertPracticeQuiz,
   setShowCalloutPicker, setShowTerminalModal, setTerminalContent, setFilenameInput,
 }: ToolbarProps) {
+  const [insertOpen, setInsertOpen] = useState(false)
+  const insertId = useId()
   const hasMath      = packs.includes('math')
   const hasCode      = packs.includes('code')
   const hasGraph     = packs.includes('graph')
@@ -67,104 +50,52 @@ export function Toolbar({
 
   return (
     <>
-      {/* ── Toolbar row ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', background: 'var(--surface-2)' }}>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>B</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>I</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>&lt;/&gt;</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })}>H3</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>• List</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. List</ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>\" Quote</ToolbarButton>
-
-        {/* Callout picker */}
-        <div style={{ position: 'relative' }}>
-          <ToolbarButton onClick={() => setShowCalloutPicker((v) => !v)} active={showCalloutPicker}>
-            ✦ Callout
-          </ToolbarButton>
-          {showCalloutPicker && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0, zIndex: 50,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)',
-              minWidth: 170, marginTop: 4, overflow: 'hidden',
-            }}>
-              {CALLOUT_TYPES.map((t) => (
-                <button type="button"
-                  key={t.value}
-                  onClick={() => {
-                    editor.chain().focus().insertContent({
-                      type: 'callout',
-                      attrs: { type: t.value },
-                      content: [{ type: 'paragraph' }],
-                    }).run()
-                    setShowCalloutPicker(false)
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                    padding: '7px 12px', border: 'none', background: 'none',
-                    cursor: 'pointer', fontSize: 13, color: 'var(--text)',
-                    textAlign: 'left', borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  <span>{t.icon}</span>
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+      <WritingTools editor={editor} formatting={<>
+        <ToolbarButton label="Bold" onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}><strong>B</strong></ToolbarButton>
+        <ToolbarButton label="Italic" onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}><em>I</em></ToolbarButton>
+        <span className="editor-desktop-inline"><ToolbarButton label="Inline code" onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>{'</>'}</ToolbarButton></span>
+        <select className="editor-tool" aria-label="Text style" value={editor.isActive('heading', {level:2}) ? '2' : editor.isActive('heading', {level:3}) ? '3' : '0'} onChange={e => { const level = Number(e.target.value); if (level) editor.chain().focus().setHeading({level:level as 2|3}).run(); else editor.chain().focus().setParagraph().run() }}>
+          <option value="0">Paragraph</option><option value="2">Heading 2</option><option value="3">Heading 3</option>
+        </select>
+        <select className="editor-tool editor-desktop-list" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
+          <option value="">List</option><option value="bullet">Bullets</option><option value="ordered">Numbered</option>
+        </select>
+      </>} extraFormatting={<><span className="editor-mobile-only"><ToolbarButton label="Inline code" onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>{'</>'}</ToolbarButton><select className="editor-tool" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
+          <option value="">List</option><option value="bullet">Bullets</option><option value="ordered">Numbered</option>
+        </select></span><ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>Quote</ToolbarButton></>} secondary={
+        <div className="editor-insert-row" aria-label="Insert content" onKeyDown={e => {if(e.key==='Escape'){setInsertOpen(false);(e.currentTarget.querySelector('.editor-insert-toggle') as HTMLButtonElement)?.focus()}}}>
+          <span className="editor-row-label">Insert</span>
+          <button type="button" className="editor-tool editor-insert-toggle" aria-expanded={insertOpen} aria-controls={insertId} onClick={() => setInsertOpen(!insertOpen)}>Insert tools <span aria-hidden="true">⌄</span></button>
+          <div id={insertId} className="editor-insert-tools" data-open={insertOpen} onClick={e => {if ((e.target as HTMLElement).closest('button')) setInsertOpen(false)}}>
+            <ToolbarButton onClick={onFileClick} active={false}>{uploading ? 'Uploading…' : 'Image'}</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run()} active={false}>Table</ToolbarButton>
+            <button type="button" className="editor-tool" aria-expanded={showCalloutPicker} onMouseDown={e => e.preventDefault()} onClick={() => setShowCalloutPicker(v => !v)}>Callout</button>
+            <ToolbarButton onClick={() => onInsertPracticeQuiz?.()} active={false}>Quiz</ToolbarButton>
+            {hasMath && <ToolbarButton label="Formula — type $x$ or $$x$$ then Space, or insert with this tool" onClick={() => onLatexButtonClick?.()} active={false}>Formula</ToolbarButton>}
+            {hasMath && <ToolbarButton onClick={() => onActivateLatex?.()} active={false}>Activate LaTeX</ToolbarButton>}
+            {hasGraph && <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>Graph</ToolbarButton>}
+            {hasCode && <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>}
+            {hasTerminal && <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>Terminal</ToolbarButton>}
+          </div>
         </div>
-
-        <ToolbarButton onClick={onFileClick} active={false}>
-          {uploading ? 'Uploading...' : '🖼 Image'}
-        </ToolbarButton>
-
-        {/* Table insert + context controls */}
-        <div style={{ position: 'relative', display: 'inline-flex', gap: 4 }}>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-            active={false}
-          >
-            ⊞ Table
-          </ToolbarButton>
-          {editor.isActive('table') && (
-            <>
-              <ToolbarButton onClick={() => editor.chain().focus().addColumnAfter().run()} active={false}>+Col</ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().addRowAfter().run()} active={false}>+Row</ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().deleteColumn().run()} active={false}>−Col</ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().deleteRow().run()} active={false}>−Row</ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().deleteTable().run()} active={false}>✕ Table</ToolbarButton>
-            </>
-          )}
-        </div>
-
-        <ToolbarButton onClick={() => onInsertPracticeQuiz?.()} active={false}>✦ Quiz</ToolbarButton>
-
-        {hasMath && <ToolbarButton onClick={() => onLatexButtonClick?.()} active={false}>∑ Formula</ToolbarButton>}
-        {hasGraph && <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>📈 Graph</ToolbarButton>}
-        {hasMath && (
-          <>
-            <span style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
-            <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
-              $x^2$ or $$x^2$$ then Space
-            </span>
-          </>
-        )}
-
-        {hasTerminal && (
-          <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>⬛ Terminal</ToolbarButton>
-        )}
-
-        {/* Code group — wraps as one unit */}
-        {(hasCode || hasPythonLint || hasLangSelect) && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
-            <span style={{ width: 1, background: 'var(--border)', margin: '0 4px', alignSelf: 'stretch' }} />
-            {hasCode && (
-              <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
-            )}
+      } />
+      {showCalloutPicker && <div className="editor-context" aria-label="Callout types">
+        <span className="editor-row-label">Callout</span>
+        {CALLOUT_TYPES.map(t => <button type="button" className="editor-tool" key={t.value} onClick={() => {editor.chain().focus().insertContent({type:'callout',attrs:{type:t.value},content:[{type:'paragraph'}]}).run();setShowCalloutPicker(false)}}>{t.label}</button>)}
+        <button type="button" className="editor-tool" onClick={() => setShowCalloutPicker(false)}>Close</button>
+      </div>}
+      {editor.isActive('table') && <div className="editor-context" aria-label="Table controls">
+        <span className="editor-row-label">Table</span>
+        <ToolbarButton onClick={() => editor.chain().focus().addColumnAfter().run()} active={false}>Add column</ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().addRowAfter().run()} active={false}>Add row</ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().deleteColumn().run()} active={false}>Remove column</ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().deleteRow().run()} active={false}>Remove row</ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().deleteTable().run()} active={false}>Delete table</ToolbarButton>
+      </div>}
+      {editor.isActive('codeBlock') && (hasCode || hasLangSelect) && <div className="editor-context" aria-label="Code settings">
+        <span className="editor-row-label">Code settings</span>
             {hasLangSelect && editor.isActive('codeBlock') && (
-              <select
+              <select aria-label="Code language"
                 value={editor.getAttributes('codeBlock').language ?? 'python'}
                 onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run()}
                 style={{ padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer' }}
@@ -187,6 +118,7 @@ export function Toolbar({
                 <input
                   type="text"
                   name="code-filename"
+                  aria-label="Code filename"
                   placeholder={`name.${LANG_EXTENSIONS[editor.getAttributes('codeBlock').language ?? 'python'] ?? 'py'}`}
                   value={filenameInput}
                   autoComplete="off"
@@ -207,17 +139,16 @@ export function Toolbar({
                     }
                     editor.chain().updateAttributes('codeBlock', { filename: name }).run()
                   }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
                   style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text)', width: 110 }}
                 />
               </>
             )}
-          </span>
-        )}
-      </div>
+
+      </div>}
 
       {/* ── Terminal modal ───────────────────────────────────────────────── */}
-      {showTerminalModal && (
+      {showTerminalModal && createPortal(
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowTerminalModal(false) }}
@@ -243,10 +174,10 @@ export function Toolbar({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ── Python lint panel ────────────────────────────────────────────── */}
-      {hasPythonLint && lintDiagnostics.length > 0 && (
+      {hasPythonLint && editor.isActive('codeBlock') && lintDiagnostics.length > 0 && (
         <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)', padding: '8px 12px', maxHeight: 140, overflowY: 'auto' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Python linter</div>
           {lintDiagnostics.map((d, i) => (

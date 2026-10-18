@@ -1,9 +1,11 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import type { Editor } from '@tiptap/react'
 
-export default function WritingTools({ editor }: { editor: Editor }) {
+export default function WritingTools({ editor, formatting, extraFormatting, secondary }: { editor: Editor; formatting?: ReactNode; extraFormatting?: ReactNode; secondary?: ReactNode }) {
+  const [more, setMore] = useState(false)
+  const moreId = useId()
   const [open, setOpen] = useState(false)
   const panelId = useId()
   const search = editor.storage.findAndReplace
@@ -13,29 +15,24 @@ export default function WritingTools({ editor }: { editor: Editor }) {
   const count = search.results.length
   const button = 'btn btn-ghost btn-sm'
   return (
-    <div style={{ borderTop: '1px solid var(--border)', padding: '6px 12px', fontSize: 12 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className={button} aria-expanded={open} aria-controls={panelId} onClick={() => {
-          if (open) editor.commands.clearSearch()
-          setOpen(!open)
-        }}>Find and replace</button>
-        <button type="button" className={button} aria-pressed={editor.isActive('highlight')}
-          onMouseDown={e => e.preventDefault()} onClick={() => editor.chain().focus().toggleHighlight().run()}>Highlight</button>
-        <button type="button" className={button} aria-pressed={visible}
-          onMouseDown={e => e.preventDefault()} onClick={() => editor.commands.toggleInvisibleCharacters()}>Show invisible characters</button>
-        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>Text language
-          <select aria-label="Text language" value={language} disabled={!selected} title="Select text to label its language" onChange={e => {
-            if (e.target.value) editor.chain().focus().setMark('textLanguage', { language: e.target.value }).run()
-            else editor.chain().focus().unsetMark('textLanguage').run()
-          }}>
-            <option value="">Default / mixed</option>
-            <option value="en">English</option>
-            <option value="pl">Polish</option>
+    <div className="editor-writing-tools">
+      <div className="editor-format-row" aria-label="Format text" onKeyDown={e => {if(e.key==='Escape'){setMore(false);(e.currentTarget.querySelector('.editor-more-toggle') as HTMLButtonElement)?.focus()}}}>
+        <span className="editor-row-label">Text</span>
+        {formatting}
+        <button type="button" className="editor-tool editor-more-toggle" aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>More <span aria-hidden="true">⌄</span></button>
+        <div className="editor-extra-format" id={moreId} data-open={more}>
+          {extraFormatting}
+          <button type="button" className="editor-tool" aria-pressed={editor.isActive('highlight')} onMouseDown={e => e.preventDefault()} onClick={() => editor.chain().focus().toggleHighlight().run()}>Highlight</button>
+          <button type="button" className="editor-tool" aria-expanded={open} aria-controls={panelId} onClick={() => {if(open)editor.commands.clearSearch();setOpen(!open);setMore(false)}}>Find</button>
+          <button type="button" className="editor-tool" title="Show invisible characters: spaces and paragraph marks" aria-label="Show invisible characters" aria-pressed={visible} onMouseDown={e => e.preventDefault()} onClick={() => editor.commands.toggleInvisibleCharacters()}>¶</button>
+          <select className="editor-tool editor-text-language" aria-label="Text language" value={language} disabled={!selected} title="Select text to label its language" onChange={e => {if(e.target.value)editor.chain().focus().setMark('textLanguage',{language:e.target.value}).run();else editor.chain().focus().unsetMark('textLanguage').run()}}>
+            <option value="">Language</option><option value="en">English</option><option value="pl">Polish</option>
           </select>
-        </label>
+        </div>
       </div>
+      {secondary}
       {visible && <p style={{ margin: '6px 0', color: 'var(--text-2)' }}>Editing guides only: · space, ° nonbreaking space, ¬ line break, ¶ paragraph.</p>}
-      {open && <div id={panelId} role="region" aria-label="Find and replace" style={{ display: 'grid', gap: 8, marginTop: 10 }}
+      {open && <div id={panelId} role="region" aria-label="Find and replace" className="editor-search-panel" style={{ display: 'grid', gap: 8, padding: 12 }}
         onKeyDown={e => {
           if (e.key === 'Enter' && e.target instanceof HTMLInputElement && e.target.type === 'text') { e.preventDefault(); if (e.shiftKey) editor.commands.goToPreviousResult(); else editor.commands.goToNextResult() }
           if (e.key === 'Escape') { e.preventDefault(); editor.commands.clearSearch(); setOpen(false); editor.commands.focus() }

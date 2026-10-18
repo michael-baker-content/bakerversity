@@ -1,4 +1,5 @@
 'use client'
+import LatexActivation from './editor/LatexActivationPanel'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { useEditor, EditorContent, Extension } from '@tiptap/react'
@@ -8,7 +9,6 @@ import Highlight from '@tiptap/extension-highlight'
 import FindAndReplace from '@tiptap/extension-find-and-replace'
 import InvisibleCharacters, { SpaceCharacter, HardBreakNode, ParagraphNode, InvisibleCharacter } from '@tiptap/extension-invisible-characters'
 import { TextLanguage } from './editor/TextLanguage'
-import WritingTools from './editor/WritingTools'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import dynamic from 'next/dynamic'
@@ -138,6 +138,7 @@ export default function TipTapEditor({
     pos: number | null   // null = newly uploaded (insert), number = existing (update)
   } | null>(null)
 
+  const [showLatexActivation, setShowLatexActivation] = useState(false)
   const hasMath = packs.includes('math')
   const hasCode = packs.includes('code')
   const hasGraph = packs.includes('graph')
@@ -334,7 +335,7 @@ export default function TipTapEditor({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'visible', background: 'var(--surface)', position: 'relative' }}>
+    <div className="editor-shell" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'visible', background: 'var(--surface)', position: 'relative' }}>
       {editable && editor && (
         <>
           <input
@@ -349,7 +350,7 @@ export default function TipTapEditor({
               e.target.value = ''
             }}
           />
-          <div style={{ position: 'sticky', top: 52, zIndex: 10, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderRadius: 'var(--radius) var(--radius) 0 0' }}>
+          <div className="editor-toolbar-shell" style={{ position: 'sticky', top: 52, zIndex: 10, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderRadius: 'var(--radius) var(--radius) 0 0' }}>
             <Toolbar
               editor={editor}
               packs={packs}
@@ -361,6 +362,7 @@ export default function TipTapEditor({
               lintDiagnostics={lintDiagnostics}
               onFileClick={() => fileInputRef.current?.click()}
               onLatexButtonClick={onLatexButtonClick}
+              onActivateLatex={() => setShowLatexActivation(value => !value)}
               onGraphButtonClick={onGraphButtonClick}
               onInsertTerminal={insertTerminal}
               onInsertPracticeQuiz={() => editor?.chain().focus().insertContent({
@@ -372,7 +374,8 @@ export default function TipTapEditor({
               setTerminalContent={setTerminalContent}
               setFilenameInput={setFilenameInput}
             />
-            <WritingTools editor={editor} />
+
+            {hasMath && showLatexActivation && <LatexActivation editor={editor} onClose={() => setShowLatexActivation(false)} />}
           </div>
         </>
       )}

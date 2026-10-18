@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
@@ -103,6 +103,14 @@ function CollapsibleSection({
       ...initialAssessments.map((a): SequenceItem => ({ kind: 'assessment', item: a })),
     ].sort((a, b) => a.item.position - b.item.position)
   )
+
+  // Reconcile fresh server data without resetting the section's open state.
+  useEffect(() => {
+    setSequence([
+      ...initialLessons.map((item): SequenceItem => ({ kind: 'lesson', item })),
+      ...initialAssessments.map((item): SequenceItem => ({ kind: 'assessment', item })),
+    ].sort((a, b) => a.item.position - b.item.position))
+  }, [initialLessons, initialAssessments])
 
   const move = async (itemId: string, direction: 'up' | 'down') => {
     const index = sequence.findIndex((s) => s.item.id === itemId)
@@ -327,6 +335,7 @@ function CourseLevelSection({ label, description, pages: initialPages, courseSlu
 }) {
   const [open, setOpen] = useState(true)
   const [pages, setPages] = useState<Page[]>(initialPages)
+  useEffect(() => { setPages(initialPages) }, [initialPages])
   const [moving, setMoving] = useState<string | null>(null)
 
   const move = async (pageId: string, direction: 'up' | 'down') => {
