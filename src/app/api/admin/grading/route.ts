@@ -20,52 +20,56 @@ export async function GET() {
   }
 
   // Get all courses this instructor owns
-  const { data: courses } = await supabase
+  const { data: courses, error: coursesError } = await supabase
     .from('courses')
     .select('id, title, slug')
     .eq('instructor_id', user.id)
 
+  if (coursesError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   if (!courses?.length) return NextResponse.json({ responses: [] })
 
   const courseIds = courses.map((c) => c.id)
   const courseMap = new Map(courses.map((c) => [c.id, c]))
 
   // Get all assessments in those courses
-  const { data: assessments } = await supabase
+  const { data: assessments, error: assessmentsError } = await supabase
     .from('assessments')
     .select('id, title, course_id')
     .in('course_id', courseIds)
 
+  if (assessmentsError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   if (!assessments?.length) return NextResponse.json({ responses: [] })
 
   const assessmentIds = assessments.map((a) => a.id)
   const assessmentMap = new Map(assessments.map((a) => [a.id, a]))
 
   // Get all text_response questions for those assessments
-  const { data: textQuestions } = await supabase
+  const { data: textQuestions, error: textQuestionsError } = await supabase
     .from('assessment_questions')
     .select('id, assessment_id, question_text, content, position')
     .in('assessment_id', assessmentIds)
     .eq('question_type', 'text_response')
     .order('position', { ascending: true })
 
-  if (!textQuestions?.length) return NextResponse.json({ responses: [] })
 
+
+  if (textQuestionsError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   // Build a map: assessment_id → text question ids
   const textQsByAssessment = new Map<string, typeof textQuestions>()
-  for (const q of textQuestions) {
+  for (const q of textQuestions ?? []) {
     if (!textQsByAssessment.has(q.assessment_id)) textQsByAssessment.set(q.assessment_id, [])
     textQsByAssessment.get(q.assessment_id)!.push(q)
   }
-  const textQuestionIds = new Set(textQuestions.map((q) => q.id))
+  const textQuestionIds = new Set((textQuestions ?? []).map((q) => q.id))
 
   // Get all attempts for these assessments, with student info
-  const { data: attempts } = await supabase
+  const { data: attempts, error: attemptsError } = await supabase
     .from('assessment_attempts')
     .select(`
       id,
       assessment_id,
       answers,
+      question_snapshot,
       score,
       passed,
       attempted_at,
@@ -78,12 +82,19 @@ export async function GET() {
     .in('assessment_id', assessmentIds)
     .order('attempted_at', { ascending: false })
 
+  if (attemptsError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   if (!attempts?.length) return NextResponse.json({ responses: [] })
 
   // Filter to only attempts that have at least one non-empty text_response answer
+  // Review the question as it appeared when the learner submitted, not its current edit.
+  const questionsFor = (attempt: typeof attempts[number]) => {
+    const snapshot=attempt.question_snapshot
+    if(Array.isArray(snapshot) && snapshot.length) return snapshot.filter(q=>q && typeof q==='object' && !Array.isArray(q) && q.question_type==='text_response') as unknown as NonNullable<typeof textQuestions>
+    return textQsByAssessment.get(attempt.assessment_id) ?? []
+  }
   const relevantAttempts = attempts.filter((attempt) => {
     const answers = attempt.answers as Record<string, string>
-    const questions = textQsByAssessment.get(attempt.assessment_id) ?? []
+    const questions = questionsFor(attempt)
     return questions.some((q) => answers[q.id]?.trim())
   })
 
@@ -91,11 +102,12 @@ export async function GET() {
 
   // Fetch all existing feedback for relevant attempts
   const attemptIds = relevantAttempts.map((a) => a.id)
-  const { data: feedbackRows } = await supabase
+  const { data: feedbackRows, error: feedbackRowsError } = await supabase
     .from('response_feedback')
     .select('assessment_attempt_id, question_id, feedback_text, updated_at')
     .in('assessment_attempt_id', attemptIds)
 
+  if (feedbackRowsError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   // Build feedback lookup: attempt_id:question_id → feedback
   const feedbackMap = new Map<string, { feedback_text: string; updated_at: string }>()
   for (const f of feedbackRows ?? []) {
@@ -111,7 +123,7 @@ export async function GET() {
     const course = courseMap.get(assessment.course_id)!
     const student = attempt.users as unknown as { id: string; full_name: string | null; email: string }
     const answers = attempt.answers as Record<string, string>
-    const questions = textQsByAssessment.get(attempt.assessment_id) ?? []
+    const questions = questionsFor(attempt)
 
     const responses = questions
       .filter((q) => answers[q.id]?.trim())

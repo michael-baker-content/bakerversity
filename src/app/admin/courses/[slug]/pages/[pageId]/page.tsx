@@ -6,8 +6,11 @@ import Link from 'next/link'
 import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
 import AssetLibrary from '@/components/AssetLibrary'
 import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
+import { useDraft } from '@/lib/authoring/useDraft'
+import DraftStatus from '@/components/DraftStatus'
 import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
+import { requestJson } from '@/lib/authoring/request'
 import MarkdownImport from '@/components/MarkdownImport'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
@@ -33,8 +36,8 @@ export default function EditCoursePage() {
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [ready, setReady] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [loadedId, setLoadedId] = useState<string | null>(null)
+  const ready = loadedId === pageId
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
@@ -48,15 +51,23 @@ export default function EditCoursePage() {
   const [resources, setResources] = useState<ResourceSelection[]>([])
   const [metadata, setMetadata] = useState(() => itemMetadata({}, 'page'))
 
+  const draftFields = {title, page_type:pageType, introduction:introduction || null, content, resources, ...metadata}
+  const draft = useDraft(JSON.stringify(draftFields), pageId, version, ready)
+  const saving = draft.state.status === 'saving'
+
   useEffect(() => {
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
+    let active = true
+    setLoadedId(null);setLoading(true);setError('')
+    requestJson<{id:string}>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then(async (data) => {
-        if (!data.id) return
+        if (!active) return
+        if (!data.id) throw new Error('Course not found.')
         setCourseId(data.id)
         const [pageRes] = await Promise.all([
-          fetch(`/api/admin/courses/${data.id}/pages/${pageId}`).then((r) => r.json()),
+          requestJson<Partial<import('@/components/ItemMetadataFields').ItemMetadata> & {title:string;version:number;resources?:ResourceSelection[];page_type:string;introduction:string;content:Record<string,unknown>;is_published:boolean}>(`/api/admin/courses/${data.id}/pages/${pageId}`),
         ])
+        if (!active) return
+        if (!Number.isInteger(pageRes.version)) throw new Error('Unable to load the saved page safely.')
         setTitle(pageRes.title ?? '')
         setVersion(pageRes.version)
         setResources(resourceSelection(pageRes.resources ?? []))
@@ -65,44 +76,27 @@ export default function EditCoursePage() {
         setIntroduction(pageRes.introduction ?? '')
         setContent(pageRes.content ?? {})
         setIsPublished(pageRes.is_published ?? false)
-        setReady(true)
+        setLoadedId(pageId)
       })
-      .finally(() => setLoading(false))
+      .catch(e=>active && setError(e instanceof Error ? e.message : 'Unable to load page.'))
+      .finally(() => {if(active)setLoading(false)})
+    return () => {active=false}
   }, [slug, pageId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
-    setSaving(true)
+    if (!courseId || !ready || saving || deleting) return
     setError('')
-
-    const res = await fetch(`/api/admin/courses/${courseId}/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        page_type: pageType,
-        introduction: introduction || null,
-        content,
-        version, action: saveAction, resources, ...metadata,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to save')
-      setSaving(false)
-      return
-    }
-    router.push(`/admin/courses/${slug}`)
+    const action=saveAction
+    const saved=await draft.save(`/api/admin/courses/${courseId}/pages/${pageId}`, {...draftFields,action})
+    if(saved){if(action!=='draft')setIsPublished(action==='publish');setSaveAction('draft')}
   }
 
   const handleDelete = async () => {
-    if (!courseId || !confirm('Archive this page? Its history will be preserved.')) return
-    setDeleting(true)
-    const deletion = await fetch(`/api/admin/courses/${courseId}/pages/${pageId}`, { method: 'DELETE' })
-    if (!deletion.ok) { setError((await deletion.json()).error ?? 'Unable to archive'); setDeleting(false); return }
-    router.push(`/admin/courses/${slug}`)
+    if(!courseId || saving || deleting || !confirm('Archive this item? Its history will be preserved.'))return
+    setDeleting(true);setError('')
+    try {await requestJson(`/api/admin/courses/${courseId}/pages/${pageId}`,{method:'DELETE'},'archive');router.push(`/admin/courses/${slug}`)}
+    catch(e){setError(e instanceof Error ? e.message : 'Unable to archive.');setDeleting(false)}
   }
 
   if (loading) return (
@@ -110,6 +104,8 @@ export default function EditCoursePage() {
       Loading…
     </div>
   )
+
+  if(!ready)return <main className="page"><p role="alert">{error || 'Unable to load this page.'}</p><button type="button" onClick={()=>window.location.reload()}>Retry loading</button></main>
 
   return (
     <main className="page">
@@ -123,6 +119,7 @@ export default function EditCoursePage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>Edit page</h1>
 
+      <DraftStatus session={draft} fields={draftFields} kind="page" overview={`/admin/courses/${slug}`} />
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         {/* Page type */}
@@ -184,7 +181,7 @@ export default function EditCoursePage() {
         </div>
 
         {/* Published */}
-        {pageId && <RevisionHistory itemId={pageId} onRestore={v => { setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}
+        {pageId && <RevisionHistory itemId={pageId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}
         {pageId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
         <ItemMetadataFields value={metadata} onChange={setMetadata} />
         <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
@@ -193,7 +190,7 @@ export default function EditCoursePage() {
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
+          <button type="submit" disabled={!draft.canSave || deleting || !title.trim() || !courseId} className="btn btn-primary">
             {saving ? 'Saving…' : 'Save page'}
           </button>
           <Link href={`/admin/courses/${slug}`}>
@@ -210,7 +207,7 @@ export default function EditCoursePage() {
         </p>
         <button
           onClick={handleDelete}
-          disabled={deleting}
+          disabled={deleting || saving || !draft.canSave}
           className="btn btn-sm"
           style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
         >

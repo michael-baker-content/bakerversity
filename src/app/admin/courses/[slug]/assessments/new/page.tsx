@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
+import { downloadRecovery } from '@/lib/authoring/recovery'
+import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import type { AssessmentType } from '@/lib/types'
 
 const ASSESSMENT_TYPES: { value: AssessmentType; label: string; description: string }[] = [
@@ -33,6 +36,7 @@ export default function NewAssessmentPage() {
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [createUncertain, setCreateUncertain] = useState(false)
 
   const [title, setTitle] = useState('')
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('quiz')
@@ -43,16 +47,15 @@ export default function NewAssessmentPage() {
     const qp = new URLSearchParams(window.location.search)
     const preModule = qp.get('module')
 
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
+    requestJson<{id:string}>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then(async (data) => {
         if (!data.id) return
         setCourseId(data.id)
-        const res = await fetch(`/api/admin/courses/${data.id}/modules`)
-        const mods = await res.json()
+        const mods = await requestJson<{id:string;title:string}[]>(`/api/admin/courses/${data.id}/modules`)
         setModules(Array.isArray(mods) ? mods : [])
         if (preModule) setModuleId(preModule)
       })
+      .catch(error=>setError(error instanceof Error ? error.message : 'Unable to load course.'))
   }, [slug])
 
   // Keep is_graded in sync: practice is always ungraded
@@ -61,33 +64,19 @@ export default function NewAssessmentPage() {
     else setIsGraded(true)
   }, [assessmentType])
 
+  const creationFields = {title,assessment_type:assessmentType,module_id:moduleId,is_graded:isGraded,passing_score:passingScore}
+  useUnsavedChanges(!!title.trim() || createUncertain)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
-    setLoading(true)
-    setError('')
+    if (!courseId || loading || createUncertain) return
+    setLoading(true);setError('')
+    try {
+      const result=await requestJson<{id:string}>(`/api/admin/courses/${courseId}/assessments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(creationFields)},'assessment creation')
+      if(!result.id)throw new AuthoringRequestError('Creation could not be confirmed. Download a recovery copy, then check the overview before trying again.',200,true)
+      router.push(`/admin/courses/${slug}/assessments/${result.id}`)
+    } catch(error) {setError(error instanceof Error ? error.message : 'Unable to create this item.');setCreateUncertain(error instanceof AuthoringRequestError && error.uncertain)}
+    finally {setLoading(false)}
 
-    const res = await fetch(`/api/admin/courses/${courseId}/assessments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        assessment_type: assessmentType,
-        module_id: moduleId ?? null,
-        is_graded: isGraded,
-        passing_score: passingScore,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to create assessment')
-      setLoading(false)
-      return
-    }
-
-    const { id } = await res.json()
-    router.push(`/admin/courses/${slug}/assessments/${id}`)
   }
 
   return (
@@ -102,6 +91,7 @@ export default function NewAssessmentPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>New assessment</h1>
 
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         {/* Title */}
@@ -203,7 +193,7 @@ export default function NewAssessmentPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="submit"
-            disabled={loading || !title.trim() || !courseId}
+            disabled={loading || createUncertain || !title.trim() || !courseId}
             className="btn btn-primary"
           >
             {loading ? 'Saving…' : 'Create assessment'}

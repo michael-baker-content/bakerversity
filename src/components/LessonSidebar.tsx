@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
+import { useOutlineScroll } from './useOutlineScroll'
 import { buildCourseSequence, sequenceItemHref, INTRO_PAGE_TYPES, type SeqLesson, type SeqAssessment, type SeqPage, type SeqModule } from '@/lib/courseSequence'
 
 interface LessonSidebarProps {
@@ -49,15 +50,17 @@ function SidebarContent(props: LessonSidebarProps & { onNavigate?: () => void })
 export default function LessonSidebar(props: LessonSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const panelId = useId()
+  const desktopScroll = useOutlineScroll(props.courseSlug, 'desktop')
+  const mobileScroll = useOutlineScroll(props.courseSlug, 'mobile', mobileOpen)
   return <>
-    <aside className="lesson-sidebar-desktop"><SidebarContent {...props} /></aside>
+    <aside ref={desktopScroll.ref} onScroll={desktopScroll.remember} className="lesson-sidebar-desktop"><SidebarContent {...props} onNavigate={desktopScroll.remember} /></aside>
     <div className="lesson-sidebar-mobile" onKeyDown={e => {
       if (e.key === 'Escape') { setMobileOpen(false); document.getElementById(`${panelId}-toggle`)?.focus() }
     }}>
       <button id={`${panelId}-toggle`} type="button" className="course-outline-toggle" aria-expanded={mobileOpen} aria-controls={panelId} onClick={() => setMobileOpen(value => !value)}>
         <span>Course contents</span><span aria-hidden="true">{mobileOpen ? '−' : '+'}</span>
       </button>
-      <div id={panelId} hidden={!mobileOpen} className="course-outline-mobile-panel"><SidebarContent {...props} onNavigate={() => setMobileOpen(false)} /></div>
+      <div ref={mobileScroll.ref} onScroll={mobileScroll.remember} id={panelId} hidden={!mobileOpen} className="course-outline-mobile-panel"><SidebarContent {...props} onNavigate={() => { mobileScroll.remember(); setMobileOpen(false) }} /></div>
     </div>
   </>
 }

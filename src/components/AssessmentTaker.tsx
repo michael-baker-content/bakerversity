@@ -110,31 +110,21 @@ export default function AssessmentTaker({
   const allGradedAnswered = gradedQuestions.every((q) => answers[q.id]?.trim())
 
   const handleSubmit = async () => {
+    if (submitting) return
     setSubmitting(true)
     setError('')
 
     const payload = JSON.stringify(answers)
     if (!submission.current || submission.current.payload !== payload) submission.current = { payload, id: crypto.randomUUID() }
-    const res = await fetch(`/api/students/assessments/${assessmentId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, request_id: submission.current.id }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Submission failed. Please try again.')
-      setSubmitting(false)
-      return
-    }
-
-    const data: SubmitResponse = await res.json()
-    setResult(data)
-    setSubmitting(false)
-
-    setTimeout(() => {
-      document.getElementById('assessment-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
+    try {
+      const res = await fetch(`/api/students/assessments/${assessmentId}/submit`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers,request_id:submission.current.id}),signal:AbortSignal.timeout(30000)})
+      const data = await res.json().catch(()=>null)
+      if (!res.ok) throw new Error(data?.error ?? (res.status===401 ? 'Sign in before submitting. Your answers are still here.' : 'Submission failed. Your answers are still here; please retry.'))
+      if(!data || !Array.isArray(data.results) || typeof data.passed!=='boolean')throw new Error('The submission result could not be confirmed. Retry with the same answers to check it safely.')
+      setResult(data)
+      setTimeout(()=>document.getElementById('assessment-results')?.scrollIntoView({behavior:'smooth',block:'start'}),100)
+    } catch(error) {setError(error instanceof TypeError || (error instanceof DOMException && error.name==='TimeoutError') ? 'The submission response was lost. Your answers are still here. Retry with the same answers; the same submission will not be recorded twice.' : error instanceof Error ? error.message : 'Unable to submit. Your answers are still here.')}
+    finally {setSubmitting(false)}
   }
 
   const handleRetake = () => {
@@ -216,7 +206,7 @@ export default function AssessmentTaker({
                           transition: 'border-color 0.1s, background 0.1s',
                         }}
                       >
-                        <input
+                        <input disabled={submitting}
                           type="radio"
                           name={q.id}
                           value={String(i)}
@@ -254,7 +244,7 @@ export default function AssessmentTaker({
                           transition: 'border-color 0.1s, background 0.1s',
                         }}
                       >
-                        <input
+                        <input disabled={submitting}
                           type="radio"
                           name={q.id}
                           value={val}
@@ -271,7 +261,7 @@ export default function AssessmentTaker({
 
               {q.question_type === 'short_answer' && (
                 <div>
-                  <input
+                  <input disabled={submitting}
                     className="input"
                     type="text"
                     value={answers[q.id] ?? ''}
@@ -287,7 +277,7 @@ export default function AssessmentTaker({
 
               {q.question_type === 'text_response' && (
                 <div>
-                  <textarea
+                  <textarea disabled={submitting}
                     className="input"
                     value={answers[q.id] ?? ''}
                     onChange={(e) => setAnswer(q.id, e.target.value)}
@@ -304,7 +294,7 @@ export default function AssessmentTaker({
           ))}
 
           {error && (
-            <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>
+            <p role="alert" style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>
           )}
 
           <button

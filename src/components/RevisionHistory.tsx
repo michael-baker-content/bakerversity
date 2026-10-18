@@ -1,14 +1,16 @@
 'use client'
 import { useState } from 'react'
+import { requestJson } from '@/lib/authoring/request'
 type Revision = { id: string; version: number; created_at: string; snapshot: Record<string, unknown> }
 export default function RevisionHistory({ itemId, onRestore }: { itemId: string; onRestore: (snapshot: Record<string, unknown>) => void }) {
   const [rows, setRows] = useState<Revision[] | null>(null)
   const [error, setError] = useState('')
   async function load() {
     try {
-      const res = await fetch(`/api/admin/items/${itemId}/history`)
-      if (!res.ok) throw new Error('Unable to load revision history')
-      setRows(await res.json())
+      setError('')
+      const rows = await requestJson<Revision[]>(`/api/admin/items/${itemId}/history`)
+      if(!Array.isArray(rows))throw new Error('Unable to load revision history.')
+      setRows(rows)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load history') }
   }
   return <div><button className="btn btn-ghost" type="button" onClick={load}>Revision history</button>{error && <p role="alert">{error}</p>}

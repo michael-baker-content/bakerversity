@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
+import { downloadRecovery } from '@/lib/authoring/recovery'
+import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import dynamic from 'next/dynamic'
 import MarkdownImport from '@/components/MarkdownImport'
 
@@ -19,6 +22,7 @@ export default function NewLessonPage() {
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [createUncertain, setCreateUncertain] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState<Record<string, unknown>>({})
 
@@ -28,38 +32,30 @@ export default function NewLessonPage() {
     const params = new URLSearchParams(window.location.search)
     const preselectedModule = params.get('module')
 
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
+    requestJson<{id:string}>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then(async (data) => {
         if (!data.id) return
         setCourseId(data.id)
-        const res = await fetch(`/api/admin/courses/${data.id}/modules`)
-        const mods = await res.json()
+        const mods = await requestJson<{id:string;title:string}[]>(`/api/admin/courses/${data.id}/modules`)
         setModules(Array.isArray(mods) ? mods : [])
         if (preselectedModule) setModuleId(preselectedModule)
       })
+      .catch(error=>setError(error instanceof Error ? error.message : 'Unable to load course.'))
   }, [slug])
 
+  const creationFields = {title,content,module_id:moduleId}
+  useUnsavedChanges(!!title.trim() || createUncertain)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
-    setLoading(true)
-    setError('')
+    if (!courseId || loading || createUncertain) return
+    setLoading(true);setError('')
+    try {
+      const result=await requestJson<{id:string}>(`/api/admin/courses/${courseId}/lessons`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(creationFields)},'lesson creation')
+      if(!result.id)throw new AuthoringRequestError('Creation could not be confirmed. Download a recovery copy, then check the overview before trying again.',200,true)
+      router.push(`/admin/courses/${slug}`)
+    } catch(error) {setError(error instanceof Error ? error.message : 'Unable to create this item.');setCreateUncertain(error instanceof AuthoringRequestError && error.uncertain)}
+    finally {setLoading(false)}
 
-    const res = await fetch(`/api/admin/courses/${courseId}/lessons`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content, module_id: moduleId ?? undefined }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to create lesson')
-      setLoading(false)
-      return
-    }
-
-    router.push(`/admin/courses/${slug}`)
   }
 
   return (
@@ -74,6 +70,7 @@ export default function NewLessonPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>New lesson</h1>
 
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div>
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -123,7 +120,7 @@ export default function NewLessonPage() {
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={loading || !title || !courseId} className="btn btn-primary">
+          <button type="submit" disabled={loading || createUncertain || !title || !courseId} className="btn btn-primary">
             {loading ? 'Saving…' : 'Save lesson'}
           </button>
           <Link href={`/admin/courses/${slug}`}>

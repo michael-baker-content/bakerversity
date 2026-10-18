@@ -17,7 +17,7 @@ export default function AssetLibrary({ value = [], onChange, disabled = false }:
     setBusy(true)
     try {
       const body = new FormData(); body.append('file', file)
-      await requestJson('/api/admin/assets', { method: 'POST', body })
+      await requestJson('/api/admin/assets', { method: 'POST', body }, 'resource upload')
       await load(); setMessage('File uploaded to the library. Select it below to include it in this item.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Upload failed') }
     finally { setBusy(false) }

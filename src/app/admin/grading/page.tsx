@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { requestJson } from '@/lib/authoring/request'
 import LessonRenderer from '@/components/LessonRenderer'
 
 interface QuestionResponse {
@@ -52,6 +53,7 @@ function isEmptyDoc(doc: Record<string, unknown>): boolean {
 }
 
 function GradingContent() {
+  const [error, setError] = useState('')
   const [groups, setGroups] = useState<AttemptGroup[]>([])
   const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
@@ -62,8 +64,7 @@ function GradingContent() {
   const [saved, setSaved] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    fetch('/api/admin/grading')
-      .then((r) => r.json())
+    requestJson<{responses:AttemptGroup[]}>('/api/admin/grading')
       .then((data) => {
         setGroups(data.responses ?? [])
         // Pre-populate feedback inputs with existing feedback
@@ -77,17 +78,20 @@ function GradingContent() {
         }
         setFeedback(initial)
       })
+      .catch(e=>setError(e instanceof Error ? e.message : 'Unable to load responses.'))
       .finally(() => setLoading(false))
   }, [])
 
   const saveFeedback = async (group: AttemptGroup, response: QuestionResponse) => {
     const key = `${group.attempt_id}:${response.question_id}`
     const text = feedback[key]?.trim()
-    if (!text) return
+    if (!text || saving[key]) return
+    setError('')
 
     setSaving((s) => ({ ...s, [key]: true }))
 
-    await fetch('/api/admin/grading', {
+    try {
+    await requestJson('/api/admin/grading', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -112,6 +116,8 @@ function GradingContent() {
     setSaving((s) => ({ ...s, [key]: false }))
     setSaved((s) => ({ ...s, [key]: true }))
     setTimeout(() => setSaved((s) => ({ ...s, [key]: false })), 2000)
+    } catch(e){setError(e instanceof Error ? e.message : 'Unable to save feedback. Your text is still here.')}
+    finally {setSaving(s=>({...s,[key]:false}))}
   }
 
   const courses = Array.from(new Map(groups.map((g) => [g.course.id, g.course])).values())
@@ -137,6 +143,7 @@ function GradingContent() {
 
   return (
     <main className="page">
+      {error && <p role="alert">{error}</p>}
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: '1.25rem' }}>
         <Link href="/dashboard" style={{ color: 'var(--text-3)' }}>Dashboard</Link>
         <span style={{ margin: '0 6px' }}>›</span>
@@ -290,6 +297,7 @@ function GradingContent() {
                       </label>
                       <textarea
                         className="input"
+                        disabled={saving[key]}
                         value={feedback[key] ?? ''}
                         onChange={(e) => setFeedback((f) => ({ ...f, [key]: e.target.value }))}
                         placeholder="Type your feedback here…"

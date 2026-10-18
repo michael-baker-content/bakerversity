@@ -6,7 +6,12 @@ import Link from 'next/link'
 import ItemMetadataFields, { itemMetadata, type ItemMetadata } from '@/components/ItemMetadataFields'
 import AssetLibrary from '@/components/AssetLibrary'
 import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
-import { requestJson } from '@/lib/authoring/request'
+import { compactAnswerOptions, removeAnswerOption, hasQuestionContent } from '@/lib/authoring/questions'
+import { useUnsavedChanges, discardMessage } from '@/lib/authoring/useUnsavedChanges'
+import { downloadRecovery } from '@/lib/authoring/recovery'
+import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
+import { useDraft } from '@/lib/authoring/useDraft'
+import DraftStatus from '@/components/DraftStatus'
 import RevisionHistory from '@/components/RevisionHistory'
 import dynamic from 'next/dynamic'
 import type { AssessmentType } from '@/lib/types'
@@ -66,16 +71,7 @@ function emptyDoc(): Record<string, unknown> {
   return { type: 'doc', content: [{ type: 'paragraph' }] }
 }
 
-function docIsEmpty(doc: Record<string, unknown> | null): boolean {
-  if (!doc) return true
-  const content = doc.content as unknown[]
-  if (!content?.length) return true
-  if (content.length === 1) {
-    const first = content[0] as Record<string, unknown>
-    if (first.type === 'paragraph' && !first.content) return true
-  }
-  return false
-}
+function docIsEmpty(doc: Record<string, unknown> | null): boolean { return !hasQuestionContent(doc) }
 
 // ── QuestionForm ──────────────────────────────────────────────────────────────
 
@@ -117,6 +113,7 @@ function QuestionForm({
   editorPacks: string[]
 }) {
   const [form, setForm] = useState<QuestionFormState>(initial)
+  useUnsavedChanges(saving || JSON.stringify(form) !== JSON.stringify(initial))
   const [showLatexModal, setShowLatexModal] = useState(false)
   const [latexTarget, setLatexTarget] = useState<'question' | 'explanation'>('question')
   const insertLatexQuestionRef = useRef<((latex: string, display: boolean) => void) | null>(null)
@@ -143,9 +140,7 @@ function QuestionForm({
 
   const addOption = () => set('options', [...form.options, ''])
   const removeOption = (i: number) => {
-    const next = form.options.filter((_, idx) => idx !== i)
-    set('options', next)
-    if (form.correct_answer === String(i)) set('correct_answer', '0')
+    setForm(f => ({...f, ...removeAnswerOption(f.options, f.correct_answer, i)}))
   }
 
   const setAccepted = (i: number, val: string) => {
@@ -158,14 +153,14 @@ function QuestionForm({
     set('accepted_answers', form.accepted_answers.filter((_, idx) => idx !== i))
 
   const canSave = !docIsEmpty(form.content) && (
-    form.question_type !== 'short_answer' ||
-    form.accepted_answers.some((a) => a.trim())
+    form.question_type === 'multiple_choice' ? form.options.filter(o => o.trim()).length >= 2 && form.correct_answer !== '' && !!form.options[Number(form.correct_answer)]?.trim() : form.question_type !== 'short_answer' || form.accepted_answers.some(a => a.trim())
   )
 
   const hasMath = editorPacks.includes('math')
 
   return (
     <>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => downloadRecovery('question', form)}>Download question recovery copy</button>
       {showLatexModal && hasMath && (
         <LatexModal
           onInsert={(latex, displayMode) => {
@@ -196,7 +191,7 @@ function QuestionForm({
             ))}
           </div>
           {form.question_type === 'text_response' && (
-            <p style={hintStyle}>Free-response questions are graded manually in the Responses tab.</p>
+            <p style={hintStyle}>Free-response questions are reviewed in the Responses tab and do not count toward the automatic score.</p>
           )}
           {form.question_type === 'short_answer' && (
             <p style={hintStyle}>Auto-graded. Student input is trimmed and lowercased before comparison.</p>
@@ -383,7 +378,7 @@ function QuestionForm({
           >
             {saving ? 'Saving…' : 'Save question'}
           </button>
-          <button type="button" onClick={onCancel} className="btn btn-ghost btn-sm">
+          <button type="button" onClick={() => { if (JSON.stringify(form) === JSON.stringify(initial) || confirm(discardMessage)) onCancel() }} className="btn btn-ghost btn-sm">
             Cancel
           </button>
         </div>
@@ -402,21 +397,27 @@ function QuestionRow({
   editorPacks,
   onUpdated,
   onDeleted,
+  onEditingChange,
 }: {
   question: Question
   index: number
   courseId: string
   assessmentId: string
   editorPacks: string[]
-  onUpdated: () => void
-  onDeleted: () => void
+  onEditingChange: (id:string,open:boolean) => void
+  onUpdated: () => Promise<void>
+  onDeleted: () => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
+  useEffect(()=>{onEditingChange(question.id,editing);return ()=>onEditingChange(question.id,false)},[editing,question.id,onEditingChange])
   const [saving, setSaving] = useState(false)
+  const [questionError, setQuestionError] = useState('')
+  const [uncertain, setUncertain] = useState(false)
   const { bg, color } = TYPE_COLORS[question.question_type]
 
   const handleSave = async (form: QuestionFormState) => {
-    setSaving(true)
+    if(saving || uncertain) return
+    setQuestionError('');setSaving(true)
     const payload: Record<string, unknown> = {
       question_type: form.question_type,
       content: docIsEmpty(form.content) ? null : form.content,
@@ -424,8 +425,7 @@ function QuestionRow({
     }
 
     if (form.question_type === 'multiple_choice') {
-      payload.options = form.options.filter((o) => o.trim())
-      payload.correct_answer = form.correct_answer
+      Object.assign(payload, compactAnswerOptions(form.options, form.correct_answer))
     } else if (form.question_type === 'true_false') {
       payload.options = ['true', 'false']
       payload.correct_answer = form.correct_answer
@@ -433,28 +433,22 @@ function QuestionRow({
       payload.accepted_answers = form.accepted_answers.filter((a) => a.trim())
     }
 
-    const response = await fetch(
-      `/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }
-    )
-    setSaving(false)
-    if (!response.ok) { alert((await response.json()).error ?? 'Unable to save question'); return }
-    setEditing(false)
-    onUpdated()
+    try {
+      await requestJson(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}, 'question save')
+      setEditing(false)
+      try { await onUpdated() } catch { setQuestionError('Question saved, but the list could not refresh. Reload before making more changes.'); setUncertain(true) }
+    } catch(error) {setQuestionError(error instanceof Error ? error.message : 'Unable to save question.');setUncertain(error instanceof AuthoringRequestError && (error.uncertain || error.status===409))}
+    finally {setSaving(false)}
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this question? This cannot be undone.')) return
-    const response = await fetch(
-      `/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`,
-      { method: 'DELETE' }
-    )
-    if (!response.ok) { alert((await response.json()).error ?? 'Unable to delete question'); return }
-    onDeleted()
+    if (saving || uncertain || !confirm('Delete this question? This cannot be undone.')) return
+    setSaving(true);setQuestionError('')
+    try {
+      await requestJson(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions/${question.id}`, {method:'DELETE'}, 'question deletion')
+      try { await onDeleted() } catch { setQuestionError('Question deleted, but the list could not refresh. Reload to see the current list.');setUncertain(true) }
+    } catch(error) {setQuestionError(error instanceof Error ? error.message : 'Unable to delete question.');setUncertain(error instanceof AuthoringRequestError && error.uncertain)}
+    finally {setSaving(false)}
   }
 
   const preview = (() => {
@@ -482,6 +476,7 @@ function QuestionRow({
 
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+      {questionError && <p role="alert">{questionError}</p>}
       {editing ? (
         <div style={{ padding: '1rem' }}>
           <p style={{ margin: '0 0 1rem', fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
@@ -493,7 +488,7 @@ function QuestionRow({
             courseId={courseId}
             onSave={handleSave}
             onCancel={() => setEditing(false)}
-            saving={saving}
+            saving={saving || uncertain}
             editorPacks={editorPacks}
           />
         </div>
@@ -526,8 +521,8 @@ function QuestionRow({
             )}
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button onClick={() => setEditing(true)} className="btn btn-ghost btn-sm">Edit</button>
-            <button onClick={handleDelete} className="btn btn-sm" style={{ background: 'none', color: 'var(--danger)', border: 'none', cursor: 'pointer', fontSize: 13 }}>
+            <button type="button" disabled={saving || uncertain} onClick={() => setEditing(true)} className="btn btn-ghost btn-sm">Edit</button>
+            <button type="button" disabled={saving || uncertain} onClick={handleDelete} className="btn btn-sm" style={{ background: 'none', color: 'var(--danger)', border: 'none', cursor: 'pointer', fontSize: 13 }}>
               Delete
             </button>
           </div>
@@ -551,9 +546,11 @@ export default function EditAssessmentPage() {
   const [assessment, setAssessment] = useState<AssessmentData | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [editingQuestions, setEditingQuestions] = useState<Record<string,boolean>>({})
+  const reportQuestionEditing = useCallback((id:string,open:boolean)=>setEditingQuestions(previous => !!previous[id]===open ? previous : {...previous,[id]:open}),[])
   const [addingQuestion, setAddingQuestion] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
+  const [questionUncertain, setQuestionUncertain] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
@@ -569,9 +566,14 @@ export default function EditAssessmentPage() {
   const [metadata, setMetadata] = useState(() => itemMetadata({}, 'assessment'))
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [introContent, setIntroContent] = useState<Record<string, unknown>>(emptyDoc())
-  const [ready, setReady] = useState(false)
+  const [loadedId, setLoadedId] = useState<string | null>(null)
+  const ready = loadedId === assessmentId
   const insertLatexIntroRef = useRef<((latex: string, display: boolean) => void) | null>(null)
   const [showLatexIntro, setShowLatexIntro] = useState(false)
+
+  const draftFields = {title, assessment_type:assessmentType, module_id:moduleId, is_graded:isGraded, passing_score:passingScore, intro_content:introContent, resources, ...metadata}
+  const draft = useDraft(JSON.stringify(draftFields), assessmentId, version, ready)
+  const saving = draft.state.status === 'saving'
 
   const loadQuestions = useCallback(async (cId: string) => {
     const data = await requestJson<Question[]>(`/api/admin/courses/${cId}/assessments/${assessmentId}/questions`)
@@ -580,8 +582,11 @@ export default function EditAssessmentPage() {
   }, [assessmentId])
 
   useEffect(() => {
+    let active = true
+    setLoadedId(null);setLoading(true);setError('')
     requestJson<{ id: string }>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(courseSlug)}`)
       .then(async (data) => {
+        if (!active) return
         if (!data.id) throw new Error('Course not found.')
         setCourseId(data.id)
 
@@ -592,6 +597,7 @@ export default function EditAssessmentPage() {
           requestJson<Question[]>(`/api/admin/courses/${data.id}/assessments/${assessmentId}/questions`),
         ])
 
+        if (!active) return
         if (!assessmentRes.id || !Array.isArray(questionsRes)) throw new Error('Unable to load the assessment and its questions. Please reload.')
         setAssessment(assessmentRes)
         setTitle(assessmentRes.title ?? '')
@@ -607,44 +613,25 @@ export default function EditAssessmentPage() {
         setModules(Array.isArray(modsRes) ? modsRes : [])
         setEditorPacks(Array.isArray(courseRes.editor_tools) ? courseRes.editor_tools : [])
         setQuestions(Array.isArray(questionsRes) ? questionsRes : [])
-        setReady(true)
+        setLoadedId(assessmentId)
       })
-      .catch(failure => setError(failure instanceof Error ? failure.message : 'Unable to load this assessment.'))
-      .finally(() => setLoading(false))
+      .catch(failure => active && setError(failure instanceof Error ? failure.message : 'Unable to load this assessment.'))
+      .finally(() => {if(active)setLoading(false)})
+    return () => {active=false}
   }, [courseSlug, assessmentId])
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
-    setSaving(true)
+    if (!courseId || !ready || saving || deleting || addingQuestion || Object.values(editingQuestions).some(Boolean)) return
     setError('')
-
-    const res = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        assessment_type: assessmentType,
-        module_id: moduleId ?? null,
-        is_graded: isGraded,
-        passing_score: passingScore,
-        intro_content: docIsEmpty(introContent) ? null : introContent,
-        version, action: saveAction, resources, ...metadata,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to save')
-      setSaving(false)
-      return
-    }
-    router.push(`/admin/courses/${courseSlug}`)
+    const action=saveAction
+    const saved=await draft.save(`/api/admin/courses/${courseId}/assessments/${assessmentId}`, {...draftFields,action})
+    if(saved){if(action!=='draft')setIsPublished(action==='publish');setSaveAction('draft')}
   }
 
   const handleAddQuestion = async (form: QuestionFormState) => {
-    if (!courseId) return
-    setSavingQuestion(true)
+    if (!courseId || savingQuestion || questionUncertain) return
+    setError('');setSavingQuestion(true)
 
     const payload: Record<string, unknown> = {
       question_type: form.question_type,
@@ -653,8 +640,7 @@ export default function EditAssessmentPage() {
     }
 
     if (form.question_type === 'multiple_choice') {
-      payload.options = form.options.filter((o) => o.trim())
-      payload.correct_answer = form.correct_answer
+      Object.assign(payload, compactAnswerOptions(form.options, form.correct_answer))
     } else if (form.question_type === 'true_false') {
       payload.options = ['true', 'false']
       payload.correct_answer = form.correct_answer
@@ -663,23 +649,18 @@ export default function EditAssessmentPage() {
     }
 
     try {
-      const res = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error((await res.json()).error ?? 'Unable to add question')
+      await requestJson(`/api/admin/courses/${courseId}/assessments/${assessmentId}/questions`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}, 'question creation')
       setAddingQuestion(false)
-      await loadQuestions(courseId)
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to add question. Your form is still here.') }
+      try { await loadQuestions(courseId) } catch { setError('Question added, but the list could not refresh. Reload before adding another.');setQuestionUncertain(true) }
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to add question. Your form is still here.');setQuestionUncertain(failure instanceof AuthoringRequestError && (failure.uncertain || failure.status===409)) }
     finally { setSavingQuestion(false) }
   }
 
   const handleDelete = async () => {
-    if (!courseId) return
-    if (!confirm(`Archive "${title}"? Its questions, history and learning records will be preserved.`)) return
-    setDeleting(true)
-    const deletion = await fetch(`/api/admin/courses/${courseId}/assessments/${assessmentId}`, { method: 'DELETE' })
-    if (!deletion.ok) { setError((await deletion.json()).error ?? 'Unable to archive'); setDeleting(false); return }
-    router.push(`/admin/courses/${courseSlug}`)
+    if(!courseId || saving || deleting || !confirm('Archive this item? Its history will be preserved.'))return
+    setDeleting(true);setError('')
+    try {await requestJson(`/api/admin/courses/${courseId}/assessments/${assessmentId}`,{method:'DELETE'},'archive');router.push(`/admin/courses/${courseSlug}`)}
+    catch(e){setError(e instanceof Error ? e.message : 'Unable to archive.');setDeleting(false)}
   }
 
   if (loading) return (
@@ -722,7 +703,7 @@ export default function EditAssessmentPage() {
             </p>
           </div>
           {!addingQuestion && (
-            <button type="button" disabled={isPublished} onClick={() => setAddingQuestion(true)} className="btn btn-primary">
+            <button type="button" disabled={isPublished || saving || questionUncertain} onClick={() => setAddingQuestion(true)} className="btn btn-primary">
               + Add question
             </button>
           )}
@@ -730,7 +711,7 @@ export default function EditAssessmentPage() {
 
         <p style={{ color: 'var(--text-2)' }}>Add a question, choose its type, then enter answer choices and mark the correct answer. Questions are saved separately from assessment settings.</p>
         {isPublished && <p role="status">Question editing is locked while this assessment is published. In <a href="#assessment-settings" style={{ textDecoration: 'underline' }}>settings below</a>, choose “Save and unpublish” and save before editing questions.</p>}
-        <fieldset disabled={isPublished} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <fieldset disabled={isPublished || saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>Assessment questions</legend>
         {questions.length === 0 && !addingQuestion && (
           <div style={{ padding: '2rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 'var(--radius-lg)', color: 'var(--text-3)', fontSize: 14 }}>
@@ -747,6 +728,7 @@ export default function EditAssessmentPage() {
               courseId={courseId ?? ''}
               assessmentId={assessmentId}
               editorPacks={editorPacks}
+              onEditingChange={reportQuestionEditing}
               onUpdated={() => loadQuestions(courseId ?? '')}
               onDeleted={() => loadQuestions(courseId ?? '')}
             />
@@ -762,7 +744,7 @@ export default function EditAssessmentPage() {
               courseId={courseId ?? ''}
               onSave={handleAddQuestion}
               onCancel={() => setAddingQuestion(false)}
-              saving={savingQuestion}
+              saving={savingQuestion || questionUncertain}
               editorPacks={editorPacks}
             />
           </div>
@@ -772,6 +754,7 @@ export default function EditAssessmentPage() {
 
       <h2 id="assessment-settings" style={{ scrollMarginTop: 72 }}>Assessment settings &amp; introduction</h2>
       <p style={{ color: 'var(--text-2)' }}>The introduction is optional text students read before answering. Use the Questions section above to build the quiz or exam.</p>
+      <DraftStatus session={draft} fields={draftFields} kind="assessment" overview={`/admin/courses/${courseSlug}`} />
       <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         <div>
@@ -838,7 +821,7 @@ export default function EditAssessmentPage() {
           )}
         </div>
 
-        {assessmentId && <RevisionHistory itemId={assessmentId} onRestore={v => { setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroContent((v.intro_content ?? {}) as Record<string, unknown>); setAssessmentType(v.assessment_type as AssessmentType); setIsGraded(Boolean(v.is_graded)); setPassingScore(Number(v.passing_score ?? 70)); setModuleId(v.module_id as string | null); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'assessment')); setSaveAction('draft'); }} />}
+        {assessmentId && <RevisionHistory itemId={assessmentId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroContent((v.intro_content ?? {}) as Record<string, unknown>); setAssessmentType(v.assessment_type as AssessmentType); setIsGraded(Boolean(v.is_graded)); setPassingScore(Number(v.passing_score ?? 70)); setModuleId(v.module_id as string | null); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'assessment')); setSaveAction('draft'); }} />}
         {assessmentId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
         <ItemMetadataFields value={metadata} onChange={setMetadata} />
         <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
@@ -847,7 +830,7 @@ export default function EditAssessmentPage() {
         
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
+          <button type="submit" disabled={!draft.canSave || deleting || !title.trim() || !courseId || addingQuestion || Object.values(editingQuestions).some(Boolean)} className="btn btn-primary">
             {saving ? 'Saving…' : 'Save'}
           </button>
           <Link href={`/admin/courses/${courseSlug}`}>
@@ -865,7 +848,7 @@ export default function EditAssessmentPage() {
         <button
           type="button"
           onClick={handleDelete}
-          disabled={deleting}
+          disabled={deleting || saving || !draft.canSave}
           className="btn btn-sm"
           style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', opacity: deleting ? 0.6 : 1 }}
         >

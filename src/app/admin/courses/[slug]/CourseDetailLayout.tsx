@@ -460,6 +460,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
   const conclusionPages = courseLevelPages.filter((p) => !INTRO_TYPES.includes(p.page_type))
 
   // Unassigned lessons (no module) still shown in their own section
+  const unassignedAssessments = assessments.filter((a) => !a.module_id)
   const unassignedLessons = lessons.filter((l) => !l.module_id)
 
   const isEmpty =
@@ -566,6 +567,45 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
                   <DeleteButton
                     url={`/api/admin/courses/${course.id}/lessons/${lesson.id}`}
                     confirm={`Delete "${lesson.title}"? This cannot be undone.`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}      {unassignedAssessments.length > 0 && (
+        <div style={{
+          border: '1px dashed var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          marginBottom: '1rem',
+        }}>
+          <div style={{
+            padding: '10px 16px',
+            background: 'var(--surface-2)',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-3)' }}>Course-level assessments</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>Assessments outside modules</span>
+          </div>
+          <div style={{ padding: '1rem', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {unassignedAssessments.map((assessment, index) => (
+              <div key={assessment.id} style={{
+                padding: '0.75rem 1rem',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{assessment.title}</span>
+                  {!assessment.is_published && (
+                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)' }}>Draft</span>
+                  )}
+                  <Link href={`/admin/courses/${course.slug}/assessments/${assessment.id}`}>
+                    <button className="btn btn-ghost btn-sm">Edit</button>
+                  </Link>
+                  <DeleteButton
+                    url={`/api/admin/courses/${course.id}/assessments/${assessment.id}`}
+                    confirm={`Delete "${assessment.title}"? This cannot be undone.`}
                   />
                 </div>
               </div>

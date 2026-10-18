@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
+import { downloadRecovery } from '@/lib/authoring/recovery'
+import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import dynamic from 'next/dynamic'
 import MarkdownImport from '@/components/MarkdownImport'
 
@@ -30,44 +33,32 @@ export default function NewCoursePage() {
   const [resolving, setResolving] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [createUncertain, setCreateUncertain] = useState(false)
   const [title, setTitle] = useState('')
   const [pageType, setPageType] = useState('overview')
   const [introduction, setIntroduction] = useState('')
   const [content, setContent] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
-    fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
+    requestJson<{id:string}>(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then((data) => { if (data.id) setCourseId(data.id) })
       .catch(() => setError('Could not load course'))
       .finally(() => setResolving(false))
   }, [slug])
 
+  const creationFields = {title,page_type:pageType,introduction,content,module_id:null}
+  useUnsavedChanges(!!title.trim() || createUncertain)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
-    setLoading(true)
-    setError('')
+    if (!courseId || loading || createUncertain) return
+    setLoading(true);setError('')
+    try {
+      const result=await requestJson<{id:string}>(`/api/admin/courses/${courseId}/pages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(creationFields)},'page creation')
+      if(!result.id)throw new AuthoringRequestError('Creation could not be confirmed. Download a recovery copy, then check the overview before trying again.',200,true)
+      router.push(`/admin/courses/${slug}`)
+    } catch(error) {setError(error instanceof Error ? error.message : 'Unable to create this item.');setCreateUncertain(error instanceof AuthoringRequestError && error.uncertain)}
+    finally {setLoading(false)}
 
-    const res = await fetch(`/api/admin/courses/${courseId}/pages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        page_type: pageType,
-        introduction: introduction || null,
-        content,
-        module_id: null,
-      }),
-    })
-
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error ?? `Failed to create page (${res.status})`)
-      setLoading(false)
-      return
-    }
-    router.push(`/admin/courses/${slug}`)
   }
 
   const selectedType = PAGE_TYPES.find((t) => t.value === pageType)
@@ -87,6 +78,7 @@ export default function NewCoursePage() {
         Course pages appear in the Introduction or Conclusion sections — not inside modules.
       </p>
 
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         {/* Page type */}
