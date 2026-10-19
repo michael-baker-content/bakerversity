@@ -1,12 +1,12 @@
 import { Node, Extension, mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import { all, createLowlight } from 'lowlight'
+import { createCodeHighlighter } from '@/lib/codeHighlighting'
 import {
   TerminalNodeView, MafsGraphNodeView, CalloutNodeView,
   InlineMathNodeView, BlockMathNodeView, PracticeQuizNodeView,
 } from './NodeViews'
 
-const lowlight = createLowlight(all)
+const lowlight = createCodeHighlighter()
 
 // ── Math nodes ────────────────────────────────────────────────────────────────
 export const InlineMath = Node.create({

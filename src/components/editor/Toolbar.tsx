@@ -100,6 +100,7 @@ export function Toolbar({
                 onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run()}
                 style={{ padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer' }}
               >
+                {!LANGUAGES.some(l => l.value === (editor.getAttributes('codeBlock').language ?? 'python')) && <option value={editor.getAttributes('codeBlock').language}>{editor.getAttributes('codeBlock').language || 'Plain text'} (existing block)</option>}
                 {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
               </select>
             )}

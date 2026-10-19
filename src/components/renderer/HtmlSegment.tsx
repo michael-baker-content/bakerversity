@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useId } from 'react'
 import katex from 'katex'
-import { all, createLowlight } from 'lowlight'
+import { createCodeHighlighter } from '@/lib/codeHighlighting'
 import { hastToHtml } from './renderNode'
 
-const lowlight = createLowlight(all)
+const lowlight = createCodeHighlighter()
 
 export function HtmlSegment({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null)
