@@ -3,6 +3,8 @@ import { adminAccess } from '@/lib/adminAccess'
 export async function uploadAsset(req: Request, kind: 'image' | 'slides' | 'resource') {
   const ctx = await adminAccess()
   if (!ctx) return NextResponse.json({ error: 'Instructor access required' }, { status: 403 })
+  const courseId = new URL(req.url).searchParams.get('course_id')
+  if (courseId && !(await adminAccess(courseId))) return NextResponse.json({error:'Course access required'}, {status:403})
   const form = await req.formData()
   const file = form.get('file')
   if (!(file instanceof File) || !file.size) return NextResponse.json({ error: 'Select a file' }, { status: 400 })
@@ -26,6 +28,14 @@ export async function uploadAsset(req: Request, kind: 'image' | 'slides' | 'reso
   if (error) {
     await ctx.db.storage.from(bucket).remove([objectPath])
     return NextResponse.json({ error: 'The file could not be registered. Please retry.' }, { status: 500 })
+  }
+  if (courseId) {
+    const {error: linkError} = await ctx.db.from('course_assets').insert({course_id:courseId,asset_id:asset.id})
+    if (linkError) {
+      await ctx.db.from('assets').delete().eq('id',asset.id)
+      await ctx.db.storage.from(bucket).remove([objectPath])
+      return NextResponse.json({error:'Unable to add file to the course library. Please retry.'}, {status:500})
+    }
   }
   return NextResponse.json({ asset_id: asset.id, url: ctx.db.storage.from(bucket).getPublicUrl(objectPath).data.publicUrl })
 }

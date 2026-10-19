@@ -130,7 +130,7 @@ export default async function AdminCourseDetailPage({
           </summary>
           <div style={{ padding: '0 16px 16px' }}>
             <CourseClassification courseId={course.id} />
-            <AssetLibrary />
+            <AssetLibrary courseId={course.id} />
             <CourseItemManager courseId={course.id} courseSlug={course.slug} />
           </div>
         </details>

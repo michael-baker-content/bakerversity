@@ -128,6 +128,9 @@ export default function TipTapEditor({
   // Latex editing — null = inserting new, object = editing existing node
   const [editingLatex, setEditingLatex] = useState<{ latex: string; displayMode: boolean; pos: number } | null>(null)
 
+  const replacementInputRef = useRef<HTMLInputElement>(null)
+  const [imageError, setImageError] = useState('')
+
   // Image modal — shown after upload and on double-click of existing image
   const [imageModal, setImageModal] = useState<{
     src: string
@@ -209,6 +212,8 @@ export default function TipTapEditor({
           if (node.type.name === 'image') {
             setImageModal({
               src: node.attrs.src ?? '',
+              width: node.attrs.width,
+              height: node.attrs.height,
               alt: node.attrs.alt ?? '',
               title: node.attrs.title ?? '',
               pos: pos.pos,
@@ -246,21 +251,39 @@ export default function TipTapEditor({
     })
   }, [editor, hasMath])
 
+  useEffect(() => {
+    if (!editor) return
+    const track = ({transaction}: {transaction: import('@tiptap/pm/state').Transaction}) => {
+      if (!transaction.docChanged) return
+      setImageModal(current => {
+        if (!current || current.pos === null) return current
+        const mapped = transaction.mapping.mapResult(current.pos)
+        if (mapped.deleted || transaction.doc.nodeAt(mapped.pos)?.type.name !== 'image') return null
+        return {...current, pos:mapped.pos}
+      })
+    }
+    editor.on('transaction',track)
+    return () => {editor.off('transaction',track)}
+  },[editor])
+
   // ── Image upload ───────────────────────────────────────────────────────────
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback(async (file: File, replace = false) => {
     if (!editor) return
     setUploading(true)
+    setImageError('')
     try {
       const formData = new FormData()
       formData.append('file', file)
       const res = await fetch('/api/admin/upload', { method: 'POST', body: formData })
-      if (!res.ok) { const d = await res.json(); alert(`Upload failed: ${d.error}`); return }
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Upload failed.') }
       const { url } = await res.json()
+      if (typeof url !== 'string' || !url) throw new Error('Upload did not return an image URL.')
       // Show modal to set alt text and caption before inserting
       let dimensions: { width?: number; height?: number } = {}
       try { const bitmap = await createImageBitmap(file); dimensions = { width: bitmap.width, height: bitmap.height }; bitmap.close() } catch { /* Older browsers still insert the image. */ }
-      setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
-    } catch { alert('Upload failed. Check your connection and try again.') }
+      if (replace) setImageModal(current => current ? {...current, src:url, width:dimensions.width, height:dimensions.height} : current)
+      else setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
+    } catch (error) { const message = error instanceof Error ? error.message : 'Upload failed. Please try again.'; if (replace) setImageError(message); else alert(message) }
     finally { setUploading(false) }
   }, [editor])
 
@@ -413,23 +436,20 @@ export default function TipTapEditor({
       )}
       {/* Image alt/caption modal */}
       {imageModal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-          onClick={() => setImageModal(null)}
-        >
-          <div
-            style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', width: 400, maxWidth: '90vw', boxShadow: 'var(--shadow-lg)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{position:'fixed', inset:0, zIndex:1000, pointerEvents:'none'}}>
+          <div role="dialog" aria-label="Image settings"
+            style={{position:'absolute', right:16, bottom:16, pointerEvents:'auto', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'1.5rem', width:400, maxWidth:'calc(100vw - 32px)', maxHeight:'calc(100dvh - 32px)', overflowY:'auto', boxShadow:'var(--shadow-lg)'}}>
             <h3 style={{ margin: '0 0 1rem', fontSize: 15 }}>Image settings</h3>
             <img src={imageModal.src} alt="" style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 4, marginBottom: '1rem', display: 'block' }} />
+            <input ref={replacementInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={async e => {const file=e.target.files?.[0];e.target.value='';if(file)await handleImageUpload(file,true)}} />
+            <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={()=>replacementInputRef.current?.click()}>{uploading ? 'Uploading…' : 'Replace image'}</button>
+            {imageError && <p role="alert" style={{color:'var(--danger)'}}>{imageError}</p>}
+            <p style={{fontSize:12,color:'var(--text-3)'}}>You can copy text from the page while these settings stay open.</p>
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Alt text</label>
               <input
                 className="input"
+                aria-label="Alt text"
                 value={imageModal.alt}
                 onChange={(e) => setImageModal((m) => m ? { ...m, alt: e.target.value } : m)}
                 placeholder="Describe the image for screen readers…"
@@ -440,6 +460,7 @@ export default function TipTapEditor({
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Caption <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
               <input
                 className="input"
+                aria-label="Caption"
                 value={imageModal.title}
                 onChange={(e) => setImageModal((m) => m ? { ...m, title: e.target.value } : m)}
                 placeholder="Shown below the image…"
@@ -448,24 +469,25 @@ export default function TipTapEditor({
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button"
                 className="btn btn-primary btn-sm"
+                disabled={uploading}
                 onClick={() => {
-                  if (!editor) return
+                  if (!editor || uploading) return
                   if (imageModal.pos === null) {
                     editor.chain().focus().setImage({ src: imageModal.src, alt: imageModal.alt, title: imageModal.title, width: imageModal.width, height: imageModal.height }).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
-                    if (node) {
+                    if (node?.type.name === 'image') {
                       editor.chain().focus().setNodeSelection(imageModal.pos)
-                        .updateAttributes('image', { alt: imageModal.alt, title: imageModal.title })
+                        .updateAttributes('image', { src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt, title: imageModal.title })
                         .run()
                     }
                   }
                   setImageModal(null)
                 }}
               >
-                {imageModal.pos === null ? 'Insert image' : 'Update'}
+                {uploading ? 'Uploading…' : imageModal.pos === null ? 'Insert image' : 'Update'}
               </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setImageModal(null)}>Cancel</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={() => {setImageModal(null);setImageError('')}}>Cancel</button>
             </div>
           </div>
         </div>

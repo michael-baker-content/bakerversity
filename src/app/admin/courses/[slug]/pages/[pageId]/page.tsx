@@ -182,7 +182,7 @@ export default function EditCoursePage() {
 
         {/* Published */}
         {pageId && <RevisionHistory itemId={pageId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}
-        {pageId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
+        {pageId && <AssetLibrary courseId={courseId ?? undefined} value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
         <ItemMetadataFields value={metadata} onChange={setMetadata} />
         <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
         <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>

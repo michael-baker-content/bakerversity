@@ -822,7 +822,7 @@ export default function EditAssessmentPage() {
         </div>
 
         {assessmentId && <RevisionHistory itemId={assessmentId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroContent((v.intro_content ?? {}) as Record<string, unknown>); setAssessmentType(v.assessment_type as AssessmentType); setIsGraded(Boolean(v.is_graded)); setPassingScore(Number(v.passing_score ?? 70)); setModuleId(v.module_id as string | null); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'assessment')); setSaveAction('draft'); }} />}
-        {assessmentId && <AssetLibrary value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
+        {assessmentId && <AssetLibrary courseId={courseId ?? undefined} value={resources} onChange={setResources} disabled={saving || deleting || !ready} />}
         <ItemMetadataFields value={metadata} onChange={setMetadata} />
         <label>When saving<select className="input" value={saveAction} onChange={e => setSaveAction(e.target.value)}><option value="draft">Save draft — keep the published version unchanged</option><option value="publish">Publish these changes</option><option value="unpublish">Save and unpublish</option></select></label>
         <p>{isPublished ? 'A published version is available to learners.' : 'This item is not published.'}</p>

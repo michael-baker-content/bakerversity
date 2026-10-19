@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "db:generate": "node scripts/generate-database.mjs",
     "db:check": "node scripts/generate-database.mjs --check",
-    "test": "node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs && node tests/writing-tools.mjs && node tests/images.mjs && node tests/slides-upload.mjs && node tests/latex-activation.mjs && node tests/questions.mjs",
+    "test": "node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs && node tests/writing-tools.mjs && node tests/images.mjs && node tests/slides-upload.mjs && node tests/latex-activation.mjs && node tests/questions.mjs && node tests/course-assets.mjs",
     "test:authoring:harness": "node scripts/authoring-harness.cjs",
     "test:smoke": "node scripts/authoring-smoke.mjs"
   },
