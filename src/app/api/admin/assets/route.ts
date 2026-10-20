@@ -1,3 +1,4 @@
+import { filterCourseAssets } from '@/lib/assetSearch.mjs'
 import { NextResponse } from 'next/server'
 import { adminAccess } from '@/lib/adminAccess'
 import { uploadAsset } from '@/lib/assetUpload'
@@ -6,10 +7,17 @@ export async function GET(req: Request) {
  const ctx=await adminAccess(courseId || undefined)
  if(!ctx)return NextResponse.json({error:'Forbidden'},{status:403})
  if(courseId){
-  const page=Math.max(0,Math.min(10000,Number(params.get('page'))||0))
-  const {data,error}=await ctx.db.from('course_assets').select('asset_id,default_alt_text,default_caption,assets(*)').eq('course_id',courseId).order('created_at',{ascending:false}).order('asset_id').range(page*50,page*50+49)
-  if(error)return NextResponse.json({error:'Unable to load course library. Check that its database migration has been applied.'},{status:500})
-  return NextResponse.json((data??[]).map(row=>{const a=row.assets!;return {...a,alt_text:row.default_alt_text,caption:row.default_caption,item_assets:[],url:a.external_url??(a.bucket&&a.object_path?ctx.db.storage.from(a.bucket).getPublicUrl(a.object_path).data.publicUrl:'')}}))
+  const page=Math.max(0,Math.min(10000,Math.floor(Number(params.get('page'))||0)))
+  // Fetch membership in batches so filters cover the entire course, not just its first page.
+  const rows=[]
+  for(let offset=0;;offset+=500){
+    const {data,error}=await ctx.db.from('course_assets').select('asset_id,default_alt_text,default_caption,assets!inner(*)').eq('course_id',courseId).order('asset_id').range(offset,offset+499)
+    if(error)return NextResponse.json({error:'Unable to load course library. Check that its database migration has been applied.'},{status:500})
+    rows.push(...(data??[]));if(!data||data.length<500)break
+  }
+  const assets=rows.map(row=>({...row.assets!,alt_text:row.default_alt_text,caption:row.default_caption}))
+  const filtered=filterCourseAssets(assets,{q:(params.get('q')??'').slice(0,200),type:params.get('type')??'all',sort:params.get('sort')??'newest'})
+  return NextResponse.json(filtered.slice(page*50,page*50+50).map(a=>({...a,item_assets:[],url:a.external_url??(a.bucket&&a.object_path?ctx.db.storage.from(a.bucket).getPublicUrl(a.object_path).data.publicUrl:'')})))
  }
  let query=ctx.db.from('assets').select('*, item_assets(item_id)').order('created_at',{ascending:false}).limit(200)
  if(ctx.user.role!=='admin')query=query.eq('owner_id',ctx.user.id)

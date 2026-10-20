@@ -20,6 +20,7 @@ Course-page and assessment preview links still use their existing published view
 The course overview includes a standalone expandable **Course asset library**. It also appears in content editors and through the editor's **Image** button.
 
 - Upload multiple images/files into a course library and reuse them without uploading again.
+- Search names and original filenames, filter All files / Images / PDFs / Other files, and sort newest/oldest uploaded or Name A–Z. Search runs across the whole course library.
 - Switch between tiles and a text list. Expand a file for actions and metadata; non-image tiles show the file extension.
 - Edit course-specific default alt text and captions. Selecting an image prefills those defaults; each placement can override them independently.
 - Replace an image while preserving its placement descriptions. Set a maximum width in pixels, with responsive sizing on smaller screens.
@@ -27,7 +28,7 @@ The course overview includes a standalone expandable **Course asset library**. I
 
 The library organizes assets through database relationships, not separate physical storage buckets for each course. Existing storage URLs remain public, even for draft assets. JPEG, PNG, WebP, and GIF image uploads are supported; SVG upload support is not implemented.
 
-Search/filtering, usage inspection, unassigned-upload management, granular upload retries, and safe archive/deletion are planned. See [course asset library](docs/course-asset-library.md).
+Usage inspection, unassigned-upload management, granular upload retries, and safe archive/deletion are planned. See [course asset library](docs/course-asset-library.md).
 
 ## Assessments and learning records
 

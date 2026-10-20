@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict'
+import {filterCourseAssets} from '../src/lib/assetSearch.mjs'
+const rows=Array.from({length:75},(_,i)=>({id:String(i).padStart(3,'0'),title:'Image '+i,original_filename:'photo'+i+'.png',mime_type:'image/png',created_at:'2026-10-19'}))
+rows.push({id:'pdf',title:'Polish slides',original_filename:'Żółć.pdf',mime_type:'application/octet-stream',created_at:'2026-10-18'})
+rows.push({id:'other',title:'100%_complete',original_filename:'strings.yaml',mime_type:'application/octet-stream',created_at:'2026-10-17'})
+assert.equal(filterCourseAssets(rows,{q:'PHOTO74'}).length,1)
+assert.equal(filterCourseAssets(rows,{q:' żółć ',type:'pdf'})[0].id,'pdf')
+assert.equal(filterCourseAssets(rows,{q:'%_'}).length,1)
+assert.equal(filterCourseAssets(rows,{type:'images'}).length,75)
+assert.equal(filterCourseAssets(rows,{type:'other'})[0].id,'other')
+assert.equal(filterCourseAssets(rows,{type:'images',q:'slides'}).length,0)
+assert.equal(filterCourseAssets(rows,{sort:'oldest'})[0].id,'other')
+assert.equal(filterCourseAssets(rows,{sort:'newest'})[0].id,'000')
+assert.ok(filterCourseAssets(rows,{sort:'name'}).findIndex(r=>r.title==='Image 2')<filterCourseAssets(rows,{sort:'name'}).findIndex(r=>r.title==='Image 10'))
+assert.equal(rows[0].id,'000')
+console.log('PASS: course asset search beyond one page, literal/Unicode names, PDF detection, type combinations, stable/natural sorting')

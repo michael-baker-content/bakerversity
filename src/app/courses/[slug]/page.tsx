@@ -1,3 +1,4 @@
+import outlineStyles from '@/components/CourseOutline.module.css'
 import CourseOutline from '@/components/CourseOutline'
 import { buildCourseSequence, sequenceItemHref } from '@/lib/courseSequence'
 import { createServiceClient } from '@/lib/supabase'
@@ -111,7 +112,7 @@ export default async function CourseDetailPage({
 
         {/* Course header */}
         <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ margin: '0 0 0.75rem' }}>{course.title}</h1>
+          <h1 style={{ margin: '0 0 0.75rem', letterSpacing: '0.02em' }}>{course.title}</h1>
           {course.description && (
             <p style={{ color: 'var(--text-2)', fontSize: 16, lineHeight: 1.7, margin: 0 }}>
               {course.description}
@@ -168,8 +169,8 @@ export default async function CourseDetailPage({
 
         {/* Contents */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', margin: 0 }}>Course contents</h2>
-          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', margin: 0, letterSpacing: '0.025em' }}>Course contents</h2>
+          <span className={outlineStyles.overviewMeta} style={{ fontSize: 13, color: 'var(--text-3)' }}>
             {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
             {assessments.length > 0 && ` · ${assessments.length} assessment${assessments.length !== 1 ? 's' : ''}`}
             {coursePages.length > 0 && ` · ${coursePages.length} page${coursePages.length !== 1 ? 's' : ''}`}

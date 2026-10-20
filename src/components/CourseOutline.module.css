@@ -1,0 +1,35 @@
+.outline {display:grid;gap:24px;margin:20px 0 32px}
+.section {border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm)}
+.heading {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 22px;background:var(--surface-2);border-bottom:1px solid var(--border);border-left:4px solid var(--indigo)}
+.eyebrow {display:block;color:var(--indigo);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.heading h3 {letter-spacing:.025em;margin:0;color:var(--text);font-size:20px;line-height:1.35;font-weight:700;overflow-wrap:anywhere}
+.count {flex-shrink:0;color:var(--text-2);font-size:12px}
+.list {list-style:none;margin:0;padding:0}
+.list li+li {border-top:1px solid var(--border)}
+.row {display:grid;grid-template-columns:28px minmax(0,1fr) 116px 16px;align-items:center;gap:14px;padding:16px 20px;color:var(--text);text-decoration:none;transition:background .15s}
+a.row:hover {background:var(--surface-2);text-decoration:none}
+a.row:focus-visible {outline:2px solid var(--indigo);outline-offset:-3px;background:var(--surface-2)}
+.number {font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.title {font-size:14px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.meta {display:block;color:var(--text-2);font-size:12px;font-weight:400;margin-top:4px}
+.category {display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.badge {display:inline-block;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700;line-height:1.4;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.lesson {background:var(--surface-2);color:var(--text-2)}
+.page {background:var(--success-bg);color:var(--success)}
+.quiz {background:var(--amber-muted);color:var(--amber-ink)}
+.exam {background:var(--indigo-muted);color:var(--indigo)}
+.practice {background:var(--surface-2);color:var(--text-2)}
+.kind {font-size:10px;color:var(--text-2)}
+.arrow {color:var(--text-3);font-size:14px}
+.empty {padding:24px;color:var(--text-2);background:var(--surface);border:1px dashed var(--border);border-radius:8px}
+@media(max-width:540px){.heading {padding:16px 14px;gap:10px}.heading h3 {font-size:18px}.row {grid-template-columns:20px minmax(0,1fr) 90px;gap:8px;padding:14px 12px}.arrow {display:none}.badge {padding:3px 6px;font-size:10px}.title {font-size:13px}.count {font-size:11px}}
+
+/* Match the editor's monospace stack for structural information only. */
+.eyebrow, .number, .count, .badge, .meta, .overviewMeta {
+  font-family:'Fira Mono','Cascadia Code','Consolas',monospace;
+  font-variant-numeric:tabular-nums;
+}
+.eyebrow {letter-spacing:.075em;font-weight:600}
+.badge {font-weight:600;letter-spacing:0}
+.row {grid-template-columns:28px minmax(0,1fr) 132px 16px}
+@media(max-width:540px){.row {grid-template-columns:20px minmax(0,1fr) 104px}.badge {font-size:11px}}

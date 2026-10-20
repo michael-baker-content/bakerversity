@@ -1,11 +1,19 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
 export type Asset = { id: string; title: string; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
 interface Props { onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
 export default function AssetLibrary({ onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
+  const [search,setSearch]=useState('')
+  const [query,setQuery]=useState('')
+  const [fileType,setFileType]=useState('all')
+  const [sort,setSort]=useState('newest')
+  const [loading,setLoading]=useState(false)
+  const [loadError,setLoadError]=useState('')
+  const [reload,setReload]=useState(0)
+  const knownNames=useRef<Record<string,string>>({})
   const [view,setView]=useState<'tiles'|'list'>('tiles')
   const [assets, setAssets] = useState<Asset[]>([])
   const [message, setMessage] = useState('')
@@ -14,11 +22,21 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
   const [page,setPage]=useState(0)
   const [hasMore,setHasMore]=useState(false)
   const endpoint=courseId ? '/api/admin/assets?course_id='+encodeURIComponent(courseId) : '/api/admin/assets'
+  const listEndpoint=endpoint+(courseId?'&':'?')+new URLSearchParams({q:query,type:fileType,sort}).toString()
+  const currentEndpoint=useRef(listEndpoint);currentEndpoint.current=listEndpoint
+  function remember(rows:Asset[]){for(const row of rows)knownNames.current[row.id]=row.title}
   async function load(next=0) {
-    const rows=await requestJson<Asset[]>(endpoint+(courseId?'&page='+next:''))
+    const rows=await requestJson<Asset[]>(listEndpoint+'&page='+next)
+    if(currentEndpoint.current!==listEndpoint)return
+    remember(rows)
     setAssets(old=>next===0?rows:[...old,...rows]);setPage(next);setHasMore(!!courseId && rows.length===50)
   }
-  useEffect(() => {let active=true;setAssets([]);setMessage('');requestJson<Asset[]>(endpoint).then(rows=>{if(active){setAssets(rows);setPage(0);setHasMore(!!courseId && rows.length===50)}}).catch(e=>{if(active)setMessage(e.message)});return ()=>{active=false}}, [endpoint,courseId])
+  useEffect(()=>{
+    let active=true;const controller=new AbortController()
+    setAssets([]);setHasMore(false);setLoading(true);setLoadError('')
+    requestJson<Asset[]>(listEndpoint,{signal:controller.signal}).then(rows=>{if(active){remember(rows);setAssets(rows);setPage(0);setHasMore(!!courseId&&rows.length===50)}}).catch(e=>{if(active)setLoadError(e.message)}).finally(()=>{if(active)setLoading(false)})
+    return ()=>{active=false;controller.abort()}
+  },[listEndpoint,courseId,reload])
   async function upload(files: File[]) {
     if (!files.length || busy) return
     setBusy(true)
@@ -50,7 +68,7 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
       <label>Resource purpose<select className="input" value={purpose} disabled={disabled} onChange={e => setPurpose(e.target.value as ResourcePurpose)}>{resourcePurposes.map(p => <option key={p}>{p}</option>)}</select></label>
       <h3>Selected resources</h3>
       {value.length === 0 ? <p>No attached resources selected.</p> : <ul>{value.map(row => <li key={`${row.asset_id}:${row.purpose}`}>
-        {assets.find(a => a.id === row.asset_id)?.title ?? 'Resource ' + row.asset_id} · {row.purpose}{' '}
+        {assets.find(a => a.id === row.asset_id)?.title ?? knownNames.current[row.asset_id] ?? 'Resource ' + row.asset_id} · {row.purpose}{' '}
         <button type="button" disabled={disabled} onClick={() => {
           onChange(value.filter(r => r.asset_id !== row.asset_id || r.purpose !== row.purpose))
           setMessage('Selection removed locally. Save a draft or publish to apply this change.')
@@ -58,6 +76,16 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
       </li>)}</ul>}
     </>}
     <p role="status">{message}</p>
+    {courseId && <div className="asset-search-controls">
+      <label>Search files<input className="input" type="search" maxLength={200} placeholder="Name or filename" value={search} disabled={busy} onChange={e=>{setSearch(e.target.value);if(!e.target.value)setQuery('')}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setQuery(search.trim())}}} /></label>
+      <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setQuery(search.trim())}>Search</button>
+      <label>File type<select className="input" value={fileType} disabled={busy} onChange={e=>setFileType(e.target.value)}><option value="all">All files</option><option value="images">Images</option><option value="pdf">PDFs</option><option value="other">Other files</option></select></label>
+      <label>Sort<select className="input" value={sort} disabled={busy} onChange={e=>setSort(e.target.value)}><option value="newest">Newest uploaded</option><option value="oldest">Oldest uploaded</option><option value="name">Name A–Z</option></select></label>
+      {(search||query||fileType!=='all'||sort!=='newest')&&<button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setSearch('');setQuery('');setFileType('all');setSort('newest')}}>Reset</button>}
+    </div>}
+    {loading && <p role="status">Loading files…</p>}
+    {loadError && <p role="alert">{loadError} <button type="button" onClick={()=>setReload(n=>n+1)}>Retry</button></p>}
+    {!loading&&!loadError&&!assets.length&&<p>{query||fileType!=='all'?'No files match these filters.':'No files in this course library yet.'}</p>}
     <div role="group" aria-label="Library view" style={{display:'flex',gap:6,margin:'12px 0'}}>
       <button type="button" className={'btn btn-sm '+(view==='tiles'?'btn-secondary':'btn-ghost')} aria-pressed={view==='tiles'} onClick={()=>setView('tiles')}>Tiles</button>
       <button type="button" className={'btn btn-sm '+(view==='list'?'btn-secondary':'btn-ghost')} aria-pressed={view==='list'} onClick={()=>setView('list')}>Text list</button>
@@ -94,6 +122,10 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
     })}
     </div>
     <style>{`
+      .asset-search-controls {display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:16px 0}
+      .asset-search-controls label {display:grid;gap:4px;font-size:12px;color:var(--text-2);min-width:120px;flex:1}
+      .asset-search-controls label:first-child {flex:2;min-width:min(200px,100%)}
+      .asset-search-controls .input {width:100%;box-sizing:border-box}
       .asset-browser {display:grid;gap:12px;align-items:start;margin-bottom:12px}
       .asset-browser--tiles {grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr))}
       .asset-browser--list {grid-template-columns:minmax(0,1fr)}

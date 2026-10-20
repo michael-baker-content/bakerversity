@@ -22,7 +22,7 @@ Course-aware Tiptap editors now associate direct image uploads immediately. The 
 
 ## Next increments
 
-- An unassigned-files review/import screen, search and file-type filters.
+- An unassigned-files review/import screen and refinements to search/filter options.
 - Per-file retry controls, drag-and-drop, and a persistent upload queue. Current failures are reported by filename; retry by selecting those files again after checking for completed uploads.
 - Usage inspection covering published content, drafts, and revisions; deliberate archive/deletion rules.
 - Private-asset access, if required. No SVG support or format conversion is introduced here.
@@ -32,3 +32,11 @@ Course-aware Tiptap editors now associate direct image uploads immediately. The 
 `npm test` includes an isolated database migration test covering pre-existing published and draft assets, default preservation on rediscovery, restricted database privileges, and protection against deletion of referenced files. `npm run typecheck`, `npm run db:check`, production build, and the existing authoring browser smoke test check integration. Live upload/authorization checks require the migration and a signed-in instructor; the smoke fixture does not test production Supabase storage or Clerk authorization.
 
 The editor integration requires no migration beyond 202610190001_course_assets.sql. Browser smoke coverage verifies library selection, default descriptions, and a placement-specific alt-text override.
+
+## Search and filtering: first pass
+
+Search matches display names and original filenames literally and case-insensitively. Submit using Search or Enter; clearing the search field clears the applied search. Type filters are All files, Images, PDFs, and Other files. PDF detection checks MIME type and filename because existing resource uploads may use application/octet-stream. Sorting uses asset upload dates or natural name order, with asset IDs breaking ties. Reset restores the defaults. Both tile and text-list views use the same results.
+
+The server authorizes course access and reads course membership in batches before filtering and returning 50 matches per page. This deliberately simple first pass searches the entire library without a schema migration; very large libraries will benefit from database-side filtering/indexes later. The API never searches other courses. UI requests cancel/ignore stale search results, and selections stay attached when filters change.
+
+Run npm test for the search helper checks, including matches beyond 50 assets, Unicode names, literal wildcard characters, mixed upload types, and sorting. No new migration is required. GitHub runs the existing browser smoke test; local verification does not start a server automatically.
