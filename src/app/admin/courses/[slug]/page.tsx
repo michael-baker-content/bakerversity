@@ -126,15 +126,15 @@ export default async function AdminCourseDetailPage({
         </div>
         <details style={{ marginTop: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', background: 'var(--surface)' }}>
           <summary style={{ padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
-            Course tools <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>— classification, resources and sequence</span>
+            Course tools <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>— classification and sequence</span>
           </summary>
           <div style={{ padding: '0 16px 16px' }}>
             <CourseClassification courseId={course.id} />
-            <AssetLibrary courseId={course.id} />
             <CourseItemManager courseId={course.id} courseSlug={course.slug} />
           </div>
         </details>
       </div>
+      <AssetLibrary courseId={course.id} />
       {/* Course content */}
       <div>
         <h2 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>

@@ -21,3 +21,8 @@ assert.match(html, /A &quot;quoted&quot; image/)
 assert.match(html, /<figcaption>Caption<\/figcaption>/)
 assert.ok(!renderNode({type:'image',attrs:{src:uploaded,width:'bad',height:-1}}).includes('width="bad"'))
 console.log('PASS: responsive image delivery, allowed sources, animation bypass, dimensions, captions and escaping')
+
+const sized=renderNode({type:'image',attrs:{src:uploaded,maxWidth:420,title:'Caption'}})
+assert.match(sized, /max-width:min\(100%, 420px\)/)
+for(const maxWidth of [null,'',-1,Infinity,'100px;display:none',10001])assert.ok(!renderNode({type:'image',attrs:{src:uploaded,maxWidth}}).includes('max-width:min'))
+console.log('PASS: image maximum width is responsive and rejects invalid CSS values')

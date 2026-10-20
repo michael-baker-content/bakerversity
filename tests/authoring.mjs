@@ -52,3 +52,13 @@ assert.throws(() => resourceSelection([{asset_id:resourceId,purpose:'unknown'}])
 assert.throws(() => resourceSelection([{asset_id:resourceId,purpose:'starter',source:'published'}]))
 assert.throws(() => resourceSelection(null))
 console.log('PASS: resource selection validation and canonical form')
+
+const {lessonDraftDiffers}=await import('../src/lib/lessonPreview.mjs')
+const publishedLesson={is_published:true,title:'Lesson',content:{type:'doc',content:[]}}
+const attachments=[{asset_id:'a',purpose:'download'},{asset_id:'b',purpose:'example'}]
+const sameDraft={...publishedLesson,content:{content:[],type:'doc'},resources:[...attachments].reverse(),version:99}
+assert.equal(lessonDraftDiffers(publishedLesson,sameDraft,attachments),false)
+assert.equal(lessonDraftDiffers(publishedLesson,{...sameDraft,title:'Changed'},attachments),true)
+assert.equal(lessonDraftDiffers(publishedLesson,{...sameDraft,resources:[]},attachments),true)
+assert.equal(lessonDraftDiffers({...publishedLesson,is_published:false},sameDraft,attachments),true)
+console.log('PASS: preview notice ignores identical drafts and metadata, detects content/resources and unpublished lessons')

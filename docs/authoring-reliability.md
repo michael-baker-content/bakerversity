@@ -25,6 +25,6 @@ Database tests additionally cover all four question types, feedback persistence,
 
 ## Existing boundaries
 
-Published question sets remain locked: unpublish before changing questions. Versioned drafts for entire question sets require a separate design/migration. Free-response answers support instructor feedback and are not part of the automatic score. Public previews show the published version; they are not draft previews. Student assessment submission still requires sign-in.
+Published question sets remain locked: unpublish before changing questions. Versioned drafts for entire question sets require a separate design/migration. Free-response answers support instructor feedback and are not part of the automatic score. Lesson editor and overview preview links now open an instructor/admin-only saved-draft preview, including draft attachments. Public lesson URLs continue to show published content. Course-page and assessment previews still use their existing published views. Student assessment submission still requires sign-in.
 
 No database migrations are introduced by this pass.

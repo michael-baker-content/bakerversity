@@ -25,7 +25,7 @@ export async function startAuthoringFixture() {
    if(path.startsWith('/api/fixture/student/')){const id=path.split('/').pop();const assessment=(await rows('select * from assessments where id=$1 and is_published',[id]))[0];return assessment?reply({assessment,questions:await rows('select id,question_type,question_text,content,options,position from assessment_questions where assessment_id=$1 order by position,id',[id])}):reply({error:'Not published'},404)}
    if(path==='/api/fixture/attempts')return reply(await rows('select * from assessment_attempts'))
    if(path.includes('course-id-by-slug'))return reply({id:course})
-   if(path==='/api/admin/assets')return reply([])
+   if(path==='/api/admin/assets')return reply([{id:'fixture-image',title:'Library diagram',url:'https://example.test/diagram.png',mime_type:'image/png',alt_text:'Default diagram description',caption:'Default diagram caption',byte_size:100,item_assets:[]}])
    if(path.endsWith('/modules'))return reply([])
    if(path===`/api/admin/courses/${course}`)return reply({editor_tools:[]})
    if(path.endsWith('/history'))return reply(await rows('select id,version,created_at,snapshot from content_revisions where item_id=$1 order by version desc',[path.split('/').at(-2)]))

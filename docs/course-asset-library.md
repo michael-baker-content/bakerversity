@@ -18,12 +18,10 @@ The application reports a library-loading error if the migration has not been ap
 
 The migration discovers assets through published item associations and asset IDs/storage paths/external URLs in saved drafts and revision snapshots. A file used by multiple courses appears in each. A trigger discovers later published associations without resetting edited defaults. This does not import arbitrary remote images lacking asset records. Unassigned files are retained; no course is guessed from ownership alone.
 
-Uploads made directly from the current Tiptap image button are still associated through publication; immediate course attribution from that button is deferred. New bulk uploads through this library are associated immediately.
+Course-aware Tiptap editors now associate direct image uploads immediately. The Image button opens the course library, with an Upload new image shortcut. Choosing an existing image copies default alt text and caption into Image settings for review and local override. Replacing an image preserves the current placement descriptions. The overview library is a standalone expandable section outside Course tools.
 
 ## Next increments
 
-- An editor image picker and immediate course attribution for direct image uploads.
-- Copy default descriptions into image placements with local overrides.
 - An unassigned-files review/import screen, search and file-type filters.
 - Per-file retry controls, drag-and-drop, and a persistent upload queue. Current failures are reported by filename; retry by selecting those files again after checking for completed uploads.
 - Usage inspection covering published content, drafts, and revisions; deliberate archive/deletion rules.
@@ -32,3 +30,5 @@ Uploads made directly from the current Tiptap image button are still associated 
 ## Validation
 
 `npm test` includes an isolated database migration test covering pre-existing published and draft assets, default preservation on rediscovery, restricted database privileges, and protection against deletion of referenced files. `npm run typecheck`, `npm run db:check`, production build, and the existing authoring browser smoke test check integration. Live upload/authorization checks require the migration and a signed-in instructor; the smoke fixture does not test production Supabase storage or Clerk authorization.
+
+The editor integration requires no migration beyond 202610190001_course_assets.sql. Browser smoke coverage verifies library selection, default descriptions, and a placement-specific alt-text override.

@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { PHASE_DEVELOPMENT_SERVER } from 'next/constants'
 
 const storage = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig: NextConfig = {
@@ -10,4 +11,8 @@ const nextConfig: NextConfig = {
     remotePatterns: storage ? [{ protocol: 'https', hostname: new URL(storage).hostname, port: '', pathname: '/storage/v1/object/public/lesson-images/**' }] : [],
   },
 }
-export default nextConfig
+// Keep local development output separate from production builds.
+export default (phase: string): NextConfig => ({
+  ...nextConfig,
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
+})

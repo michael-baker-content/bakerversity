@@ -111,7 +111,7 @@ export default function NewLessonPage() {
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>
             Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
           </p>
-          <TipTapEditor
+          <TipTapEditor courseId={courseId ?? undefined}
             onChange={setContent}
             onEditorReady={(fn) => { insertFnRef.current = fn }}
           />

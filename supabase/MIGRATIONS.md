@@ -34,3 +34,11 @@ If the migration reports that existing resource links and pending drafts need re
 Apply during a quiet authoring period, then deploy the matching application. Older direct-attachment requests will fail safely after migration and ask the author to reload. Do not remove the database guard to restore that old behavior. If application deployment fails, keep authoring paused and correct/redeploy the application; rolling back application code does not reverse the migration.
 
 Do not run `schema.sql` or `baseline.sql` on the existing project. No further content reset is required.
+
+## Course asset library migration
+
+After the five preceding migrations, apply `migrations/202610190001_course_assets.sql` once. It creates course-library membership and default image descriptions, backfills known asset relationships from published associations and saved drafts/history, and tracks later published associations. It does not make storage private or delete existing assets/accounts.
+
+The project owner has confirmed this migration was applied. Do not rerun it. Later image picker, presentation, and saved-draft lesson preview changes need no additional SQL. See `docs/course-asset-library.md` for scope and verification.
+
+The empty-database observations above are historical preflight records from October 14–15, 2026. The database now contains authored course content; do not use those observations as a basis for a reset.

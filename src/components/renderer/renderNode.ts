@@ -1,3 +1,4 @@
+import { imageMaxWidth } from '../../lib/imageWidth.mjs'
 import { imageDelivery } from '../../lib/imageDelivery.mjs'
 // Pure functions — no React imports needed
 
@@ -100,15 +101,17 @@ export function renderNode(node: Record<string, unknown>): string {
       </div>`
     }
     case 'image': {
+      const maxWidth=imageMaxWidth(attrs.maxWidth)
+      const sizeStyle=maxWidth ? ` style="max-width:min(100%, ${maxWidth}px)"` : ''
       const original = (attrs.src as string) ?? ''
       const delivery = imageDelivery(original)
       const attr = (value: string) => escapeAttr(escapeHtml(value))
       const width = Number(attrs.width), height = Number(attrs.height)
       const dimensions = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? ` width="${width}" height="${height}"` : ''
       const responsive = delivery.srcSet ? ` srcset="${attr(delivery.srcSet)}" sizes="${attr(delivery.sizes ?? '')}"` : ''
-      const img = `<div class="lesson-image media-image" data-original-src="${attr(original)}"><img src="${attr(delivery.src)}"${responsive}${dimensions} alt="${attr((attrs.alt as string) ?? '')}" loading="lazy" decoding="async" /><div class="media-image-error" hidden><span>Image could not be loaded.</span> <button type="button">Retry image</button></div></div>`
+      const img = `<div class="lesson-image media-image"${sizeStyle} data-original-src="${attr(original)}"><img src="${attr(delivery.src)}"${responsive}${dimensions} alt="${attr((attrs.alt as string) ?? '')}" loading="lazy" decoding="async" /><div class="media-image-error" hidden><span>Image could not be loaded.</span> <button type="button">Retry image</button></div></div>`
       const caption = (attrs.title as string) ?? ''
-      return caption ? `<figure>${img}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : img
+      return caption ? `<figure${sizeStyle}>${img}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : img
     }
     case 'practiceQuiz': {
       // Static placeholder in HTML output — interactive version handled by LessonRenderer

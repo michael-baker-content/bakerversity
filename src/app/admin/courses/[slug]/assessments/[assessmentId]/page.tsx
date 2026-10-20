@@ -213,7 +213,7 @@ function QuestionForm({
             )}
           </div>
           <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-            <TipTapEditor
+            <TipTapEditor courseId={courseId ?? undefined}
               key={`q-body-${initial.question_type}`}
               packs={hasMath ? ['math'] : []}
               content={docIsEmpty(form.content) ? undefined : form.content}
@@ -356,7 +356,7 @@ function QuestionForm({
               )}
             </div>
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-              <TipTapEditor
+              <TipTapEditor courseId={courseId ?? undefined}
                 key={`q-explanation-${initial.question_type}`}
                 packs={hasMath ? ['math'] : []}
                 content={docIsEmpty(form.explanation_content) ? undefined : form.explanation_content}
@@ -809,7 +809,7 @@ export default function EditAssessmentPage() {
           </div>
           {ready && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-              <TipTapEditor
+              <TipTapEditor courseId={courseId ?? undefined}
                 key={`assessment-intro-${editorKey}`}
                 packs={editorPacks.includes('math') ? ['math'] : []}
                 content={docIsEmpty(introContent) ? undefined : introContent}

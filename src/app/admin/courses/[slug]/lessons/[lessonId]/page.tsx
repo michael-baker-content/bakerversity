@@ -236,7 +236,7 @@ export default function EditLessonPage() {
             </div>
           </div>
           {ready && (
-            <TipTapEditor
+            <TipTapEditor courseId={courseId ?? undefined}
               key={editorKey}
               packs={(editorTools as import('@/components/TipTapEditor').EditorPack[])}
               content={Object.keys(content).length > 0 ? content : undefined}
@@ -348,6 +348,7 @@ export default function EditLessonPage() {
               Back to course overview
             </button>
           )}
+          <Link href={`/admin/courses/${slug}/lessons/${lessonUuid}/preview`} target="_blank" className="btn btn-ghost">Preview saved draft ↗</Link>
           <Link href={`/admin/courses/${slug}`} className="btn btn-ghost">Cancel</Link>
         </div>
       </form>

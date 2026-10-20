@@ -1,10 +1,12 @@
 'use client'
+import AssetLibrary from './AssetLibrary'
 import LatexActivation from './editor/LatexActivationPanel'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { useEditor, EditorContent, Extension } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import { imageMaxWidth } from '@/lib/imageWidth.mjs'
 import Highlight from '@tiptap/extension-highlight'
 import FindAndReplace from '@tiptap/extension-find-and-replace'
 import InvisibleCharacters, { SpaceCharacter, HardBreakNode, ParagraphNode, InvisibleCharacter } from '@tiptap/extension-invisible-characters'
@@ -21,6 +23,16 @@ import {
 import type { LintDiagnostic } from './editor/nodes'
 import { Toolbar } from './editor/Toolbar'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+
+const SizedImage = Image.extend({
+  addAttributes() {
+    return {...this.parent?.(), maxWidth: {
+      default:null,
+      parseHTML:element=>imageMaxWidth(element.getAttribute('data-max-width')),
+      renderHTML:attrs=>{const width=imageMaxWidth(attrs.maxWidth);return width ? {'data-max-width':width,style: `max-width:min(100%, ${width}px);height:auto`} : {}},
+    }}
+  },
+})
 
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
@@ -92,6 +104,7 @@ const NoInputRules = Extension.create({
 export type EditorPack = 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
 interface TipTapEditorProps {
+  courseId?: string
   content?: Record<string, unknown>
   onChange?: (content: Record<string, unknown>) => void
   editable?: boolean
@@ -105,6 +118,7 @@ interface TipTapEditorProps {
 }
 
 export default function TipTapEditor({
+  courseId,
   content,
   onChange,
   editable = true,
@@ -119,6 +133,7 @@ export default function TipTapEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [libraryMode,setLibraryMode] = useState<'insert'|'replace'|null>(null)
   const [uploading, setUploading] = useState(false)
   const [lintDiagnostics, setLintDiagnostics] = useState<LintDiagnostic[]>([])
   const [showTerminalModal, setShowTerminalModal] = useState(false)
@@ -136,6 +151,7 @@ export default function TipTapEditor({
     src: string
     width?: number
     height?: number
+    maxWidth?: string
     alt: string
     title: string
     pos: number | null   // null = newly uploaded (insert), number = existing (update)
@@ -159,7 +175,7 @@ export default function TipTapEditor({
       new SpaceCharacter(), new HardBreakNode(), new ParagraphNode(),
       new InvisibleCharacter({ type: 'nonbreaking-space', predicate: value => value === '\u00a0' }),
     ] }),
-    Image.configure({ inline: false, allowBase64: false }),
+    SizedImage.configure({ inline: false, allowBase64: false }),
     CalloutNode,
     Table.configure({ resizable: false, HTMLAttributes: { style: 'width: auto; min-width: 0;' } }),
     TableRow,
@@ -212,6 +228,7 @@ export default function TipTapEditor({
           if (node.type.name === 'image') {
             setImageModal({
               src: node.attrs.src ?? '',
+              maxWidth: imageMaxWidth(node.attrs.maxWidth)?.toString() ?? '',
               width: node.attrs.width,
               height: node.attrs.height,
               alt: node.attrs.alt ?? '',
@@ -274,7 +291,7 @@ export default function TipTapEditor({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: formData })
+      const res = await fetch('/api/admin/upload'+(courseId?'?course_id='+encodeURIComponent(courseId):''), { method: 'POST', body: formData })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Upload failed.') }
       const { url } = await res.json()
       if (typeof url !== 'string' || !url) throw new Error('Upload did not return an image URL.')
@@ -285,7 +302,7 @@ export default function TipTapEditor({
       else setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
     } catch (error) { const message = error instanceof Error ? error.message : 'Upload failed. Please try again.'; if (replace) setImageError(message); else alert(message) }
     finally { setUploading(false) }
-  }, [editor])
+  }, [editor,courseId])
 
   // ── LaTeX insert ───────────────────────────────────────────────────────────
   const insertLatexFormula = useCallback((latex: string, displayMode: boolean) => {
@@ -383,7 +400,7 @@ export default function TipTapEditor({
               terminalContent={terminalContent}
               filenameInput={filenameInput}
               lintDiagnostics={lintDiagnostics}
-              onFileClick={() => fileInputRef.current?.click()}
+              onFileClick={() => {if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
               onLatexButtonClick={onLatexButtonClick}
               onActivateLatex={() => setShowLatexActivation(value => !value)}
               onGraphButtonClick={onGraphButtonClick}
@@ -434,6 +451,19 @@ export default function TipTapEditor({
           onClose={() => setEditingLatex(null)}
         />
       )}
+      {libraryMode && courseId && <div style={{position:'fixed',inset:0,zIndex:1100,background:'rgba(0,0,0,.35)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <section role="dialog" aria-label="Choose course image" style={{background:'var(--surface)',padding:20,borderRadius:12,width:720,maxWidth:'94vw',maxHeight:'85dvh',overflowY:'auto'}}>
+          <h3>Choose a course image</h3>
+          <button type="button" className="btn btn-primary btn-sm" onClick={()=>{const replacing=libraryMode==='replace';setLibraryMode(null);(replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setLibraryMode(null)}>Close library</button>
+          <AssetLibrary key={courseId} courseId={courseId} initiallyOpen onPickImage={asset=>{
+            setImageError('')
+            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,width:undefined,height:undefined}:current)
+            else setImageModal({src:asset.url,alt:asset.alt_text??'',title:asset.caption??'',pos:null})
+            setLibraryMode(null)
+          }} />
+        </section>
+      </div>}
       {/* Image alt/caption modal */}
       {imageModal && (
         <div style={{position:'fixed', inset:0, zIndex:1000, pointerEvents:'none'}}>
@@ -442,7 +472,7 @@ export default function TipTapEditor({
             <h3 style={{ margin: '0 0 1rem', fontSize: 15 }}>Image settings</h3>
             <img src={imageModal.src} alt="" style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 4, marginBottom: '1rem', display: 'block' }} />
             <input ref={replacementInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={async e => {const file=e.target.files?.[0];e.target.value='';if(file)await handleImageUpload(file,true)}} />
-            <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={()=>replacementInputRef.current?.click()}>{uploading ? 'Uploading…' : 'Replace image'}</button>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={()=>{if(courseId)setLibraryMode('replace');else replacementInputRef.current?.click()}}>{uploading ? 'Uploading…' : 'Replace image'}</button>
             {imageError && <p role="alert" style={{color:'var(--danger)'}}>{imageError}</p>}
             <p style={{fontSize:12,color:'var(--text-3)'}}>You can copy text from the page while these settings stay open.</p>
             <div style={{ marginBottom: '0.75rem' }}>
@@ -466,19 +496,22 @@ export default function TipTapEditor({
                 placeholder="Shown below the image…"
               />
             </div>
+            <label style={{display:'block',fontSize:12,fontWeight:600,marginBottom:16}}>Maximum width (px)
+              <input className="input" type="number" min={1} max={10000} step={1} placeholder="No limit" value={imageModal.maxWidth ?? ''} onChange={e=>setImageModal(current=>current?{...current,maxWidth:e.target.value}:current)} />
+            </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button"
                 className="btn btn-primary btn-sm"
-                disabled={uploading}
+                disabled={uploading || (!!imageModal.maxWidth && imageMaxWidth(imageModal.maxWidth) === null)}
                 onClick={() => {
                   if (!editor || uploading) return
                   if (imageModal.pos === null) {
-                    editor.chain().focus().setImage({ src: imageModal.src, alt: imageModal.alt, title: imageModal.title, width: imageModal.width, height: imageModal.height }).run()
+                    editor.chain().focus().insertContent({type:'image',attrs:{ src: imageModal.src, alt: imageModal.alt, title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node?.type.name === 'image') {
                       editor.chain().focus().setNodeSelection(imageModal.pos)
-                        .updateAttributes('image', { src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt, title: imageModal.title })
+                        .updateAttributes('image', { maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt, title: imageModal.title })
                         .run()
                     }
                   }

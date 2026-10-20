@@ -284,8 +284,8 @@ function CollapsibleSection({
                           <Link href={`/admin/courses/${courseSlug}/lessons/${(item as Lesson).slug ?? item.id}`}>
                             <button className="btn btn-ghost btn-sm">Edit</button>
                           </Link>
-                          {(item as Lesson).slug && (
-                            <Link href={`/courses/${courseSlug}/lessons/${(item as Lesson).slug}`} target="_blank">
+                          {(
+                            <Link href={`/admin/courses/${courseSlug}/lessons/${item.id}/preview`} target="_blank">
                               <button className="btn btn-ghost btn-sm">Preview ↗</button>
                             </Link>
                           )}
@@ -561,6 +561,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
                   {!lesson.is_published && (
                     <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)' }}>Draft</span>
                   )}
+                  <Link href={`/admin/courses/${course.slug}/lessons/${lesson.id}/preview`} target="_blank" className="btn btn-ghost btn-sm">Preview ↗</Link>
                   <Link href={`/admin/courses/${course.slug}/lessons/${lesson.slug ?? lesson.id}`}>
                     <button className="btn btn-ghost btn-sm">Edit</button>
                   </Link>

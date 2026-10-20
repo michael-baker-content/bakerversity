@@ -132,7 +132,7 @@ export default function NewCoursePage() {
               onInsert={(doc) => insertFnRef.current?.(doc)}
             />
           </div>
-          <TipTapEditor
+          <TipTapEditor courseId={courseId ?? undefined}
             packs={['code']}
             onChange={setContent}
             onEditorReady={(fn) => { insertFnRef.current = fn }}

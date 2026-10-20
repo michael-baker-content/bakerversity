@@ -170,7 +170,7 @@ export default function EditCoursePage() {
             />
           </div>
           {ready && (
-            <TipTapEditor
+            <TipTapEditor courseId={courseId ?? undefined}
               key={editorKey}
               packs={['code']}
               content={Object.keys(content).length > 0 ? content : undefined}
