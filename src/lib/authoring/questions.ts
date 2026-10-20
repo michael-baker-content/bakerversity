@@ -14,6 +14,7 @@ export function compactAnswerOptions(options: string[], correct: string) {
 export function hasQuestionContent(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
   const node = value as { type?: string; text?: string; content?: unknown[]; attrs?: Record<string, unknown> }
+  if (node.type === 'directoryTree') return typeof node.attrs?.source === 'string' && !!node.attrs.source.trim()
   if (node.type === 'text') return !!node.text?.trim()
   if (['image','inlineMath','blockMath','mafsGraph','terminal'].includes(node.type ?? '')) return true
   return Array.isArray(node.content) && node.content.some(hasQuestionContent)

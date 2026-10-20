@@ -451,7 +451,8 @@ textarea.input { resize: vertical; min-height: 80px; }
 
 /* ── Lesson rendered content ───────────────────────────────────────────────── */
 .lesson-content h2 { font-family: var(--font-serif); font-size: 1.5rem; margin: 2rem 0 0.75rem; }
-.lesson-content h3 { font-family: var(--font-serif); font-size: 1.2rem; margin: 1.5rem 0 0.5rem; }
+.lesson-content h3, .lesson-content h4, .lesson-content h5, .lesson-content h6 { font-family: var(--font-sans); font-weight: 600; line-height: 1.4; }
+.lesson-content h3 { font-size: 1.2rem; margin: 1.5rem 0 0.5rem; }
 .lesson-content p { margin: 0 0 1rem; }
 .lesson-content ul, .lesson-content ol { padding-left: 1.5rem; margin: 0 0 1rem; }
 .lesson-content li { margin-bottom: 0.25rem; }
@@ -743,3 +744,52 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 @keyframes image-loading { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .media-image[data-state="loading"]::before { animation: none; } }
 @media print { .media-image::before, .media-image-error { display: none; } }
+
+.directory-tree { width:fit-content; max-width:100%; min-width:0; margin:1rem auto; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); color:var(--text); }
+.directory-header { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 12px; background:var(--surface-2); border-bottom:1px solid var(--border); font-size:13px; }
+.directory-scroll { overflow-x:auto; padding:8px 12px; }
+.directory-tree .directory-scroll ul { list-style:none; margin:0; padding:0 0 0 22px; border-left:1px solid var(--border); }
+.directory-tree .directory-scroll > ul { padding:0; border:0; }
+.directory-tree .directory-scroll li { margin:0; padding:0; }
+.directory-tree summary,.directory-file,.directory-folder { padding:2px 6px; white-space:nowrap; font:13px/1.45 'Fira Mono','Cascadia Code',Consolas,monospace; min-width:max-content; }
+.directory-tree summary { cursor:pointer; }
+.directory-icon { color:var(--text-2); margin-right:8px; }
+.directory-name { font-weight:500; }
+.directory-tree .directory-highlight > details > summary,.directory-highlight > .directory-file,.directory-highlight > .directory-folder { background:var(--indigo-muted); border-left:3px solid var(--indigo); border-radius:4px; }
+.directory-focus { font:600 11px var(--font-sans); color:var(--indigo); margin-left:10px; }
+.directory-note { margin-left:10px; color:var(--text-2); font:12px/1.45 var(--font-sans); }
+.directory-copy { font:12px/1.5 var(--font-sans); color:var(--text-2); background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:2px 6px; cursor:pointer; margin-left:10px; }
+.directory-copy:hover { color:var(--text); border-color:var(--text-3); }
+.directory-tree :focus-visible { outline:2px solid var(--indigo); outline-offset:2px; }
+.directory-status { font-size:12px; }
+.directory-editor { margin:1rem 0; padding:10px; border:1px solid var(--border); border-radius:10px; }
+.directory-editor[data-selected=true] { outline:2px solid var(--indigo); }
+.directory-fields { display:grid; gap:10px; margin-top:12px; }
+.directory-fields label { display:grid; gap:4px; font-size:13px; }
+.directory-fields textarea { font:14px/1.6 'Fira Mono',Consolas,monospace; white-space:pre; overflow:auto; }
+.directory-fields p { font-size:12px; color:var(--text-2); }
+@media(max-width:600px) { .directory-copy { min-height:40px; } .directory-scroll { padding:8px; } }
+
+/* Directory-tree palettes: muted surfaces with contrasting accents. */
+[data-tree-color="sage"] { --tree-bg:#e1e7dd; --tree-header:#d3ddce; --tree-accent:#355141; --tree-edge:2px; }
+[data-tree-color="indigo"] { --tree-bg:#e7e5ef; --tree-header:#d8d5ed; --tree-accent:#403577; --tree-edge:3px; }
+[data-tree-color="amber"] { --tree-bg:#eee3ca; --tree-header:#e6cf9b; --tree-accent:#704800; --tree-edge:4px; }
+[data-theme="dark"] [data-tree-color="sage"] { --tree-bg:#232b24; --tree-header:#2b372d; --tree-accent:#abc9ac; }
+[data-theme="dark"] [data-tree-color="indigo"] { --tree-bg:#242337; --tree-header:#302d49; --tree-accent:#c3bcf5; }
+[data-theme="dark"] [data-tree-color="amber"] { --tree-bg:#30291c; --tree-header:#42341b; --tree-accent:#f3cc78; }
+.directory-tree[data-tree-color] { background:var(--tree-bg); border-top:var(--tree-edge) solid var(--tree-accent); }
+.directory-tree[data-tree-color] .directory-header { background:var(--tree-header); }
+.directory-tree[data-tree-color] .directory-header > strong,
+.directory-tree[data-tree-color] .directory-icon,
+.directory-tree[data-tree-color] .directory-focus { color:var(--tree-accent); }
+.directory-tree[data-tree-color] .directory-highlight > details > summary,
+.directory-tree[data-tree-color] .directory-highlight > .directory-file { background:var(--tree-header); border-left-color:var(--tree-accent); }
+.directory-tree[data-tree-color] :focus-visible { outline-color:var(--tree-accent); }
+.directory-color-options { display:flex; flex-wrap:wrap; gap:8px; }
+.directory-color-option { flex:1 1 120px; display:flex; align-items:center; gap:10px; padding:10px 12px; border:2px solid transparent; border-radius:8px; background:var(--tree-bg); color:var(--text); cursor:pointer; text-align:left; font:600 14px var(--font-sans); }
+.directory-color-option[aria-pressed="true"] { border-color:var(--tree-accent); }
+.directory-color-option:focus-visible { outline:2px solid var(--tree-accent); outline-offset:2px; }
+.directory-color-option small { display:block; margin-top:3px; font-size:12px; font-weight:400; }
+.directory-color-swatch { width:14px; height:14px; flex-shrink:0; border-radius:50%; background:var(--tree-accent); }
+
+[data-theme="dark"] .directory-tree[data-tree-color] { --text-2:#b9b4a4; }

@@ -1,5 +1,9 @@
 'use client'
+import { jsonToMarkdown } from '@/lib/lessonMarkdown'
+import { htmlDownloadDocument } from '@/lib/lessonExport.mjs'
 import AssetLibrary from './AssetLibrary'
+import { DirectoryTreeNode } from './editor/DirectoryTreeNode'
+import UnsplashPicker from './UnsplashPicker'
 import LatexActivation from './editor/LatexActivationPanel'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
@@ -26,7 +30,7 @@ import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table
 
 const SizedImage = Image.extend({
   addAttributes() {
-    return {...this.parent?.(), maxWidth: {
+    return {...this.parent?.(), creditName: {default:null, rendered:false}, creditUrl: {default:null, rendered:false}, maxWidth: {
       default:null,
       parseHTML:element=>imageMaxWidth(element.getAttribute('data-max-width')),
       renderHTML:attrs=>{const width=imageMaxWidth(attrs.maxWidth);return width ? {'data-max-width':width,style: `max-width:min(100%, ${width}px);height:auto`} : {}},
@@ -37,64 +41,6 @@ const SizedImage = Image.extend({
 const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
 // ── JSON → Markdown converter ─────────────────────────────────────────────────
-function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): string {
-  const type = node.type as string
-  const content = (node.content as Record<string, unknown>[] | undefined) ?? []
-  const attrs = (node.attrs as Record<string, unknown> | undefined) ?? {}
-  const children = () => content.map((n) => nodeToMd(n, indent)).join('')
-
-  switch (type) {
-    case 'doc': return content.map((n) => nodeToMd(n)).join('\n')
-    case 'paragraph': return children() ? `${children()}\n` : '\n'
-    case 'heading': return `${'#'.repeat((attrs.level as number) ?? 2)} ${children()}\n`
-    case 'bulletList': return content.map((n) => nodeToMd(n, indent)).join('') + '\n'
-    case 'orderedList': return content.map((n, i) => nodeToMd(n, indent, i + 1)).join('') + '\n'
-    case 'listItem':
-      return num !== undefined
-        ? `${indent}${num}. ${content.map((n) => nodeToMd(n, indent + '   ')).join('').trimEnd()}\n`
-        : `${indent}- ${content.map((n) => nodeToMd(n, indent + '  ')).join('').trimEnd()}\n`
-    case 'blockquote': return children().split('\n').map((l) => `> ${l}`).join('\n') + '\n'
-    case 'codeBlock': {
-      const lang = (attrs.language as string) ?? ''
-      return `\`\`\`${lang}\n${children()}\n\`\`\`\n`
-    }
-    case 'table': {
-      const rows = content.map((n) => nodeToMd(n, indent))
-      // Insert separator row after header
-      if (rows.length > 0) {
-        const headerCols = (content[0].content as Record<string, unknown>[] | undefined)?.length ?? 1
-        rows.splice(1, 0, '|' + ' --- |'.repeat(headerCols))
-      }
-      return rows.join('\n') + '\n'
-    }
-    case 'tableRow': return '| ' + content.map((n) => nodeToMd(n, indent)).join(' | ') + ' |\n'
-    case 'tableCell':
-    case 'tableHeader': return children().replace(/\n/g, ' ').trim()
-    case 'horizontalRule': return '---\n'
-    case 'hardBreak': return '  \n'
-    case 'inlineMath': return `$${attrs.latex ?? ''}$`
-    case 'blockMath': return `$$\n${attrs.latex ?? ''}\n$$\n`
-    case 'terminalBlock': return `\`\`\`bash\n${attrs.content ?? ''}\n\`\`\`\n`
-    case 'callout': {
-      const label = (attrs.type as string) ?? 'note'
-      return `> **${label.toUpperCase()}**: ${attrs.content ?? ''}\n`
-    }
-    case 'text': {
-      const marks = (node.marks as { type: string }[]) ?? []
-      let t = (node.text as string) ?? ''
-      if (marks.some((m) => m.type === 'bold')) t = `**${t}**`
-      if (marks.some((m) => m.type === 'italic')) t = `*${t}*`
-      if (marks.some((m) => m.type === 'code')) t = `\`${t}\``
-      return t
-    }
-    default: return children()
-  }
-}
-
-function jsonToMarkdown(doc: Record<string, unknown>): string {
-  return nodeToMd(doc).replace(/\n{3,}/g, '\n\n').trim()
-}
-
 // Disables all markdown input rules (**, *, #, ---, etc.)
 const NoInputRules = Extension.create({
   name: 'noInputRules',
@@ -138,6 +84,7 @@ export default function TipTapEditor({
     if(libraryDirty && !confirm('Discard unsaved image description edits in the library?'))return false
     setLibraryDirty(false);return true
   }
+  const [unsplashMode,setUnsplashMode] = useState<'insert'|'replace'|null>(null)
   const [libraryMode,setLibraryMode] = useState<'insert'|'replace'|null>(null)
   const [uploading, setUploading] = useState(false)
   const [lintDiagnostics, setLintDiagnostics] = useState<LintDiagnostic[]>([])
@@ -156,6 +103,8 @@ export default function TipTapEditor({
     src: string
     width?: number
     height?: number
+    creditName?: string | null
+    creditUrl?: string | null
     maxWidth?: string
     alt: string
     title: string
@@ -192,6 +141,7 @@ export default function TipTapEditor({
     ...(hasTerminal ? [TerminalNode] : []),
     ...(hasPythonLint ? [PythonLintExtension] : []),
     PracticeQuizNode,
+    DirectoryTreeNode,
   ]
 
   // ── Editor ─────────────────────────────────────────────────────────────────
@@ -233,6 +183,7 @@ export default function TipTapEditor({
           if (node.type.name === 'image') {
             setImageModal({
               src: node.attrs.src ?? '',
+              creditName: node.attrs.creditName, creditUrl: node.attrs.creditUrl,
               maxWidth: imageMaxWidth(node.attrs.maxWidth)?.toString() ?? '',
               width: node.attrs.width,
               height: node.attrs.height,
@@ -303,7 +254,7 @@ export default function TipTapEditor({
       // Show modal to set alt text and caption before inserting
       let dimensions: { width?: number; height?: number } = {}
       try { const bitmap = await createImageBitmap(file); dimensions = { width: bitmap.width, height: bitmap.height }; bitmap.close() } catch { /* Older browsers still insert the image. */ }
-      if (replace) setImageModal(current => current ? {...current, src:url, width:dimensions.width, height:dimensions.height} : current)
+      if (replace) setImageModal(current => current ? {...current, src:url, creditName:null, creditUrl:null, width:dimensions.width, height:dimensions.height} : current)
       else setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
     } catch (error) { const message = error instanceof Error ? error.message : 'Upload failed. Please try again.'; if (replace) setImageError(message); else alert(message) }
     finally { setUploading(false) }
@@ -364,10 +315,10 @@ export default function TipTapEditor({
   const exportAs = useCallback((format: 'html' | 'markdown' | 'txt') => {
     if (!editor) return
     let content: string
-    if (format === 'html') content = editor.getHTML()
+    if (format === 'html') content = htmlDownloadDocument(editor.getHTML())
     else if (format === 'txt') content = editor.getText()
     else content = jsonToMarkdown(editor.getJSON() as Record<string, unknown>)
-    const blob = new Blob([content], { type: 'text/plain' })
+    const blob = new Blob([content], { type: format === 'html' ? 'text/html;charset=utf-8' : format === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -460,32 +411,43 @@ export default function TipTapEditor({
         <section role="dialog" aria-label="Choose course image" style={{background:'var(--surface)',padding:20,borderRadius:12,width:720,maxWidth:'94vw',maxHeight:'85dvh',overflowY:'auto'}}>
           <h3>Choose a course image</h3>
           <button type="button" className="btn btn-primary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;const replacing=libraryMode==='replace';setLibraryMode(null);(replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;setUnsplashMode(libraryMode);setLibraryMode(null)}}>Search Unsplash</button>{' '}
           <button type="button" className="btn btn-ghost btn-sm" onClick={()=>{if(canLeaveLibrary())setLibraryMode(null)}}>Close library</button>
           <AssetLibrary key={courseId} courseId={courseId} initiallyOpen onPendingChanges={setLibraryDirty} onPickImage={asset=>{
             if(!canLeaveLibrary())return
             setImageError('')
-            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,width:undefined,height:undefined}:current)
+            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,creditName:null,creditUrl:null,width:undefined,height:undefined}:current)
             else setImageModal({src:asset.url,alt:asset.alt_text??'',title:asset.caption??'',pos:null})
             setLibraryMode(null)
           }} />
         </section>
       </div>}
+      {unsplashMode && <UnsplashPicker onClose={()=>{setLibraryMode(unsplashMode);setUnsplashMode(null)}} onSelect={photo=>{
+        setImageError('')
+        const selected={src:photo.regular,alt:(photo.alt??'').trim(),creditName:photo.photographer_name,creditUrl:photo.photographer_url,width:undefined,height:undefined}
+        if(unsplashMode==='replace')setImageModal(current=>current?{...current,...selected}:current)
+        else setImageModal({...selected,title:'',pos:null})
+        setUnsplashMode(null)
+      }} />}
       {/* Image alt/caption modal */}
-      {imageModal && (
+      {imageModal && !unsplashMode && (
         <div style={{position:'fixed', inset:0, zIndex:1000, pointerEvents:'none'}}>
           <div role="dialog" aria-label="Image settings"
             style={{position:'absolute', right:16, bottom:16, pointerEvents:'auto', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'1.5rem', width:400, maxWidth:'calc(100vw - 32px)', maxHeight:'calc(100dvh - 32px)', overflowY:'auto', boxShadow:'var(--shadow-lg)'}}>
             <h3 style={{ margin: '0 0 1rem', fontSize: 15 }}>Image settings</h3>
             <img src={imageModal.src} alt="" style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 4, marginBottom: '1rem', display: 'block' }} />
+            {imageModal.creditName && <p style={{fontSize:12,color:'var(--text-3)'}}>Photo by {imageModal.creditName} on Unsplash</p>}
             <input ref={replacementInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={async e => {const file=e.target.files?.[0];e.target.value='';if(file)await handleImageUpload(file,true)}} />
             <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={()=>{if(courseId)setLibraryMode('replace');else replacementInputRef.current?.click()}}>{uploading ? 'Uploading…' : 'Replace image'}</button>
             {imageError && <p role="alert" style={{color:'var(--danger)'}}>{imageError}</p>}
             <p style={{fontSize:12,color:'var(--text-3)'}}>You can copy text from the page while these settings stay open.</p>
             <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Alt text</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Alt text (required)</label>
               <input
                 className="input"
                 aria-label="Alt text"
+                required
+                aria-required="true"
                 value={imageModal.alt}
                 onChange={(e) => setImageModal((m) => m ? { ...m, alt: e.target.value } : m)}
                 placeholder="Describe the image for screen readers…"
@@ -508,16 +470,16 @@ export default function TipTapEditor({
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button"
                 className="btn btn-primary btn-sm"
-                disabled={uploading || (!!imageModal.maxWidth && imageMaxWidth(imageModal.maxWidth) === null)}
+                disabled={uploading || !imageModal.alt.trim() || (!!imageModal.maxWidth && imageMaxWidth(imageModal.maxWidth) === null)}
                 onClick={() => {
-                  if (!editor || uploading) return
+                  if (!editor || uploading || !imageModal.alt.trim()) return
                   if (imageModal.pos === null) {
-                    editor.chain().focus().insertContent({type:'image',attrs:{ src: imageModal.src, alt: imageModal.alt, title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
+                    editor.chain().focus().insertContent({type:'image',attrs:{ creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node?.type.name === 'image') {
                       editor.chain().focus().setNodeSelection(imageModal.pos)
-                        .updateAttributes('image', { maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt, title: imageModal.title })
+                        .updateAttributes('image', { creditName:imageModal.creditName??null, creditUrl:imageModal.creditUrl??null, maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt.trim(), title: imageModal.title })
                         .run()
                     }
                   }

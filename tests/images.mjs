@@ -26,3 +26,12 @@ const sized=renderNode({type:'image',attrs:{src:uploaded,maxWidth:420,title:'Cap
 assert.match(sized, /max-width:min\(100%, 420px\)/)
 for(const maxWidth of [null,'',-1,Infinity,'100px;display:none',10001])assert.ok(!renderNode({type:'image',attrs:{src:uploaded,maxWidth}}).includes('max-width:min'))
 console.log('PASS: image maximum width is responsive and rejects invalid CSS values')
+
+const credited = renderNode({type:'image',attrs:{src:'https://images.unsplash.com/photo-fixture',creditName:'A <B>',creditUrl:'https://unsplash.com/@artist',title:'My caption'}})
+assert.match(credited,/A &lt;B&gt;/)
+assert.match(credited,/My caption/)
+assert.match(credited,/href="https:\/\/unsplash.com\/@artist"/)
+for(const creditUrl of ['javascript:alert(1)','https://unsplash.com.evil.test/@artist']) {
+ assert.ok(!renderNode({type:'image',attrs:{src:'/image.jpg',creditName:'Artist',creditUrl}}).includes('Photo by'))
+}
+console.log('PASS: Unsplash credit rendering and unsafe link rejection')

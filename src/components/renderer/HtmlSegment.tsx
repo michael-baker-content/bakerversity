@@ -103,7 +103,7 @@ export function HtmlSegment({ html }: { html: string }) {
       observer.observe(table)
     }
     measure()
-    return () => observer.disconnect()
+      return () => observer.disconnect()
   }, [html, tableId])
 
   useEffect(() => {
@@ -135,6 +135,25 @@ export function HtmlSegment({ html }: { html: string }) {
       cleanups.push(() => { img.removeEventListener('load', loaded); img.removeEventListener('error', failed); retry.removeEventListener('click', reload) })
     })
     return () => cleanups.forEach(cleanup => cleanup())
+  }, [html])
+
+  useEffect(() => {
+    const root = ref.current
+    if (!root) return
+    const copy = async (event: MouseEvent) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-directory-copy]')
+      if (!button || !root.contains(button)) return
+      event.preventDefault()
+      const status = button.closest('.directory-tree')?.querySelector('[role="status"]')
+      try {
+        await navigator.clipboard.writeText(button.dataset.directoryCopy ?? '')
+        if (status) status.textContent = 'Copied.'
+      } catch {
+        if (status) status.textContent = 'Copy unavailable. Select the text and copy it manually.'
+      }
+    }
+    root.addEventListener('click', copy)
+    return () => root.removeEventListener('click', copy)
   }, [html])
 
   return (

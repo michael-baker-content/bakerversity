@@ -1,3 +1,4 @@
+import { renderDirectoryTree } from '../../lib/directoryTree.mjs'
 import { imageMaxWidth } from '../../lib/imageWidth.mjs'
 import { imageDelivery } from '../../lib/imageDelivery.mjs'
 // Pure functions — no React imports needed
@@ -100,6 +101,7 @@ export function renderNode(node: Record<string, unknown>): string {
         <pre data-terminal-pre style="margin:0;color:#e6edf3;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all;">${termContent}</pre>
       </div>`
     }
+    case 'directoryTree': return renderDirectoryTree(attrs.source, attrs.title, attrs.copyFolders === true, attrs.color, attrs.collapsible === true)
     case 'image': {
       const maxWidth=imageMaxWidth(attrs.maxWidth)
       const sizeStyle=maxWidth ? ` style="max-width:min(100%, ${maxWidth}px)"` : ''
@@ -111,7 +113,16 @@ export function renderNode(node: Record<string, unknown>): string {
       const responsive = delivery.srcSet ? ` srcset="${attr(delivery.srcSet)}" sizes="${attr(delivery.sizes ?? '')}"` : ''
       const img = `<div class="lesson-image media-image"${sizeStyle} data-original-src="${attr(original)}"><img src="${attr(delivery.src)}"${responsive}${dimensions} alt="${attr((attrs.alt as string) ?? '')}" loading="lazy" decoding="async" /><div class="media-image-error" hidden><span>Image could not be loaded.</span> <button type="button">Retry image</button></div></div>`
       const caption = (attrs.title as string) ?? ''
-      return caption ? `<figure${sizeStyle}>${img}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : img
+      let credit = ''
+      if (typeof attrs.creditName === 'string' && typeof attrs.creditUrl === 'string') {
+        try {
+          const url = new URL(attrs.creditUrl)
+          if (url.protocol === 'https:' && url.hostname === 'unsplash.com' && !url.username && !url.password) {
+            credit = `Photo by <a href="${attr(url.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(attrs.creditName)}</a> on <a href="https://unsplash.com/?utm_source=bakerversity&amp;utm_medium=referral" target="_blank" rel="noopener noreferrer">Unsplash</a>`
+          }
+        } catch {}
+      }
+      return caption || credit ? `<figure${sizeStyle}>${img}<figcaption>${escapeHtml(caption)}${caption && credit ? '<br />' : ''}${credit}</figcaption></figure>` : img
     }
     case 'practiceQuiz': {
       // Static placeholder in HTML output — interactive version handled by LessonRenderer

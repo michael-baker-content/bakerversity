@@ -11,6 +11,7 @@ Built with **Next.js 15**, **React 19**, **Tiptap 3**, **Supabase**, and **Clerk
 - Load earlier revisions into the editor for review before saving or publishing.
 - Preview a lesson's **saved draft**, including attached resources, without publishing. The preview is restricted to its instructor and admins. Its draft notice appears when the saved content/resources differ from publication, or the lesson is unpublished. Unsaved editor changes are not included.
 - Use course-enabled mathematics, interactive graphs, code blocks, terminal blocks, callouts, and inline practice quizzes. Writing tools include search/replace, highlighting, language annotations, and optional invisible characters.
+- Paste editable [directory trees](docs/directory-trees.md), with collapsible folders, file paths, notes, and highlighted entries.
 - Highlight localization formats including YAML, XML, TOML, XLIFF, TMX, TBX, Java properties, and INI, alongside Python, JavaScript/TypeScript, shell languages, SQL, Markdown, and other offered formats.
 
 Course-page and assessment preview links still use their existing published views. Published assessment questions must be unpublished before editing; question sets do not yet have independent draft versions.
@@ -100,6 +101,10 @@ The legacy `npm run lint` script invokes interactive ESLint setup when no config
 `course_items` is the shared registry; subtype tables hold lesson/page/assessment content. `content_drafts` and `content_revisions` preserve authoring state. `assets` inventories files, `course_assets` organizes course libraries and defaults, and `item_assets` records published resource associations.
 
 After adding a migration, run `npm run db:generate` and include both generated artifacts. Do not edit them manually.
+
+## Planned editor component system
+
+The next authoring effort introduces grouped editor tools and a two-column composition that can contain supported content blocks. This is currently a documented plan, not an available feature. See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
 
 ## Further documentation
 

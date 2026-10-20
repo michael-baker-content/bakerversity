@@ -67,6 +67,7 @@ export function Toolbar({
           <span className="editor-row-label">Insert</span>
           <button type="button" className="editor-tool editor-insert-toggle" aria-expanded={insertOpen} aria-controls={insertId} onClick={() => setInsertOpen(!insertOpen)}>Insert tools <span aria-hidden="true">⌄</span></button>
           <div id={insertId} className="editor-insert-tools" data-open={insertOpen} onClick={e => {if ((e.target as HTMLElement).closest('button')) setInsertOpen(false)}}>
+            <ToolbarButton label="Directory tree" onClick={() => editor.chain().focus().insertContent({type:'directoryTree',attrs:{source:'',title:'Directory tree'}}).run()} active={editor.isActive('directoryTree')}>Directory tree</ToolbarButton>
             <ToolbarButton onClick={onFileClick} active={false}>{uploading ? 'Uploading…' : 'Image'}</ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run()} active={false}>Table</ToolbarButton>
             <button type="button" className="editor-tool" aria-expanded={showCalloutPicker} onMouseDown={e => e.preventDefault()} onClick={() => setShowCalloutPicker(v => !v)}>Callout</button>

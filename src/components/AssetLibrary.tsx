@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useId } from 'react'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
@@ -14,6 +14,7 @@ function unpackResults(result:LibraryResults) {
 }
 interface Props { onPendingChanges?: (pending:boolean)=>void; onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
 export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
+  const labelId = useId()
   const [descriptionDrafts,setDescriptionDrafts]=useState<Record<string,DescriptionDraft>>({})
   const hasDescriptionEdits=Object.keys(descriptionDrafts).length>0
   useUnsavedChanges(hasDescriptionEdits)
@@ -88,7 +89,7 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
     <input aria-label="Upload course resource" type="file" multiple disabled={busy || disabled || !courseId} onChange={e => { void upload(Array.from(e.target.files ?? [])); e.target.value = '' }} />
     {onChange && <>
       <p>Resource selections are saved with this item. Uploading or copying a link does not publish an attachment.</p>
-      <label>Resource purpose<select className="input" value={purpose} disabled={disabled} onChange={e => setPurpose(e.target.value as ResourcePurpose)}>{resourcePurposes.map(p => <option key={p}>{p}</option>)}</select></label>
+      <label><span id={labelId+'-purpose'}>Resource purpose</span><select aria-labelledby={labelId+'-purpose'} className="input" value={purpose} disabled={disabled} onChange={e => setPurpose(e.target.value as ResourcePurpose)}>{resourcePurposes.map(p => <option key={p}>{p}</option>)}</select></label>
       <h3>Selected resources</h3>
       {value.length === 0 ? <p>No attached resources selected.</p> : <ul>{value.map(row => <li key={`${row.asset_id}:${row.purpose}`}>
         {assets.find(a => a.id === row.asset_id)?.title ?? knownNames.current[row.asset_id] ?? 'Resource ' + row.asset_id} · {row.purpose}{' '}
@@ -102,8 +103,8 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
     {courseId && <div className="asset-search-controls">
       <label>Search files<input className="input" type="search" maxLength={200} placeholder="Name or filename" value={search} disabled={busy} onChange={e=>{setSearch(e.target.value);if(!e.target.value)setQuery('')}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setQuery(search.trim())}}} /></label>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setQuery(search.trim())}>Search</button>
-      <label>File type<select className="input" value={fileType} disabled={busy} onChange={e=>setFileType(e.target.value)}><option value="all">All files</option><option value="images">Images</option><option value="pdf">PDFs</option><option value="other">Other files</option></select></label>
-      <label>Sort<select className="input" value={sort} disabled={busy} onChange={e=>setSort(e.target.value)}><option value="newest">Newest uploaded</option><option value="oldest">Oldest uploaded</option><option value="name">Name A–Z</option></select></label>
+      <label><span id={labelId+'-type'}>File type</span><select aria-labelledby={labelId+'-type'} className="input" value={fileType} disabled={busy} onChange={e=>setFileType(e.target.value)}><option value="all">All files</option><option value="images">Images</option><option value="pdf">PDFs</option><option value="other">Other files</option></select></label>
+      <label><span id={labelId+'-sort'}>Sort</span><select aria-labelledby={labelId+'-sort'} className="input" value={sort} disabled={busy} onChange={e=>setSort(e.target.value)}><option value="newest">Newest uploaded</option><option value="oldest">Oldest uploaded</option><option value="name">Name A–Z</option></select></label>
       {(search||query||fileType!=='all'||sort!=='newest')&&<button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setSearch('');setQuery('');setFileType('all');setSort('newest')}}>Reset</button>}
     </div>}
     {loading && <p role="status">Loading files…</p>}

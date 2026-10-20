@@ -25,6 +25,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [selected, setSelected] = useState<UnsplashPhoto | null>(null)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -54,27 +55,35 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
   }
 
   const handleConfirm = async () => {
-    if (!selected) return
-    // Trigger Unsplash download event as required by API guidelines
-    await fetch('/api/admin/unsplash/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo_id: selected.id }),
-    })
-    onSelect(selected)
+    if (!selected || confirming) return
+    setConfirming(true)
+    setError('')
+    try {
+      const response = await fetch('/api/admin/unsplash/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_id: selected.id }),
+      })
+      if (!response.ok) throw new Error('Unable to select photo')
+      onSelect(selected)
+    } catch {
+      setError('Unable to select this photo. Please try again.')
+    } finally {
+      setConfirming(false)
+    }
   }
 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 200,
+        position: 'fixed', inset: 0, zIndex: 1200,
         background: 'rgba(0,0,0,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '1rem',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{
+      <div role="dialog" aria-label="Search Unsplash" aria-modal="true" style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
@@ -102,7 +111,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
               placeholder="Search Unsplash photos…"
               style={{ flex: 1 }}
             />
-            <button
+            <button type="button"
               onClick={() => search(query, 1)}
               disabled={loading || !query.trim()}
               className="btn btn-primary btn-sm"
@@ -110,7 +119,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
               {loading ? '…' : 'Search'}
             </button>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', flexShrink: 0 }}
           >×</button>
@@ -141,7 +150,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
               gap: 8,
             }}>
               {results.map((photo) => (
-                <button
+                <button type="button"
                   key={photo.id}
                   onClick={() => setSelected(photo.id === selected?.id ? null : photo)}
                   style={{
@@ -191,7 +200,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
           {/* Pagination */}
           {totalPages > 1 && !loading && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: '1rem' }}>
-              <button
+              <button type="button"
                 onClick={() => search(query, page - 1)}
                 disabled={page <= 1}
                 className="btn btn-ghost btn-sm"
@@ -199,7 +208,7 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
               <span style={{ fontSize: 13, color: 'var(--text-3)', alignSelf: 'center' }}>
                 {page} / {totalPages}
               </span>
-              <button
+              <button type="button"
                 onClick={() => search(query, page + 1)}
                 disabled={page >= totalPages}
                 className="btn btn-ghost btn-sm"
@@ -230,13 +239,13 @@ export default function UnsplashPicker({ onSelect, onClose, initialQuery = '' }:
             )}
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
-            <button
+            <button type="button" onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
+            <button type="button"
               onClick={handleConfirm}
-              disabled={!selected}
+              disabled={!selected || confirming}
               className="btn btn-primary btn-sm"
             >
-              Use this photo
+              {confirming ? 'Selecting…' : 'Use this photo'}
             </button>
           </div>
         </div>
