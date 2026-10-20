@@ -20,8 +20,8 @@ Course-page and assessment preview links still use their existing published view
 The course overview includes a standalone expandable **Course asset library**. It also appears in content editors and through the editor's **Image** button.
 
 - Upload multiple images/files into a course library and reuse them without uploading again.
-- Search names and original filenames, filter All files / Images / PDFs / Other files, and sort newest/oldest uploaded or Name A–Z. Search runs across the whole course library.
-- Switch between tiles and a text list. Expand a file for actions and metadata; non-image tiles show the file extension.
+- Search names and original filenames, filter All files / Images / PDFs / Other files, and sort newest/oldest uploaded or Name A–Z. Search runs across the whole course library, updates after a short typing pause, and shows matching counts.
+- Switch between tiles and a text list; the browser remembers your preference. Expand a file for actions and metadata; non-image tiles show the file extension.
 - Edit course-specific default alt text and captions. Selecting an image prefills those defaults; each placement can override them independently.
 - Replace an image while preserving its placement descriptions. Set a maximum width in pixels, with responsive sizing on smaller screens.
 - Select downloadable resources for a lesson, then save a draft or publish. Published attachments appear in **Resources** below the student lesson content. Saved-draft previews show draft attachments.

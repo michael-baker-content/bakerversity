@@ -133,6 +133,11 @@ export default function TipTapEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [libraryDirty,setLibraryDirty]=useState(false)
+  function canLeaveLibrary(){
+    if(libraryDirty && !confirm('Discard unsaved image description edits in the library?'))return false
+    setLibraryDirty(false);return true
+  }
   const [libraryMode,setLibraryMode] = useState<'insert'|'replace'|null>(null)
   const [uploading, setUploading] = useState(false)
   const [lintDiagnostics, setLintDiagnostics] = useState<LintDiagnostic[]>([])
@@ -454,9 +459,10 @@ export default function TipTapEditor({
       {libraryMode && courseId && <div style={{position:'fixed',inset:0,zIndex:1100,background:'rgba(0,0,0,.35)',display:'flex',alignItems:'center',justifyContent:'center'}}>
         <section role="dialog" aria-label="Choose course image" style={{background:'var(--surface)',padding:20,borderRadius:12,width:720,maxWidth:'94vw',maxHeight:'85dvh',overflowY:'auto'}}>
           <h3>Choose a course image</h3>
-          <button type="button" className="btn btn-primary btn-sm" onClick={()=>{const replacing=libraryMode==='replace';setLibraryMode(null);(replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
-          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setLibraryMode(null)}>Close library</button>
-          <AssetLibrary key={courseId} courseId={courseId} initiallyOpen onPickImage={asset=>{
+          <button type="button" className="btn btn-primary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;const replacing=libraryMode==='replace';setLibraryMode(null);(replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>{if(canLeaveLibrary())setLibraryMode(null)}}>Close library</button>
+          <AssetLibrary key={courseId} courseId={courseId} initiallyOpen onPendingChanges={setLibraryDirty} onPickImage={asset=>{
+            if(!canLeaveLibrary())return
             setImageError('')
             if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,width:undefined,height:undefined}:current)
             else setImageModal({src:asset.url,alt:asset.alt_text??'',title:asset.caption??'',pos:null})

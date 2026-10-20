@@ -1,11 +1,25 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
 export type Asset = { id: string; title: string; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
-interface Props { onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
-export default function AssetLibrary({ onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
+type DescriptionDraft = {alt:string;caption:string}
+type LibraryResults = Asset[] | {items:Asset[];total:number;courseTotal:number}
+function unpackResults(result:LibraryResults) {
+  if(Array.isArray(result))return {items:result,total:null,courseTotal:null}
+  if(!Array.isArray(result.items)||!Number.isInteger(result.total)||!Number.isInteger(result.courseTotal))throw new Error('Unable to read library results.')
+  return result
+}
+interface Props { onPendingChanges?: (pending:boolean)=>void; onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
+export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
+  const [descriptionDrafts,setDescriptionDrafts]=useState<Record<string,DescriptionDraft>>({})
+  const hasDescriptionEdits=Object.keys(descriptionDrafts).length>0
+  useUnsavedChanges(hasDescriptionEdits)
+  useEffect(()=>{onPendingChanges?.(hasDescriptionEdits)},[hasDescriptionEdits,onPendingChanges])
+  const [total,setTotal]=useState<number|null>(null)
+  const [courseTotal,setCourseTotal]=useState<number|null>(null)
   const [search,setSearch]=useState('')
   const [query,setQuery]=useState('')
   const [fileType,setFileType]=useState('all')
@@ -15,26 +29,35 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
   const [reload,setReload]=useState(0)
   const knownNames=useRef<Record<string,string>>({})
   const [view,setView]=useState<'tiles'|'list'>('tiles')
+  useEffect(()=>{try{const saved=localStorage.getItem('bakerversity.asset-view');if(saved==='tiles'||saved==='list')setView(saved)}catch{}},[])
+  function chooseView(next:'tiles'|'list'){setView(next);try{localStorage.setItem('bakerversity.asset-view',next)}catch{}}
   const [assets, setAssets] = useState<Asset[]>([])
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  useEffect(()=>{
+    if(busy)return
+    const timer=setTimeout(()=>setQuery(search.trim()),300)
+    return ()=>clearTimeout(timer)
+  },[search,busy])
+
   const [purpose, setPurpose] = useState<ResourcePurpose>('download')
   const [page,setPage]=useState(0)
   const [hasMore,setHasMore]=useState(false)
   const endpoint=courseId ? '/api/admin/assets?course_id='+encodeURIComponent(courseId) : '/api/admin/assets'
-  const listEndpoint=endpoint+(courseId?'&':'?')+new URLSearchParams({q:query,type:fileType,sort}).toString()
+  const listEndpoint=endpoint+(courseId?'&':'?')+new URLSearchParams({q:query,type:fileType,sort,summary:'1'}).toString()
   const currentEndpoint=useRef(listEndpoint);currentEndpoint.current=listEndpoint
   function remember(rows:Asset[]){for(const row of rows)knownNames.current[row.id]=row.title}
   async function load(next=0) {
-    const rows=await requestJson<Asset[]>(listEndpoint+'&page='+next)
+    const result=unpackResults(await requestJson<LibraryResults>(listEndpoint+'&page='+next,{},'library load'))
+    const rows=result.items
     if(currentEndpoint.current!==listEndpoint)return
     remember(rows)
-    setAssets(old=>next===0?rows:[...old,...rows]);setPage(next);setHasMore(!!courseId && rows.length===50)
+    setAssets(old=>next===0?rows:[...old,...rows]);setPage(next);setTotal(result.total);setCourseTotal(result.courseTotal);setHasMore(result.total===null?!!courseId&&rows.length===50:(next+1)*50<result.total)
   }
   useEffect(()=>{
     let active=true;const controller=new AbortController()
-    setAssets([]);setHasMore(false);setLoading(true);setLoadError('')
-    requestJson<Asset[]>(listEndpoint,{signal:controller.signal}).then(rows=>{if(active){remember(rows);setAssets(rows);setPage(0);setHasMore(!!courseId&&rows.length===50)}}).catch(e=>{if(active)setLoadError(e.message)}).finally(()=>{if(active)setLoading(false)})
+    setAssets([]);setTotal(null);setCourseTotal(null);setHasMore(false);setLoading(true);setLoadError('')
+    requestJson<LibraryResults>(listEndpoint,{signal:controller.signal},'library load').then(response=>{if(active){const result=unpackResults(response),rows=result.items;remember(rows);setAssets(rows);setPage(0);setTotal(result.total);setCourseTotal(result.courseTotal);setHasMore(result.total===null?!!courseId&&rows.length===50:rows.length<result.total)}}).catch(e=>{if(active)setLoadError(e.message)}).finally(()=>{if(active)setLoading(false)})
     return ()=>{active=false;controller.abort()}
   },[listEndpoint,courseId,reload])
   async function upload(files: File[]) {
@@ -85,13 +108,15 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
     </div>}
     {loading && <p role="status">Loading files…</p>}
     {loadError && <p role="alert">{loadError} <button type="button" onClick={()=>setReload(n=>n+1)}>Retry</button></p>}
-    {!loading&&!loadError&&!assets.length&&<p>{query||fileType!=='all'?'No files match these filters.':'No files in this course library yet.'}</p>}
+    {!loading&&!loadError&&total!==null&&<p role="status" style={{fontSize:12,color:'var(--text-2)'}}>{assets.length} of {total} matching {total===1?'file':'files'}{courseTotal!==total?' · '+courseTotal+' in course':''}</p>}
+    {!loading&&!loadError&&!assets.length&&<p>{query||fileType!=='all'?'No files match these filters.':'No files in this course library yet.'} {(query||fileType!=='all')&&<button type="button" className="btn btn-ghost btn-sm" onClick={()=>{setSearch('');setQuery('');setFileType('all')}}>Clear filters</button>}</p>}
     <div role="group" aria-label="Library view" style={{display:'flex',gap:6,margin:'12px 0'}}>
-      <button type="button" className={'btn btn-sm '+(view==='tiles'?'btn-secondary':'btn-ghost')} aria-pressed={view==='tiles'} onClick={()=>setView('tiles')}>Tiles</button>
-      <button type="button" className={'btn btn-sm '+(view==='list'?'btn-secondary':'btn-ghost')} aria-pressed={view==='list'} onClick={()=>setView('list')}>Text list</button>
+      <button type="button" className={'btn btn-sm '+(view==='tiles'?'btn-secondary':'btn-ghost')} aria-pressed={view==='tiles'} onClick={()=>chooseView('tiles')}>Tiles</button>
+      <button type="button" className={'btn btn-sm '+(view==='list'?'btn-secondary':'btn-ghost')} aria-pressed={view==='list'} onClick={()=>chooseView('list')}>Text list</button>
     </div>
     <div className={'asset-browser asset-browser--'+view}>
     {assets.map(a => {
+      const draftKey=(courseId??'')+':'+a.id
       const isImage=!!a.mime_type?.startsWith('image/')
       const filename=a.original_filename || a.title
       const extension=filename.includes('.') ? filename.split('.').pop()!.slice(0,12).toUpperCase() : 'FILE'
@@ -106,9 +131,9 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
           </summary>
           <div className="asset-browser-options">
             <div className="asset-file-meta"><span>{extension === 'FILE' && isImage ? 'Image' : extension}</span><span>{a.byte_size < 1048576 ? Math.max(1,Math.ceil(a.byte_size/1024))+' KB' : (a.byte_size/1048576).toFixed(1)+' MB'}</span></div>
-            {courseId && isImage && <ImageDefaults asset={a} endpoint={endpoint} disabled={disabled||busy} onSaved={(alt,caption)=>setAssets(rows=>rows.map(row=>row.id===a.id?{...row,alt_text:alt,caption}:row))} />}
+            {courseId && isImage && <ImageDefaults asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(alt,caption)=>{setAssets(rows=>rows.map(row=>row.id===a.id?{...row,alt_text:alt,caption}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
             <div className="asset-file-actions">
-        {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy} onClick={()=>onPickImage(a)}>Use image</button>}
+        {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy||!!descriptionDrafts[draftKey]} title={descriptionDrafts[draftKey]?'Save or discard the edited defaults before using this image':undefined} onClick={()=>onPickImage(a)}>Use image</button>}
               <a className="btn btn-ghost btn-sm" href={a.url} target="_blank" rel="noreferrer">Open file ↗</a>
               <button type="button" className="btn btn-ghost btn-sm" onClick={async()=>{
                 try{await navigator.clipboard.writeText(a.url);setMessage('Resource link copied.')}
@@ -169,13 +194,13 @@ export default function AssetLibrary({ onPickImage, initiallyOpen = false, cours
   </details>
 }
 
-function ImageDefaults({asset,endpoint,disabled,onSaved}:{asset:Asset;endpoint:string;disabled:boolean;onSaved:(alt:string,caption:string)=>void}) {
- const [alt,setAlt]=useState(asset.alt_text??''),[caption,setCaption]=useState(asset.caption??'')
+function ImageDefaults({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Asset;draft?:DescriptionDraft;onDraft:(draft:DescriptionDraft|null)=>void;endpoint:string;disabled:boolean;onSaved:(alt:string,caption:string)=>void}) {
+ const [alt,setAlt]=useState(draft?.alt??asset.alt_text??''),[caption,setCaption]=useState(draft?.caption??asset.caption??'')
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
  return <section className="asset-description-editor" aria-label="Default image descriptions">
- <h4>Image descriptions</h4>
- <label>Alt text<textarea className="input" rows={3} maxLength={2000} value={alt} disabled={busy||disabled} onChange={e=>setAlt(e.target.value)} /></label>
- <label>Caption <span className="asset-field-optional">(optional)</span><textarea className="input" rows={3} maxLength={5000} value={caption} disabled={busy||disabled} onChange={e=>setCaption(e.target.value)} /></label>
- <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled || (alt===(asset.alt_text??'') && caption===(asset.caption??''))} onClick={async()=>{setBusy(true);setMessage('');try{await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,alt_text:alt,caption})},'image defaults save');onSaved(alt,caption);setMessage('Defaults saved.')}catch(e){setMessage(e instanceof Error?e.message:'Save failed')}finally{setBusy(false)}}}>{busy?'Saving…':'Save defaults'}</button><p role="status" className="asset-description-status">{message}</p>
+ <h4>Image descriptions {(alt!==(asset.alt_text??'')||caption!==(asset.caption??''))&&<span style={{fontSize:11,fontWeight:400,color:'var(--amber-label)'}}> · Unsaved</span>}</h4>
+ <label>Alt text<textarea className="input" rows={3} maxLength={2000} value={alt} disabled={busy||disabled} onChange={e=>{const next=e.target.value;setAlt(next);onDraft(next===(asset.alt_text??'')&&caption===(asset.caption??'')?null:{alt:next,caption})}} /></label>
+ <label>Caption <span className="asset-field-optional">(optional)</span><textarea className="input" rows={3} maxLength={5000} value={caption} disabled={busy||disabled} onChange={e=>{const next=e.target.value;setCaption(next);onDraft(alt===(asset.alt_text??'')&&next===(asset.caption??'')?null:{alt,caption:next})}} /></label>
+ <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled || (alt===(asset.alt_text??'') && caption===(asset.caption??''))} onClick={async()=>{setBusy(true);setMessage('');try{await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,alt_text:alt,caption})},'image defaults save');onSaved(alt,caption);setMessage('Defaults saved.')}catch(e){setMessage(e instanceof Error?e.message:'Save failed')}finally{setBusy(false)}}}>{busy?'Saving…':'Save defaults'}</button>{(alt!==(asset.alt_text??'')||caption!==(asset.caption??''))&&<button type="button" className="btn btn-ghost btn-sm" disabled={busy||disabled} onClick={()=>{setAlt(asset.alt_text??'');setCaption(asset.caption??'');onDraft(null);setMessage('')}}>Discard edits</button>}<p role="status" className="asset-description-status">{message}</p>
  </section>
 }

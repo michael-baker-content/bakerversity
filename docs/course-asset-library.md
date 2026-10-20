@@ -35,8 +35,14 @@ The editor integration requires no migration beyond 202610190001_course_assets.s
 
 ## Search and filtering: first pass
 
-Search matches display names and original filenames literally and case-insensitively. Submit using Search or Enter; clearing the search field clears the applied search. Type filters are All files, Images, PDFs, and Other files. PDF detection checks MIME type and filename because existing resource uploads may use application/octet-stream. Sorting uses asset upload dates or natural name order, with asset IDs breaking ties. Reset restores the defaults. Both tile and text-list views use the same results.
+Search matches display names and original filenames literally and case-insensitively. Results update after a 300 ms typing pause; Search or Enter applies them immediately. Clearing the search field clears the applied search. Type filters are All files, Images, PDFs, and Other files. PDF detection checks MIME type and filename because existing resource uploads may use application/octet-stream. Sorting uses asset upload dates or natural name order, with asset IDs breaking ties. Reset restores the defaults. Both tile and text-list views use the same results.
 
 The server authorizes course access and reads course membership in batches before filtering and returning 50 matches per page. This deliberately simple first pass searches the entire library without a schema migration; very large libraries will benefit from database-side filtering/indexes later. The API never searches other courses. UI requests cancel/ignore stale search results, and selections stay attached when filters change.
 
 Run npm test for the search helper checks, including matches beyond 50 assets, Unicode names, literal wildcard characters, mixed upload types, and sorting. No new migration is required. GitHub runs the existing browser smoke test; local verification does not start a server automatically.
+
+## Search refinements
+
+The library now shows exact matching/loaded counts, removes Load more when all matches are shown, and remembers tile/list preference in browser storage. Storage restrictions fall back to tiles without breaking the library. Unsaved image description edits survive filtering and pagination; they are marked Unsaved with a Discard edits action. Save/discard before using that image, and confirm before closing a picker with pending description changes. Existing resource selections remain unchanged by searches.
+
+Expanded browser smoke assertions cover live search, PDF filtering, result counts, view preference, and description edit preservation. Those assertions run in GitHub Actions; no local server was launched for this pass.

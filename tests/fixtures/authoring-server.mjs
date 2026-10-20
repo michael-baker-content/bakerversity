@@ -1,3 +1,4 @@
+import { filterCourseAssets } from '../../src/lib/assetSearch.mjs'
 // Isolated fixture: real migrations/procedures; no Supabase, Clerk, or live credentials.
 import { PGlite } from '@electric-sql/pglite'
 import fs from 'node:fs'
@@ -25,7 +26,11 @@ export async function startAuthoringFixture() {
    if(path.startsWith('/api/fixture/student/')){const id=path.split('/').pop();const assessment=(await rows('select * from assessments where id=$1 and is_published',[id]))[0];return assessment?reply({assessment,questions:await rows('select id,question_type,question_text,content,options,position from assessment_questions where assessment_id=$1 order by position,id',[id])}):reply({error:'Not published'},404)}
    if(path==='/api/fixture/attempts')return reply(await rows('select * from assessment_attempts'))
    if(path.includes('course-id-by-slug'))return reply({id:course})
-   if(path==='/api/admin/assets')return reply([{id:'fixture-image',title:'Library diagram',url:'https://example.test/diagram.png',mime_type:'image/png',alt_text:'Default diagram description',caption:'Default diagram caption',byte_size:100,item_assets:[]}])
+   if(path==='/api/admin/assets'){
+    const files=[{id:'fixture-image',title:'Library diagram',original_filename:'diagram.png',created_at:'2026-10-19',url:'https://example.test/diagram.png',mime_type:'image/png',alt_text:'Default diagram description',caption:'Default diagram caption',byte_size:100,item_assets:[]},{id:'fixture-pdf',title:'Slides',original_filename:'slides.pdf',created_at:'2026-10-18',url:'https://example.test/slides.pdf',mime_type:'application/octet-stream',alt_text:null,caption:null,byte_size:200,item_assets:[]}]
+    const matches=filterCourseAssets(files,{q:url.searchParams.get('q')??'',type:url.searchParams.get('type')??'all',sort:url.searchParams.get('sort')??'newest'})
+    return reply(url.searchParams.get('summary')==='1'?{items:matches,total:matches.length,courseTotal:files.length}:matches)
+   }
    if(path.endsWith('/modules'))return reply([])
    if(path===`/api/admin/courses/${course}`)return reply({editor_tools:[]})
    if(path.endsWith('/history'))return reply(await rows('select id,version,created_at,snapshot from content_revisions where item_id=$1 order by version desc',[path.split('/').at(-2)]))

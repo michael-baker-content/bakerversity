@@ -17,7 +17,8 @@ export async function GET(req: Request) {
   }
   const assets=rows.map(row=>({...row.assets!,alt_text:row.default_alt_text,caption:row.default_caption}))
   const filtered=filterCourseAssets(assets,{q:(params.get('q')??'').slice(0,200),type:params.get('type')??'all',sort:params.get('sort')??'newest'})
-  return NextResponse.json(filtered.slice(page*50,page*50+50).map(a=>({...a,item_assets:[],url:a.external_url??(a.bucket&&a.object_path?ctx.db.storage.from(a.bucket).getPublicUrl(a.object_path).data.publicUrl:'')})))
+  const items=filtered.slice(page*50,page*50+50).map(a=>({...a,item_assets:[],url:a.external_url??(a.bucket&&a.object_path?ctx.db.storage.from(a.bucket).getPublicUrl(a.object_path).data.publicUrl:'')}))
+  return NextResponse.json(params.get('summary')==='1'?{items,total:filtered.length,courseTotal:assets.length}:items)
  }
  let query=ctx.db.from('assets').select('*, item_assets(item_id)').order('created_at',{ascending:false}).limit(200)
  if(ctx.user.role!=='admin')query=query.eq('owner_id',ctx.user.id)
