@@ -35,3 +35,13 @@ for(const creditUrl of ['javascript:alert(1)','https://unsplash.com.evil.test/@a
  assert.ok(!renderNode({type:'image',attrs:{src:'/image.jpg',creditName:'Artist',creditUrl}}).includes('Photo by'))
 }
 console.log('PASS: Unsplash credit rendering and unsafe link rejection')
+
+for(const title of ['', 'Caption']) {
+ const centered=renderNode({type:'image',attrs:{src:uploaded,title,alignment:'center',maxWidth:420}})
+ assert.match(centered,/margin-left:auto;margin-right:auto/)
+ assert.match(centered,/max-width:min\(100%, 420px\)/)
+ const left=renderNode({type:'image',attrs:{src:uploaded,title}})
+ assert.match(left,/margin-left:0;margin-right:0/)
+}
+assert.ok(!renderNode({type:'image',attrs:{src:uploaded,alignment:'center;display:none'}}).includes('display:none'))
+console.log('PASS: centered and left image placements, captions, width constraints and safe defaults')

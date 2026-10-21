@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import ItemMetadataFields, { itemMetadata } from '@/components/ItemMetadataFields'
@@ -9,11 +9,11 @@ import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resou
 import { useDraft } from '@/lib/authoring/useDraft'
 import DraftStatus from '@/components/DraftStatus'
 import RevisionHistory from '@/components/RevisionHistory'
-import dynamic from 'next/dynamic'
+import CoursePageContentEditor from '@/components/CoursePageContentEditor'
 import { requestJson } from '@/lib/authoring/request'
-import MarkdownImport from '@/components/MarkdownImport'
 
-const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
+
+
 
 const PAGE_TYPES = [
   { value: 'overview',      label: 'Overview' },
@@ -33,7 +33,7 @@ export default function EditCoursePage() {
   const slug = params.slug as string
   const pageId = params.pageId as string
 
-  const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
+
   const [courseId, setCourseId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadedId, setLoadedId] = useState<string | null>(null)
@@ -160,25 +160,7 @@ export default function EditCoursePage() {
           </div>
         )}
 
-        {/* Content */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <label style={labelStyle}>Content</label>
-            <MarkdownImport
-              hasExistingContent={Object.keys(content).length > 0}
-              onInsert={(doc) => insertFnRef.current?.(doc)}
-            />
-          </div>
-          {ready && (
-            <TipTapEditor courseId={courseId ?? undefined}
-              key={editorKey}
-              packs={['code']}
-              content={Object.keys(content).length > 0 ? content : undefined}
-              onChange={setContent}
-              onEditorReady={(fn) => { insertFnRef.current = fn }}
-            />
-          )}
-        </div>
+        <CoursePageContentEditor key={editorKey} courseId={courseId} content={content} onChange={setContent} />
 
         {/* Published */}
         {pageId && <RevisionHistory itemId={pageId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}

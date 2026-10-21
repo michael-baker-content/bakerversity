@@ -793,3 +793,11 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 .directory-color-swatch { width:14px; height:14px; flex-shrink:0; border-radius:50%; background:var(--tree-accent); }
 
 [data-theme="dark"] .directory-tree[data-tree-color] { --text-2:#b9b4a4; }
+
+.directory-source-field { display:grid; gap:4px; }
+
+/* Keep image captions readable against dark lesson surfaces. */
+[data-theme="dark"] .lesson-content figcaption { color:var(--text-2); }
+
+.image-alignment-option[aria-pressed="true"] { background:var(--amber); color:var(--amber-text); border-color:var(--amber-ink); box-shadow:inset 0 0 0 1px var(--amber-ink); font-weight:700; }
+.image-alignment-option[aria-pressed="true"]:hover { background:var(--amber-hover); color:var(--amber-text); }

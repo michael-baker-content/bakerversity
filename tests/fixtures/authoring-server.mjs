@@ -14,6 +14,7 @@ export async function startAuthoringFixture() {
  const author=await scalar(`insert into users(clerk_id,email,role) values('fixture_author','author@example.test','instructor') returning id`)
  const student=await scalar(`insert into users(clerk_id,email) values('fixture_student','student@example.test') returning id`)
  const course=await scalar(`insert into courses(instructor_id,title,slug,is_published,is_public) values($1,'Smoke course','smoke',true,true) returning id`,[author])
+const files=[{id:'fixture-image',title:'Library diagram',original_filename:'diagram.png',created_at:'2026-10-19',url:'https://example.test/diagram.png',mime_type:'image/png',alt_text:'Default diagram description',caption:'Default diagram caption',byte_size:100,item_assets:[]},{id:'fixture-pdf',title:'Slides',original_filename:'slides.pdf',created_at:'2026-10-18',url:'https://example.test/slides.pdf',mime_type:'application/octet-stream',alt_text:null,caption:null,byte_size:200,item_assets:[]}]
  let mode='normal'
  const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json')
@@ -27,12 +28,19 @@ export async function startAuthoringFixture() {
    if(path==='/api/fixture/attempts')return reply(await rows('select * from assessment_attempts'))
    if(path.includes('course-id-by-slug'))return reply({id:course})
    if(path==='/api/admin/assets'){
-    const files=[{id:'fixture-image',title:'Library diagram',original_filename:'diagram.png',created_at:'2026-10-19',url:'https://example.test/diagram.png',mime_type:'image/png',alt_text:'Default diagram description',caption:'Default diagram caption',byte_size:100,item_assets:[]},{id:'fixture-pdf',title:'Slides',original_filename:'slides.pdf',created_at:'2026-10-18',url:'https://example.test/slides.pdf',mime_type:'application/octet-stream',alt_text:null,caption:null,byte_size:200,item_assets:[]}]
+    if(req.method==='PATCH'){
+      const asset=files.find(row=>row.id===body.id)
+      if(!asset)return reply({error:'Not found'},404)
+      if(body.display_name)asset.title=body.display_name.trim()
+      asset.alt_text=body.alt_text;asset.caption=body.caption
+      return reply({ok:true})
+    }
+
     const matches=filterCourseAssets(files,{q:url.searchParams.get('q')??'',type:url.searchParams.get('type')??'all',sort:url.searchParams.get('sort')??'newest'})
     return reply(url.searchParams.get('summary')==='1'?{items:matches,total:matches.length,courseTotal:files.length}:matches)
    }
    if(path.endsWith('/modules'))return reply([])
-   if(path===`/api/admin/courses/${course}`)return reply({editor_tools:[]})
+   if(path===`/api/admin/courses/${course}`)return reply({editor_tools:['math','code','graph','terminal','lang-select','python-lint']})
    if(path.endsWith('/history'))return reply(await rows('select id,version,created_at,snapshot from content_revisions where item_id=$1 order by version desc',[path.split('/').at(-2)]))
    if(path.includes('/api/students/'))return reply(await scalar('select submit_assessment($1,$2,$3,$4)',[student,path.split('/').at(-2),body.answers,body.request_id]))
    const match=path.match(/^\/api\/admin\/courses\/[^/]+\/(lessons|pages|assessments)(?:\/([^/]+))?(?:\/questions(?:\/([^/]+))?)?$/)

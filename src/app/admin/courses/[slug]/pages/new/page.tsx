@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
 import { downloadRecovery } from '@/lib/authoring/recovery'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
-import dynamic from 'next/dynamic'
-import MarkdownImport from '@/components/MarkdownImport'
+import CoursePageContentEditor from '@/components/CoursePageContentEditor'
 
-const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
+
+
 
 const PAGE_TYPES = [
   { value: 'overview',      label: 'Overview',      hint: 'A high-level description of the course' },
@@ -28,7 +28,7 @@ export default function NewCoursePage() {
   const params = useParams()
   const slug = params.slug as string
 
-  const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
+
   const [courseId, setCourseId] = useState<string | null>(null)
   const [resolving, setResolving] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -123,21 +123,7 @@ export default function NewCoursePage() {
           </div>
         )}
 
-        {/* Content */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <label style={labelStyle}>Content</label>
-            <MarkdownImport
-              hasExistingContent={Object.keys(content).length > 0}
-              onInsert={(doc) => insertFnRef.current?.(doc)}
-            />
-          </div>
-          <TipTapEditor courseId={courseId ?? undefined}
-            packs={['code']}
-            onChange={setContent}
-            onEditorReady={(fn) => { insertFnRef.current = fn }}
-          />
-        </div>
+        <CoursePageContentEditor courseId={courseId} content={content} onChange={setContent} />
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 

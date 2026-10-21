@@ -75,7 +75,7 @@ npm run test:smoke
 
 **The smoke test starts a temporary local server.** Run it locally only when desired; otherwise rely on GitHub Actions. It uses isolated data and selected real UI components, with substitute authentication/API routing. It does not verify live Clerk, Supabase Storage, or Vercel configuration. See [authoring reliability](docs/authoring-reliability.md) for coverage and limitations.
 
-Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610190001_course_assets.sql`; the project owner has confirmed it was applied. The subsequent editor/library and lesson-preview changes require no additional migration.
+Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610200001_course_asset_names.sql`; apply it before deploying course-specific asset names and named downloads. The preceding `202610190001_course_assets.sql` migration was confirmed applied. Do not rerun preceding migrations.
 
 The legacy `npm run lint` script invokes interactive ESLint setup when no configuration is present. It is not part of the current CI checks; use the commands above. A standalone lint configuration remains separate work.
 
@@ -112,6 +112,7 @@ The next authoring effort introduces grouped editor tools and a two-column compo
 - [Foundation and data model](docs/foundation.md)
 - [Authoring reliability](docs/authoring-reliability.md)
 - [Course asset library](docs/course-asset-library.md)
+- [Asset names and downloads](docs/asset-names.md)
 - [Image delivery](docs/image-delivery.md)
 - [Assessment authoring](docs/assessment-authoring.md)
 - [Resource revisions](docs/authoring-resource-revisions.md)

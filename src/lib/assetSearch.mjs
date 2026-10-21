@@ -1,5 +1,5 @@
 /** Initial course-library search: literal, case-insensitive names and extension-aware types.
- * @template {{id:string,title:string,created_at:string,original_filename?:string|null,mime_type?:string|null}} T
+ * @template {{id:string,title:string,created_at:string,original_filename?:string|null,original_title?:string|null,mime_type?:string|null}} T
  * @param {T[]} rows
  * @param {{q?:string,type?:string,sort?:string}} options
  * @returns {T[]}
@@ -7,7 +7,7 @@
 export function filterCourseAssets(rows, {q='',type='all',sort='newest'}={}) {
  const term=q.trim().toLocaleLowerCase()
  return rows.filter(a=>{
-  const name=((a.title??'')+' '+(a.original_filename??'')).toLocaleLowerCase()
+  const name=((a.title??'')+' '+(a.original_filename??'')+' '+(a.original_title??'')).toLocaleLowerCase()
   const ext=(a.original_filename||a.title||'').split('.').pop().toLowerCase()
   const image=(a.mime_type??'').startsWith('image/')
   const pdf=a.mime_type==='application/pdf'||ext==='pdf'

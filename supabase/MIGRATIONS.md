@@ -42,3 +42,7 @@ After the five preceding migrations, apply `migrations/202610190001_course_asset
 The project owner has confirmed this migration was applied. Do not rerun it. Later image picker, presentation, and saved-draft lesson preview changes need no additional SQL. See `docs/course-asset-library.md` for scope and verification.
 
 The empty-database observations above are historical preflight records from October 14–15, 2026. The database now contains authored course content; do not use those observations as a basis for a reset.
+
+## Course-specific asset names (pending owner application)
+
+Apply only migrations/202610200001_course_asset_names.sql after the six existing migrations and before deploying this release. It adds nullable course_assets.display_name with a length/nonblank constraint; existing rows fall back to assets.title. It does not rename storage objects, change URLs, remove content, or alter accounts. No manual backfill is required. See [asset names and downloads](../docs/asset-names.md).

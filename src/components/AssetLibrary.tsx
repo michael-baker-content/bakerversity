@@ -4,8 +4,8 @@ import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
-export type Asset = { id: string; title: string; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
-type DescriptionDraft = {alt:string;caption:string}
+export type Asset = { id: string; title: string; download_url?: string | null; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
+type DescriptionDraft = {name:string;alt:string;caption:string}
 type LibraryResults = Asset[] | {items:Asset[];total:number;courseTotal:number}
 function unpackResults(result:LibraryResults) {
   if(Array.isArray(result))return {items:result,total:null,courseTotal:null}
@@ -132,9 +132,10 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
           </summary>
           <div className="asset-browser-options">
             <div className="asset-file-meta"><span>{extension === 'FILE' && isImage ? 'Image' : extension}</span><span>{a.byte_size < 1048576 ? Math.max(1,Math.ceil(a.byte_size/1024))+' KB' : (a.byte_size/1048576).toFixed(1)+' MB'}</span></div>
-            {courseId && isImage && <ImageDefaults asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(alt,caption)=>{setAssets(rows=>rows.map(row=>row.id===a.id?{...row,alt_text:alt,caption}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
+            {courseId && <AssetDetails asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(name,alt,caption)=>{knownNames.current[a.id]=name;setAssets(rows=>rows.map(row=>row.id===a.id?{...row,title:name,alt_text:alt,caption}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
             <div className="asset-file-actions">
-        {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy||!!descriptionDrafts[draftKey]} title={descriptionDrafts[draftKey]?'Save or discard the edited defaults before using this image':undefined} onClick={()=>onPickImage(a)}>Use image</button>}
+              {a.download_url&&<a className="btn btn-ghost btn-sm" href={a.download_url}>Download</a>}
+        {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy||!!descriptionDrafts[draftKey]} title={descriptionDrafts[draftKey]?'Save or discard the asset details before using this image':undefined} onClick={()=>onPickImage(a)}>Use image</button>}
               <a className="btn btn-ghost btn-sm" href={a.url} target="_blank" rel="noreferrer">Open file ↗</a>
               <button type="button" className="btn btn-ghost btn-sm" onClick={async()=>{
                 try{await navigator.clipboard.writeText(a.url);setMessage('Resource link copied.')}
@@ -195,13 +196,24 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
   </details>
 }
 
-function ImageDefaults({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Asset;draft?:DescriptionDraft;onDraft:(draft:DescriptionDraft|null)=>void;endpoint:string;disabled:boolean;onSaved:(alt:string,caption:string)=>void}) {
- const [alt,setAlt]=useState(draft?.alt??asset.alt_text??''),[caption,setCaption]=useState(draft?.caption??asset.caption??'')
+function AssetDetails({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Asset;draft?:DescriptionDraft;onDraft:(draft:DescriptionDraft|null)=>void;endpoint:string;disabled:boolean;onSaved:(name:string,alt:string,caption:string)=>void}) {
+ const original={name:asset.title,alt:asset.alt_text??'',caption:asset.caption??''}
+ const fields=draft??original
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
- return <section className="asset-description-editor" aria-label="Default image descriptions">
- <h4>Image descriptions {(alt!==(asset.alt_text??'')||caption!==(asset.caption??''))&&<span style={{fontSize:11,fontWeight:400,color:'var(--amber-label)'}}> · Unsaved</span>}</h4>
- <label>Alt text<textarea className="input" rows={3} maxLength={2000} value={alt} disabled={busy||disabled} onChange={e=>{const next=e.target.value;setAlt(next);onDraft(next===(asset.alt_text??'')&&caption===(asset.caption??'')?null:{alt:next,caption})}} /></label>
- <label>Caption <span className="asset-field-optional">(optional)</span><textarea className="input" rows={3} maxLength={5000} value={caption} disabled={busy||disabled} onChange={e=>{const next=e.target.value;setCaption(next);onDraft(alt===(asset.alt_text??'')&&next===(asset.caption??'')?null:{alt,caption:next})}} /></label>
- <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled || (alt===(asset.alt_text??'') && caption===(asset.caption??''))} onClick={async()=>{setBusy(true);setMessage('');try{await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,alt_text:alt,caption})},'image defaults save');onSaved(alt,caption);setMessage('Defaults saved.')}catch(e){setMessage(e instanceof Error?e.message:'Save failed')}finally{setBusy(false)}}}>{busy?'Saving…':'Save defaults'}</button>{(alt!==(asset.alt_text??'')||caption!==(asset.caption??''))&&<button type="button" className="btn btn-ghost btn-sm" disabled={busy||disabled} onClick={()=>{setAlt(asset.alt_text??'');setCaption(asset.caption??'');onDraft(null);setMessage('')}}>Discard edits</button>}<p role="status" className="asset-description-status">{message}</p>
+ const isImage=!!asset.mime_type?.startsWith('image/')
+ function change(patch:Partial<DescriptionDraft>){const next={...fields,...patch};onDraft(next.name===original.name&&next.alt===original.alt&&next.caption===original.caption?null:next)}
+ return <section className="asset-description-editor" aria-label="Asset details">
+ <h4>Asset details {draft&&<span style={{fontSize:11,fontWeight:400,color:'var(--amber-label)'}}> · Unsaved</span>}</h4>
+ <label style={{gridColumn:'1 / -1'}}>Asset name<input className="input" aria-label="Asset name" required maxLength={200} value={fields.name} disabled={busy||disabled} onChange={e=>change({name:e.target.value})} /></label>
+ {isImage&&<><label>Alt text<textarea aria-label="Alt text" className="input" rows={3} maxLength={2000} value={fields.alt} disabled={busy||disabled} onChange={e=>change({alt:e.target.value})} /></label>
+ <label>Caption <span className="asset-field-optional">(optional)</span><textarea aria-label="Caption" className="input" rows={3} maxLength={5000} value={fields.caption} disabled={busy||disabled} onChange={e=>change({caption:e.target.value})} /></label></>}
+ <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled||!draft||!fields.name.trim()} onClick={async()=>{
+   setBusy(true);setMessage('')
+   try{await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,display_name:fields.name,alt_text:fields.alt,caption:fields.caption})},'asset details save');onSaved(fields.name.trim(),fields.alt,fields.caption);setMessage('Details saved.')}
+   catch(e){setMessage(e instanceof Error?e.message:'Save failed')}
+   finally{setBusy(false)}
+ }}>{busy?'Saving…':'Save details'}</button>
+ {draft&&<button type="button" className="btn btn-ghost btn-sm" disabled={busy||disabled} onClick={()=>{onDraft(null);setMessage('')}}>Discard edits</button>}
+ <p role="status" className="asset-description-status">{message}</p>
  </section>
 }

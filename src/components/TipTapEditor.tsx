@@ -30,7 +30,11 @@ import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table
 
 const SizedImage = Image.extend({
   addAttributes() {
-    return {...this.parent?.(), creditName: {default:null, rendered:false}, creditUrl: {default:null, rendered:false}, maxWidth: {
+    return {...this.parent?.(), creditName: {default:null, rendered:false}, creditUrl: {default:null, rendered:false}, alignment: {
+      default:'left',
+      parseHTML:element=>element.getAttribute('data-image-alignment')==='center'?'center':'left',
+      renderHTML:attrs=>({'data-image-alignment':attrs.alignment==='center'?'center':'left',style:attrs.alignment==='center'?'display:block;margin-left:auto;margin-right:auto':'display:block;margin-left:0;margin-right:0'}),
+    }, maxWidth: {
       default:null,
       parseHTML:element=>imageMaxWidth(element.getAttribute('data-max-width')),
       renderHTML:attrs=>{const width=imageMaxWidth(attrs.maxWidth);return width ? {'data-max-width':width,style: `max-width:min(100%, ${width}px);height:auto`} : {}},
@@ -81,7 +85,7 @@ export default function TipTapEditor({
 
   const [libraryDirty,setLibraryDirty]=useState(false)
   function canLeaveLibrary(){
-    if(libraryDirty && !confirm('Discard unsaved image description edits in the library?'))return false
+    if(libraryDirty && !confirm('Discard unsaved asset details in the library?'))return false
     setLibraryDirty(false);return true
   }
   const [unsplashMode,setUnsplashMode] = useState<'insert'|'replace'|null>(null)
@@ -105,6 +109,7 @@ export default function TipTapEditor({
     height?: number
     creditName?: string | null
     creditUrl?: string | null
+    alignment?: 'left' | 'center'
     maxWidth?: string
     alt: string
     title: string
@@ -113,10 +118,7 @@ export default function TipTapEditor({
 
   const [showLatexActivation, setShowLatexActivation] = useState(false)
   const hasMath = packs.includes('math')
-  const hasCode = packs.includes('code')
-  const hasGraph = packs.includes('graph')
   const hasPythonLint = packs.includes('python-lint')
-  const hasTerminal = packs.includes('terminal')
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
@@ -135,10 +137,12 @@ export default function TipTapEditor({
     TableRow,
     TableCell,
     TableHeader,
-    ...(hasCode ? [ExtendedCodeBlock] : []),
-    ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
-    ...(hasGraph ? [MafsGraphNode] : []),
-    ...(hasTerminal ? [TerminalNode] : []),
+    // Keep saved block definitions available even when insertion tools are hidden.
+    ExtendedCodeBlock,
+    InlineMath, BlockMath,
+    ...(hasMath ? [MathShortcut] : []),
+    MafsGraphNode,
+    TerminalNode,
     ...(hasPythonLint ? [PythonLintExtension] : []),
     PracticeQuizNode,
     DirectoryTreeNode,
@@ -184,6 +188,7 @@ export default function TipTapEditor({
             setImageModal({
               src: node.attrs.src ?? '',
               creditName: node.attrs.creditName, creditUrl: node.attrs.creditUrl,
+              alignment: node.attrs.alignment === 'center' ? 'center' : 'left',
               maxWidth: imageMaxWidth(node.attrs.maxWidth)?.toString() ?? '',
               width: node.attrs.width,
               height: node.attrs.height,
@@ -464,6 +469,12 @@ export default function TipTapEditor({
                 placeholder="Shown below the image…"
               />
             </div>
+            <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}>
+              <legend style={{fontSize:12,fontWeight:600,marginBottom:6}}>Image alignment</legend>
+              <div style={{display:'flex',gap:8}}>
+                {(['left','center'] as const).map(alignment=><button type="button" key={alignment} className="btn btn-secondary btn-sm image-alignment-option" aria-pressed={(imageModal.alignment??'left')===alignment} onClick={()=>setImageModal(current=>current?{...current,alignment}:current)}>{alignment==='left'?'Align left':'Center image'}</button>)}
+              </div>
+            </fieldset>
             <label style={{display:'block',fontSize:12,fontWeight:600,marginBottom:16}}>Maximum width (px)
               <input className="input" type="number" min={1} max={10000} step={1} placeholder="No limit" value={imageModal.maxWidth ?? ''} onChange={e=>setImageModal(current=>current?{...current,maxWidth:e.target.value}:current)} />
             </label>
@@ -474,12 +485,12 @@ export default function TipTapEditor({
                 onClick={() => {
                   if (!editor || uploading || !imageModal.alt.trim()) return
                   if (imageModal.pos === null) {
-                    editor.chain().focus().insertContent({type:'image',attrs:{ creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
+                    editor.chain().focus().insertContent({type:'image',attrs:{ alignment:imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node?.type.name === 'image') {
                       editor.chain().focus().setNodeSelection(imageModal.pos)
-                        .updateAttributes('image', { creditName:imageModal.creditName??null, creditUrl:imageModal.creditUrl??null, maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt.trim(), title: imageModal.title })
+                        .updateAttributes('image', { alignment:imageModal.alignment??'left', creditName:imageModal.creditName??null, creditUrl:imageModal.creditUrl??null, maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt.trim(), title: imageModal.title })
                         .run()
                     }
                   }

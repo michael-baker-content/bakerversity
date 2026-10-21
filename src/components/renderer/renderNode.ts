@@ -104,7 +104,8 @@ export function renderNode(node: Record<string, unknown>): string {
     case 'directoryTree': return renderDirectoryTree(attrs.source, attrs.title, attrs.copyFolders === true, attrs.color, attrs.collapsible === true)
     case 'image': {
       const maxWidth=imageMaxWidth(attrs.maxWidth)
-      const sizeStyle=maxWidth ? ` style="max-width:min(100%, ${maxWidth}px)"` : ''
+      const aligned = attrs.alignment === 'center'
+      const sizeStyle = ` style="width:fit-content;max-width:${maxWidth ? `min(100%, ${maxWidth}px)` : '100%'};margin-left:${aligned?'auto':'0'};margin-right:${aligned?'auto':'0'}"`
       const original = (attrs.src as string) ?? ''
       const delivery = imageDelivery(original)
       const attr = (value: string) => escapeAttr(escapeHtml(value))

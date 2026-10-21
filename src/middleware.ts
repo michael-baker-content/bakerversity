@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/courses(.*)',         // course catalogue and preview pages
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/api/assets/download', // Route checks course/item access before signing a download
   '/api/webhooks/(.*)',   // Clerk + Stripe webhooks must be reachable without auth
 ])
 
