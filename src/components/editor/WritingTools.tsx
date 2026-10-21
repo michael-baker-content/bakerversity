@@ -19,7 +19,7 @@ export default function WritingTools({ editor, formatting, extraFormatting, seco
       <div className="editor-format-row" aria-label="Format text" onKeyDown={e => {if(e.key==='Escape'){setMore(false);(e.currentTarget.querySelector('.editor-more-toggle') as HTMLButtonElement)?.focus()}}}>
         <span className="editor-row-label">Text</span>
         {formatting}
-        <button type="button" className="editor-tool editor-more-toggle" aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>More <span aria-hidden="true">⌄</span></button>
+        <button type="button" className="editor-tool editor-dropdown editor-more-toggle" aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>More</button>
         <div className="editor-extra-format" id={moreId} data-open={more}>
           {extraFormatting}
           <button type="button" className="editor-tool" aria-pressed={editor.isActive('highlight')} onMouseDown={e => e.preventDefault()} onClick={() => editor.chain().focus().toggleHighlight().run()}>Highlight</button>

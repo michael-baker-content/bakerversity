@@ -1,6 +1,6 @@
 # Editor components: implementation plan
 
-Status: approved direction; implementation not started.
+Status: checkpoint 1 implemented (catalog and grouped toolbar); browser review pending. Components are not available yet.
 Prepared: 2026-10-20.
 
 This is the kickoff checkpoint for a component system in Bakerversity. It records scope and acceptance criteria before implementation. It does not indicate that components are available or tested. Michael handles all Git commands and local server startup/shutdown.
@@ -66,6 +66,8 @@ Use layout containers with `min-width: 0`. Switch to a single stack based on the
 ## Exports
 
 HTML retains two columns with responsive stacking and print rules. Markdown and plain text flatten the columns in document order with clear block separation. Preserve every supported child's existing export representation. Do not claim interactive graphs/quizzes are preserved by a format that cannot represent them; provide an explicit useful fallback and document it. Audit these existing limitations before release.
+
+See [the compatibility audit](editor-components-audit.md) for current boundaries and remaining checks.
 
 ## Delivery checkpoints
 

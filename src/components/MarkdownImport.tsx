@@ -53,25 +53,13 @@ export default function MarkdownImport({ onInsert, hasExistingContent }: Markdow
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={loading}
-        style={{
-          padding: '5px 12px',
-          fontSize: 12,
-          border: '1px solid #ddd',
-          borderRadius: 6,
-          background: 'white',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          color: '#555',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 5,
-        }}
-      >
-        {loading ? 'Parsing...' : '📄 Import from file'}
-      </button>
+      <details style={{position:'relative'}}>
+        <summary className="btn btn-ghost btn-sm" style={{cursor:'pointer'}}>Import from file</summary>
+        <div style={{position:'absolute',top:'calc(100% + 6px)',right:0,zIndex:50,width:'min(260px, calc(100vw - 32px))',padding:12,border:'1px solid var(--border)',borderRadius:8,background:'var(--surface)',color:'var(--text)',boxShadow:'0 8px 24px #0002'}}>
+          <p style={{fontSize:12,margin:'0 0 10px'}}>Markdown (.md, .markdown), MDX (.mdx), or text (.txt).</p>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={loading} onClick={event => { fileInputRef.current?.click(); event.currentTarget.closest('details')?.removeAttribute('open') }}>{loading ? 'Parsing…' : 'Choose file'}</button>
+        </div>
+      </details>
       <input
         ref={fileInputRef}
         type="file"
@@ -79,7 +67,6 @@ export default function MarkdownImport({ onInsert, hasExistingContent }: Markdow
         style={{ display: 'none' }}
         onChange={handleFile}
       />
-      <span style={{ fontSize: 11, color: '#aaa' }}>.md · .mdx · .txt</span>
       {error && <span style={{ fontSize: 12, color: '#dc2626' }}>{error}</span>}
     </div>
   )

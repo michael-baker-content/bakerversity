@@ -13,6 +13,7 @@ import { uploadLessonPdf } from '@/lib/authoring/uploadPdf'
 import { useAuthoringSession } from '@/lib/authoring/useAuthoringSession'
 import { useUnsavedChanges, discardMessage } from '@/lib/authoring/useUnsavedChanges'
 import MarkdownImport from '@/components/MarkdownImport'
+import EditorDownload from '@/components/EditorDownload'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
@@ -230,9 +231,7 @@ export default function EditLessonPage() {
                 hasExistingContent={Object.keys(content).length > 0}
                 onInsert={(doc) => insertFnRef.current?.(doc)}
               />
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('html')}>⬇ HTML</button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('markdown')}>⬇ MD</button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('txt')}>⬇ TXT</button>
+              <EditorDownload onDownload={format => exportRef.current?.(format)} />
             </div>
           </div>
           {ready && (

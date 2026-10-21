@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import MarkdownImport from './MarkdownImport'
+import EditorDownload from '@/components/EditorDownload'
 import { requestJson } from '@/lib/authoring/request'
 import type { EditorPack } from './TipTapEditor'
 import type { MafsGraphAttrs } from './MafsGraph'
@@ -41,9 +42,7 @@ export default function CoursePageContentEditor({courseId,content,onChange}:{
       <span style={{fontSize:13,fontWeight:600}}>Content</span>
       <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6}}>
         <MarkdownImport hasExistingContent={Object.keys(content).length>0} onInsert={doc=>insert.current?.(doc)} />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={()=>exportContent.current?.('html')}>⬇ HTML</button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={()=>exportContent.current?.('markdown')}>⬇ MD</button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={()=>exportContent.current?.('txt')}>⬇ TXT</button>
+        <EditorDownload onDownload={format => exportContent.current?.(format)} />
       </div>
     </div>
     <TipTapEditor courseId={courseId??undefined} packs={config.packs} content={Object.keys(content).length?content:undefined} onChange={onChange}

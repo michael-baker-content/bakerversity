@@ -15,15 +15,53 @@ select.editor-tool { border-color:var(--border); max-width:114px; }
 .editor-context { border-top:1px solid var(--border); background:var(--surface); }
 .editor-context input,.editor-context select { max-width:100%; }
 .editor-search-panel { border-top:1px solid var(--border); background:var(--surface); max-height:45vh; overflow:auto; }
+
+
+
+@media (max-width: 600px) {
+  .editor-toolbar-shell { max-height:55dvh; overflow-y:auto; }
+}
+
+/* Desktop insertion categories. */
+.editor-insert-tools { flex-wrap:wrap; min-width:0; }
+.editor-insert-group { display:flex; align-items:center; gap:4px; min-width:0; }
+.editor-insert-group + .editor-insert-group { border-left:1px solid var(--border); padding-left:8px; margin-left:4px; }
+.editor-category-label { font-size:10px; font-weight:600; color:var(--text-2); }
+.editor-category-tools { display:flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; }
+.editor-category-toggle { display:none; }
+
+
+
+
+
+/* Use one caret and surface for the style selector and disclosure controls. */
+.editor-tool.editor-dropdown {
+  appearance:none;
+  border-color:var(--border);
+  padding-right:22px;
+  text-align:left;
+  justify-content:flex-start;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23888888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 6px center;
+  background-size:12px;
+}
+.editor-tool.editor-dropdown:hover { background-color:var(--surface-2); }
+.editor-tool.editor-dropdown[aria-expanded=true] { border-color:var(--indigo); background-color:var(--surface-2); }
+
+/* Keep caret space intact when the compact toolbar rules apply. */
+.editor-writing-tools .editor-tool.editor-dropdown { padding-left:8px; padding-right:24px; }
+.editor-writing-tools .editor-tool[aria-label="Bold"],
+.editor-writing-tools .editor-tool[aria-label="Italic"] { padding-inline:10px; min-width:32px; }
+/* Desktop above 760px; compact layout below, with formatting exposed from 530px. */
 @container course-editor (max-width: 760px) {
   .editor-more-toggle { display:inline-flex; }
   .editor-format-row { flex-wrap:wrap; }
   .editor-extra-format { display:none; border-left:0; padding:8px 0 0; flex-basis:100%; flex-wrap:wrap; border-top:1px solid var(--border); }
   .editor-extra-format[data-open=true] { display:flex; }
-  .editor-tool { min-height:40px; }
+
   .editor-row-label { display:none; }
-}
-@container course-editor (max-width: 560px) {
+
   .editor-insert-toggle { display:inline-flex; }
   .editor-insert-tools { display:none; flex-basis:100%; flex-wrap:wrap; padding-top:6px; }
   .editor-insert-tools[data-open=true] { display:flex; }
@@ -32,8 +70,58 @@ select.editor-tool { border-color:var(--border); max-width:114px; }
   .editor-desktop-inline,.editor-desktop-list { display:none; }
   .editor-mobile-only { display:contents; }
 
+
+  .editor-insert-tools { width:100%; }
+  .editor-insert-group { width:100%; flex-direction:column; align-items:stretch; }
+  .editor-insert-group + .editor-insert-group { border-left:0; border-top:1px solid var(--border); padding:4px 0 0; margin:0; }
+  .editor-category-label { display:none; }
+  .editor-category-toggle { display:flex; justify-content:space-between; width:100%; }
+  .editor-category-tools { display:none; padding:2px 0 6px; }
+  .editor-category-tools[data-open=true] { display:flex; }
+
+  .editor-writing-tools { display:flex; flex-wrap:wrap; align-items:center; gap:3px; padding:5px 6px; }
+  .editor-format-row,.editor-insert-row { display:contents; }
+  .editor-writing-tools > .editor-format-row > .editor-tool,
+  .editor-insert-toggle { padding-block:4px; font-size:11px; }
+  .editor-format-row > select.editor-tool { width:64px; min-width:0; flex:1 1 64px; max-width:100px; }
+  .editor-extra-format { order:1; flex-basis:100%; }
+  .editor-insert-tools { order:2; flex-basis:100%; }
+  .editor-search-panel,.editor-writing-tools > p { order:3; flex-basis:100%; }
 }
 
-@media (max-width: 600px) {
-  .editor-toolbar-shell { max-height:55dvh; overflow-y:auto; }
+/* Expose formatting without changing the compact insertion menu. */
+@container course-editor (min-width: 530px) and (max-width: 760px) {
+  .editor-more-toggle { display:none; }
+  .editor-extra-format,
+  .editor-extra-format[data-open=true] { display:contents; }
+}
+/* Wider editors expose category dropdowns instead of the parent Insert menu. */
+@container course-editor (min-width: 660px) {
+  .editor-insert-toggle { display:none; }
+  .editor-insert-tools,
+  .editor-insert-tools[data-open=true] { display:flex; flex-wrap:wrap; align-items:flex-start; width:100%; flex-basis:100%; gap:6px; }
+  .editor-insert-group { display:flex; flex-direction:column; align-items:stretch; width:auto; min-width:0; }
+  .editor-insert-group + .editor-insert-group { border:0; padding:0; margin:0; }
+  .editor-category-label { display:none; }
+  .editor-category-toggle { display:flex; justify-content:space-between; gap:12px; border-color:var(--border); }
+  .editor-category-tools { display:none; padding:4px 0; max-width:100%; }
+  .editor-category-tools[data-open=true] { display:flex; flex-wrap:wrap; }
+}
+
+/* With desktop row labels visible, keep insertion controls beside the label. */
+@container course-editor (min-width: 761px) {
+  .editor-insert-row { align-items:flex-start; }
+  .editor-insert-row > .editor-row-label { display:flex; align-items:center; min-height:32px; }
+  .editor-insert-tools,
+  .editor-insert-tools[data-open=true] { width:auto; flex:1 1 0; }
+  .editor-insert-group:is([data-category="media"], [data-category="learning"]) { flex-direction:row; align-items:center; }
+  .editor-insert-group:is([data-category="media"], [data-category="learning"]) > .editor-category-toggle { display:none; }
+  .editor-insert-group:is([data-category="media"], [data-category="learning"]) > .editor-category-tools { display:flex; padding:0; }
+}
+
+/* Match the .page max-width in globals.css; editor width excludes page padding. */
+@media (min-width: 860px) {
+  .editor-insert-group[data-category="technical"] { flex-direction:row; align-items:center; }
+  .editor-insert-group[data-category="technical"] > .editor-category-toggle { display:none; }
+  .editor-insert-group[data-category="technical"] > .editor-category-tools { display:flex; padding:0; }
 }

@@ -3,6 +3,7 @@
 import React, { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import WritingTools from './WritingTools'
+import { ELEMENT_CATEGORIES, availableInsertTools, type InsertToolId } from './elementCatalog'
 import './toolbar.css'
 import type { Editor } from '@tiptap/react'
 import { CALLOUT_TYPES, LANGUAGES, LANG_EXTENSIONS } from './constants'
@@ -41,10 +42,21 @@ export function Toolbar({
 }: ToolbarProps) {
   const [insertOpen, setInsertOpen] = useState(false)
   const insertId = useId()
-  const hasMath      = packs.includes('math')
+  const [openCategories, setOpenCategories] = useState<string[]>([])
+  const tools = availableInsertTools(packs)
+  const actions: Record<InsertToolId, () => void> = {
+    image: onFileClick,
+    table: () => { editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run() },
+    'directory-tree': () => { editor.chain().focus().insertContent({type:'directoryTree',attrs:{source:'',title:'Directory tree'}}).run() },
+    code: () => { editor.chain().focus().toggleCodeBlock().run() },
+    terminal: () => setShowTerminalModal(true),
+    formula: () => onLatexButtonClick?.(),
+    'activate-latex': () => onActivateLatex?.(),
+    graph: () => onGraphButtonClick?.(),
+    callout: () => setShowCalloutPicker(v => !v),
+    quiz: () => onInsertPracticeQuiz?.(),
+  }
   const hasCode      = packs.includes('code')
-  const hasGraph     = packs.includes('graph')
-  const hasTerminal  = packs.includes('terminal')
   const hasLangSelect = packs.includes('lang-select')
   const hasPythonLint = packs.includes('python-lint')
 
@@ -54,7 +66,7 @@ export function Toolbar({
         <ToolbarButton label="Bold" onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}><strong>B</strong></ToolbarButton>
         <ToolbarButton label="Italic" onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}><em>I</em></ToolbarButton>
         <span className="editor-desktop-inline"><ToolbarButton label="Inline code" onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>{'</>'}</ToolbarButton></span>
-        <select className="editor-tool" aria-label="Text style" value={editor.isActive('heading', {level:2}) ? '2' : editor.isActive('heading', {level:3}) ? '3' : '0'} onChange={e => { const level = Number(e.target.value); if (level) editor.chain().focus().setHeading({level:level as 2|3}).run(); else editor.chain().focus().setParagraph().run() }}>
+        <select className="editor-tool editor-dropdown" aria-label="Text style" value={editor.isActive('heading', {level:2}) ? '2' : editor.isActive('heading', {level:3}) ? '3' : '0'} onChange={e => { const level = Number(e.target.value); if (level) editor.chain().focus().setHeading({level:level as 2|3}).run(); else editor.chain().focus().setParagraph().run() }}>
           <option value="0">Paragraph</option><option value="2">Heading 2</option><option value="3">Heading 3</option>
         </select>
         <select className="editor-tool editor-desktop-list" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
@@ -65,18 +77,32 @@ export function Toolbar({
         </select></span><ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>Quote</ToolbarButton></>} secondary={
         <div className="editor-insert-row" aria-label="Insert content" onKeyDown={e => {if(e.key==='Escape'){setInsertOpen(false);(e.currentTarget.querySelector('.editor-insert-toggle') as HTMLButtonElement)?.focus()}}}>
           <span className="editor-row-label">Insert</span>
-          <button type="button" className="editor-tool editor-insert-toggle" aria-expanded={insertOpen} aria-controls={insertId} onClick={() => setInsertOpen(!insertOpen)}>Insert tools <span aria-hidden="true">⌄</span></button>
-          <div id={insertId} className="editor-insert-tools" data-open={insertOpen} onClick={e => {if ((e.target as HTMLElement).closest('button')) setInsertOpen(false)}}>
-            <ToolbarButton label="Directory tree" onClick={() => editor.chain().focus().insertContent({type:'directoryTree',attrs:{source:'',title:'Directory tree'}}).run()} active={editor.isActive('directoryTree')}>Directory tree</ToolbarButton>
-            <ToolbarButton onClick={onFileClick} active={false}>{uploading ? 'Uploading…' : 'Image'}</ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run()} active={false}>Table</ToolbarButton>
-            <button type="button" className="editor-tool" aria-expanded={showCalloutPicker} onMouseDown={e => e.preventDefault()} onClick={() => setShowCalloutPicker(v => !v)}>Callout</button>
-            <ToolbarButton onClick={() => onInsertPracticeQuiz?.()} active={false}>Quiz</ToolbarButton>
-            {hasMath && <ToolbarButton label="Formula — type $x$ or $$x$$ then Space, or insert with this tool" onClick={() => onLatexButtonClick?.()} active={false}>Formula</ToolbarButton>}
-            {hasMath && <ToolbarButton onClick={() => onActivateLatex?.()} active={false}>Activate LaTeX</ToolbarButton>}
-            {hasGraph && <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>Graph</ToolbarButton>}
-            {hasCode && <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>}
-            {hasTerminal && <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>Terminal</ToolbarButton>}
+          <button type="button" className="editor-tool editor-dropdown editor-insert-toggle" aria-expanded={insertOpen} aria-controls={insertId} onClick={() => setInsertOpen(!insertOpen)}>Insert tools</button>
+          <div id={insertId} className="editor-insert-tools" data-open={insertOpen}>
+            {ELEMENT_CATEGORIES.map(category => {
+              const categoryTools = tools.filter(tool => tool.category === category.id)
+              if (!categoryTools.length) return null
+              const open = openCategories.includes(category.id)
+              const groupId = insertId + '-' + category.id
+              return <div className="editor-insert-group" data-category={category.id} role="group" aria-label={category.label + ' tools'} key={category.id}>
+                <span className="editor-category-label">{category.label}</span>
+                <button type="button" className="editor-tool editor-category-toggle" aria-expanded={open} aria-controls={groupId}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => setOpenCategories(current => open ? current.filter(id => id !== category.id) : [...current, category.id])}>
+                  {category.label}<span aria-hidden="true">{open ? '−' : '+'}</span>
+                </button>
+                <div id={groupId} className="editor-category-tools" data-open={open}>
+                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool"
+                    aria-label={tool.id === 'formula' ? 'Formula — type $x$ or $$x$$ then Space, or insert with this tool' : undefined}
+                    aria-expanded={tool.id === 'callout' ? showCalloutPicker : undefined}
+                    aria-pressed={tool.kind === 'block' && tool.id !== 'callout' ? editor.isActive(tool.nodeTypes[0]) : undefined}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { actions[tool.id](); setInsertOpen(false) }}>
+                    {tool.id === 'image' && uploading ? 'Uploading…' : tool.label}
+                  </button>)}
+                </div>
+              </div>
+            })}
           </div>
         </div>
       } />

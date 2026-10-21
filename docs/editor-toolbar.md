@@ -1,14 +1,20 @@
 # Responsive editor toolbar
 
-The idle desktop toolbar has two rows: text formatting and content insertion. It uses consistent compact controls, short labels, and heading/list selectors instead of separate buttons for every variant. Find, language, highlight, and editing guides share the formatting row. The LaTeX typing hint is available on Formula rather than occupying a row.
+Formatting and insertion share compact controls. Categories appear in the order Media, Learning, Technical. Course-enabled tool restrictions still apply; hiding a tool never removes saved content.
 
-Container queries respond to the actual editor width:
-- Above 760 px: all enabled tools are visible across two rows.
-- At 760 px and below: less frequent formatting controls are available through More.
-- At 560 px and below: Insert tools opens the insertion choices; list and inline-code controls move into More. Touch targets are 44 px tall.
+Widths refer to the editor container except where explicitly noted:
 
-Table actions, code language/filename/line numbering, callout choices, search and LaTeX activation appear in contextual panels. Python diagnostics only appear while a code block is selected. The terminal dialog is rendered outside the toolbar to avoid clipping in the phone scroll container. Editor settings and course tool-pack restrictions are unchanged.
+- Below 530px: additional formatting is behind More.
+- From 530px: formatting tools display directly.
+- Below 660px: Insert tools contains expandable categories.
+- From 660px: the categories are available directly as dropdowns.
+- Above 760px: Text and Insert row labels appear; Image, Callout and Quiz display directly alongside the Technical dropdown.
+- At 860px **browser width**: Technical displays its tools directly. This matches the main `.page` maximum width; its inner editor cannot reach 850px because of page padding.
 
-Controls keep native keyboard behavior and accessible names. Expanders expose their state and Escape closes the compact menus. Heading and list changes use the existing editor commands. Enter in the filename field commits the name without submitting the containing lesson form.
+Controls can wrap when space is insufficient. Expanded formatting and insertion panels use their own rows. More, Insert tools and the heading selector share a caret and bordered styling. Bold and Italic have padded hit areas. On small screens the toolbar can scroll vertically to avoid covering the entire editor.
 
-Validation: inspected desktop and mobile screenshots; checked layouts at 1280, 900, 768, 640, 390 and 320 px with all packs enabled. Desktop was two rows; none of these widths produced horizontal page overflow. Browser exercises covered More/Insert, find, heading/list selection, table actions, code language and filename completion, and terminal insertion. Type checking and production build also verified. No database changes or new dependencies.
+Lesson and course-page editors have one Download button opening a native modal with HTML, Markdown and plain-text choices. Escape or Cancel closes it and returns focus. Import from file exposes supported extensions within its disclosure before opening the file picker.
+
+Contextual table/code/callout/search controls remain unchanged. The component catalog and category grouping do not introduce new document nodes or require a database migration. Two-column components are still planned.
+
+Browser smoke coverage exercises mobile category disclosure, keyboard access, ordinary insertion and the download dialog. Run the smoke harness in GitHub or against an explicitly authorized test setup; it starts a server. Local type checking and pure regression tests do not substitute for browser layout review.

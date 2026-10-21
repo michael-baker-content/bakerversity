@@ -104,7 +104,7 @@ After adding a migration, run `npm run db:generate` and include both generated a
 
 ## Planned editor component system
 
-The next authoring effort introduces grouped editor tools and a two-column composition that can contain supported content blocks. This is currently a documented plan, not an available feature. See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
+Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, and Technical; downloads use a shared format picker. Two-column compositions remain planned and are not yet available. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
 
 ## Further documentation
 
