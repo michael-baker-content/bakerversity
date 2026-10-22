@@ -1,3 +1,4 @@
+import { textImageVerticalAlign } from '../../lib/textImage.mjs'
 import { renderDirectoryTree } from '../../lib/directoryTree.mjs'
 import { imageMaxWidth } from '../../lib/imageWidth.mjs'
 import { imageDelivery } from '../../lib/imageDelivery.mjs'
@@ -50,14 +51,18 @@ const CALLOUT_STYLES: Record<string, {
 }
 
 // Renders a single non-graph TipTap node to an HTML string
-export function renderNode(node: Record<string, unknown>): string {
+export function renderNode(node: Record<string, unknown>, interactive?: (node: Record<string, unknown>) => string | undefined): string {
+  const replacement = interactive?.(node)
+  if (replacement !== undefined) return replacement
   const type = node.type as string
   const content = (node.content as Record<string, unknown>[] | undefined) ?? []
   const attrs = (node.attrs as Record<string, unknown> | undefined) ?? {}
-  const children = content.map(renderNode).join('')
+  const children = content.map(child => renderNode(child, interactive)).join('')
 
   switch (type) {
     case 'doc':       return children
+    case 'textImage': return '<section data-text-image data-text-vertical-align="'+textImageVerticalAlign(attrs.textVerticalAlign)+'" class="text-image"><div class="text-image-grid">'+children+'</div></section>'
+    case 'textImageBody': return '<div data-text-image-body class="text-image-body">'+children+'</div>'
     case 'paragraph': return `<p>${children || '<br>'}</p>`
     case 'heading': {
       const level = (attrs.level as number) ?? 2
@@ -161,6 +166,17 @@ export function renderNode(node: Record<string, unknown>): string {
     case 'blockMath':
       return `<div data-block-math="${escapeAttr((attrs.latex as string) ?? '')}"></div>`
     default:
-      return children
+      return `<div role="note" class="unsupported-content">This content type is not supported yet.</div>${children}`
   }
+}
+
+/** Build one HTML tree, preserving wrappers while reserving client-rendered block positions. */
+export function buildRenderPlan(document: Record<string, unknown>) {
+  const islands: Record<string, unknown>[] = []
+  const html = renderNode(document, node => {
+    if (node.type !== 'mafsGraph' && node.type !== 'practiceQuiz') return undefined
+    const index = islands.push(node) - 1
+    return '<div data-lesson-island="' + index + '" style="min-width:0"><p>Loading interactive content…</p></div>'
+  })
+  return { html, islands }
 }

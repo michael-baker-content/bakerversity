@@ -1,0 +1,32 @@
+
+.text-image,.text-image-editor { container-type:inline-size; min-width:0; margin:1.25rem 0; }
+.text-image-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }
+.text-image-grid > * { min-width:0; max-width:100%; }
+.text-image-grid > [data-node-view-content-react] { display:contents; }
+.text-image-body { overflow-wrap:anywhere; }
+.text-image-grid > [data-node-view-content-react] > * { min-width:0; max-width:100%; }
+.text-image-grid img { max-width:100%; height:auto; }
+.text-image-editor { border:1px solid var(--border); border-radius:8px; padding:12px; }
+.text-image-editor[data-selected=true] { outline:2px solid var(--indigo); }
+.text-image-controls { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:12px; }
+.text-image-controls > span { font-size:12px; font-weight:600; padding:8px; cursor:grab; }
+.text-image-editor .text-image-body { min-height:100px; border:1px dashed var(--border); padding:8px; }
+.text-image-editor[data-stacked=true] .text-image-grid { grid-template-columns:minmax(0,1fr); }
+@container (max-width: 540px) { .text-image-grid { grid-template-columns:minmax(0,1fr); } }
+@media print { .text-image { break-inside:avoid; } }
+
+/* Clickable whitespace uses the editor's native gap selection, without extra controls. */
+.text-image-editor { position:relative; }
+.text-image-boundary { position:absolute; left:0; right:0; height:12px; cursor:text; }
+.text-image-boundary-before { top:-13px; }
+.text-image-boundary-after { bottom:-13px; }
+.editor-shell .ProseMirror-gapcursor:after { border-top-color:var(--text); }
+
+/* Align the text within the image-height row; stacked rows keep their natural height. */
+.text-image-body { align-self:stretch; display:flex; flex-direction:column; justify-content:var(--text-image-justify,flex-start); }
+.text-image-body > :last-child { margin-bottom:0; }
+[data-text-vertical-align="top"] { --text-image-justify:flex-start; }
+[data-text-vertical-align="center"] { --text-image-justify:center; }
+[data-text-vertical-align="bottom"] { --text-image-justify:flex-end; }
+
+.text-image-alignment { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); }

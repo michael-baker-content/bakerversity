@@ -1,3 +1,4 @@
+import { textImageError } from '@/lib/textImage.mjs'
 import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
@@ -52,6 +53,8 @@ export async function POST(
 
   const { title, page_type, content, introduction, module_id } = await req.json()
 
+  const componentError=textImageError(content)
+  if(componentError)return NextResponse.json({error:componentError},{status:400})
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
   if (!PAGE_TYPES.includes(page_type)) return NextResponse.json({ error: 'Invalid page_type' }, { status: 400 })
 

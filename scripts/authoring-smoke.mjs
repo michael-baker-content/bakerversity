@@ -1,3 +1,5 @@
+import { nestedContent } from '../tests/fixtures/nested-content.mjs'
+import { nestedRendererSmoke } from '../tests/browser/nested-renderer.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -18,6 +20,7 @@ try {
  for(const kind of ['lessons','pages','assessments'])for(const part of ['new',`[${kind==='lessons'?'lessonId':kind==='pages'?'pageId':'assessmentId'}]`]){
   const file=`src/app/admin/courses/[slug]/${kind}/${part}/page.tsx`;put(file,fs.readFileSync(path.join(repo,file),'utf8'))
  }
+ put('src/app/renderer-check/page.tsx',`'use client';import {useState} from 'react';import LessonRenderer from '@/components/LessonRenderer';export default function Page(){const [content,setContent]=useState<Record<string,unknown>>(${JSON.stringify(nestedContent)});return <><button onClick={()=>setContent({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Replacement content'}]}]})}>Replace fixture</button><LessonRenderer content={content}/></>}`)
  put('package.json','{"private":true}')
  put('tsconfig.json',fs.readFileSync(path.join(repo,'tsconfig.json'),'utf8'))
  put('next.config.mjs',"export default {transpilePackages:['mafs'],devIndicators:false}")
@@ -35,6 +38,7 @@ try {
  browser=await chromium.launch({headless:true,...(process.env.SMOKE_BROWSER_CHANNEL?{channel:process.env.SMOKE_BROWSER_CHANNEL}:{})})
  const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(20000)
  await authoringSmoke(page,origin,fixture.origin)
+ await nestedRendererSmoke(page,origin)
  console.log('PASS: authoring browser smoke test')
 } catch(error){console.error(logs);throw error}
 finally {await browser?.close();if(child?.pid){if(process.platform==='win32')spawnSync('taskkill',['/pid',String(child.pid),'/T','/F'],{stdio:'ignore'});else child.kill('SIGTERM')}await fixture.close()}

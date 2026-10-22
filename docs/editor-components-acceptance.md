@@ -1,6 +1,6 @@
 # Editor components: acceptance checklist
 
-Status: planned scenarios; none completed for the component system.
+Status: broad release checklist. The first implementation is narrowed to [Text and image](text-image-component.md); that document records local automated evidence. Browser acceptance below remains pending. General-column scenarios are deferred.
 
 Scope and decisions: [implementation plan](editor-components-plan.md).
 

@@ -1,4 +1,7 @@
 'use client'
+import { TextImageNode } from './editor/TextImageNode'
+import { TextImageBody } from './editor/TextImageExtension'
+import { textImageError, imagePlainText } from '@/lib/textImage.mjs'
 import { jsonToMarkdown } from '@/lib/lessonMarkdown'
 import { htmlDownloadDocument } from '@/lib/lessonExport.mjs'
 import AssetLibrary from './AssetLibrary'
@@ -29,6 +32,7 @@ import { Toolbar } from './editor/Toolbar'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 
 const SizedImage = Image.extend({
+  renderText({node}){return imagePlainText(node.attrs)},
   addAttributes() {
     return {...this.parent?.(), creditName: {default:null, rendered:false}, creditUrl: {default:null, rendered:false}, alignment: {
       default:'left',
@@ -101,6 +105,9 @@ export default function TipTapEditor({
 
   const replacementInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
+  const [textImagePlacement, setTextImagePlacement] = useState<'left'|'right'|null>(null)
+  const componentLoadError = textImageError(content)
+  const [componentEditError,setComponentEditError]=useState('')
 
   // Image modal — shown after upload and on double-click of existing image
   const [imageModal, setImageModal] = useState<{
@@ -145,7 +152,7 @@ export default function TipTapEditor({
     TerminalNode,
     ...(hasPythonLint ? [PythonLintExtension] : []),
     PracticeQuizNode,
-    DirectoryTreeNode,
+    DirectoryTreeNode, TextImageNode.configure({onInvalid:setComponentEditError}), TextImageBody,
   ]
 
   // ── Editor ─────────────────────────────────────────────────────────────────
@@ -154,18 +161,34 @@ export default function TipTapEditor({
     // Toolbar state follows cursor/selection changes as it did in Tiptap 2.
     shouldRerenderOnTransaction: true,
     extensions,
-    content: content ?? '',
-    editable,
+    content: componentLoadError ? '' : content ?? '',
+    editable: editable && !componentLoadError,
     onCreate: ({ editor }) => {
+      if(componentLoadError)return
       const doc = editor.state.doc
       if (doc.lastChild?.type.name !== 'paragraph') {
         editor.commands.insertContentAt(doc.content.size, { type: 'paragraph' })
       }
     },
     onUpdate: ({ editor }) => {
+      if(componentLoadError)return
+      setComponentEditError('')
       onChange?.(editor.getJSON() as Record<string, unknown>)
     },
     editorProps: {
+      handlePaste:(view,event)=>{
+        const html=event.clipboardData?.getData('text/html')
+        if(!html)return false
+        const pasted=new DOMParser().parseFromString(html,'text/html')
+        const bodies=Array.from(pasted.querySelectorAll('[data-text-image-body]'))
+        const inBody=Array.from({length:view.state.selection.$from.depth},(_,i)=>view.state.selection.$from.node(i+1)).some(node=>node.type.name==='textImageBody')
+        const allowed=new Set(['P','H1','H2','H3','H4','H5','H6','UL','OL','LI','SPAN','STRONG','B','EM','I','S','STRIKE','CODE','A','BR','MARK'])
+        const invalidBody=(element:Element)=>Array.from(element.querySelectorAll('*')).some(child=>!allowed.has(child.tagName))
+        if((inBody&&invalidBody(pasted.body))||bodies.some(invalidBody)||Array.from(pasted.querySelectorAll('[data-text-image]')).some(component=>component.querySelectorAll('[data-text-image]').length>0||component.querySelectorAll('img').length!==1||component.querySelectorAll('[data-text-image-body]').length!==1)){
+          setComponentEditError('This paste contains unsupported component content. Paste plain text or place those blocks outside the component.');return true
+        }
+        return false
+      },
       handleDOMEvents: {
         dblclick: (view, event) => {
           const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })
@@ -185,6 +208,7 @@ export default function TipTapEditor({
             return true
           }
           if (node.type.name === 'image') {
+            setTextImagePlacement(null)
             setImageModal({
               src: node.attrs.src ?? '',
               creditName: node.attrs.creditName, creditUrl: node.attrs.creditUrl,
@@ -209,6 +233,8 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor || !onEditorReady) return
     onEditorReady((doc: Record<string, unknown>) => {
+      const componentError=textImageError(doc)
+      if(componentError){alert(componentError);return}
       const nodes = (doc.content as Record<string, unknown>[] | undefined) ?? []
       nodes.forEach((node) => {
         editor.chain().focus().insertContentAt(editor.state.doc.content.size, node).run()
@@ -232,6 +258,14 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor) return
     const track = ({transaction}: {transaction: import('@tiptap/pm/state').Transaction}) => {
+      const imagePosition=transaction.getMeta('editComponentImage')
+      if(typeof imagePosition==='number'){
+        const image=editor.state.doc.nodeAt(imagePosition)
+        if(image?.type.name==='image'){
+          setTextImagePlacement(null)
+          setImageModal({src:image.attrs.src,alt:image.attrs.alt??'',title:image.attrs.title??'',pos:imagePosition,width:image.attrs.width,height:image.attrs.height,creditName:image.attrs.creditName,creditUrl:image.attrs.creditUrl,alignment:image.attrs.alignment==='center'?'center':'left',maxWidth:imageMaxWidth(image.attrs.maxWidth)?.toString()??''})
+        }
+      }
       if (!transaction.docChanged) return
       setImageModal(current => {
         if (!current || current.pos === null) return current
@@ -320,7 +354,17 @@ export default function TipTapEditor({
   const exportAs = useCallback((format: 'html' | 'markdown' | 'txt') => {
     if (!editor) return
     let content: string
-    if (format === 'html') content = htmlDownloadDocument(editor.getHTML())
+    if (format === 'html') {
+      const document = new DOMParser().parseFromString(editor.getHTML(),'text/html')
+      document.querySelectorAll<HTMLImageElement>('[data-text-image] img[title]').forEach(image=>{
+        if(!image.title)return
+        const figure=document.createElement('figure')
+        figure.style.margin='0';figure.style.minWidth='0'
+        const caption=document.createElement('figcaption');caption.textContent=image.title
+        image.replaceWith(figure);figure.append(image,caption)
+      })
+      content = htmlDownloadDocument(document.body.innerHTML)
+    }
     else if (format === 'txt') content = editor.getText()
     else content = jsonToMarkdown(editor.getJSON() as Record<string, unknown>)
     const blob = new Blob([content], { type: format === 'html' ? 'text/html;charset=utf-8' : format === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' })
@@ -334,9 +378,12 @@ export default function TipTapEditor({
 
   useEffect(() => { onExportReady?.(exportAs) }, [exportAs, onExportReady])
 
+  if(componentLoadError)return <div role="alert"><p>{componentLoadError} The original document has not been changed.</p><button type="button" className="btn btn-secondary" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='content-recovery.json';a.click();URL.revokeObjectURL(url)}}>Download original content</button></div>
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="editor-shell" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'visible', background: 'var(--surface)', position: 'relative' }}>
+      {componentEditError && <p role="alert" style={{padding:12,color:'var(--danger)'}}>{componentEditError}</p>}
       {editable && editor && (
         <>
           <input
@@ -361,7 +408,8 @@ export default function TipTapEditor({
               terminalContent={terminalContent}
               filenameInput={filenameInput}
               lintDiagnostics={lintDiagnostics}
-              onFileClick={() => {if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
+              onTextImageClick={() => {setTextImagePlacement('right');if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
+              onFileClick={() => {setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
               onLatexButtonClick={onLatexButtonClick}
               onActivateLatex={() => setShowLatexActivation(value => !value)}
               onGraphButtonClick={onGraphButtonClick}
@@ -469,6 +517,7 @@ export default function TipTapEditor({
                 placeholder="Shown below the image…"
               />
             </div>
+            {textImagePlacement && imageModal.pos===null && <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}><legend>Image placement</legend><div style={{display:'flex',gap:8}}>{(['left','right'] as const).map(side=><button key={side} type="button" className="editor-tool" aria-pressed={textImagePlacement===side} onClick={()=>setTextImagePlacement(side)}>Image {side}</button>)}</div></fieldset>}
             <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}>
               <legend style={{fontSize:12,fontWeight:600,marginBottom:6}}>Image alignment</legend>
               <div style={{display:'flex',gap:8}}>
@@ -485,7 +534,15 @@ export default function TipTapEditor({
                 onClick={() => {
                   if (!editor || uploading || !imageModal.alt.trim()) return
                   if (imageModal.pos === null) {
-                    editor.chain().focus().insertContent({type:'image',attrs:{ alignment:imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}).run()
+                    const image = {type:'image',attrs:{ alignment:imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}
+                    if(textImagePlacement){
+                      const body={type:'textImageBody',content:[{type:'paragraph'}]}
+                      const children=textImagePlacement==='left'?[image,body]:[body,image]
+                      const selection=editor.state.selection.$from
+                      const at=selection.depth ? selection.after(1) : selection.pos
+                      const textAt=at+(textImagePlacement==='left'?4:3)
+                      if(!editor.chain().focus().insertContentAt(at,{type:'textImage',content:children}).setTextSelection(textAt).run()){setImageError('Unable to insert the component here.');return}
+                    }else editor.chain().focus().insertContent(image).run()
                   } else {
                     const node = editor.state.doc.nodeAt(imageModal.pos)
                     if (node?.type.name === 'image') {
@@ -494,10 +551,11 @@ export default function TipTapEditor({
                         .run()
                     }
                   }
+                  setTextImagePlacement(null)
                   setImageModal(null)
                 }}
               >
-                {uploading ? 'Uploading…' : imageModal.pos === null ? 'Insert image' : 'Update'}
+                {uploading ? 'Uploading…' : imageModal.pos === null ? textImagePlacement ? 'Insert component' : 'Insert image' : 'Update'}
               </button>
               <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={() => {setImageModal(null);setImageError('')}}>Cancel</button>
             </div>

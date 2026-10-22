@@ -6,6 +6,9 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
   const children = () => content.map((n) => nodeToMd(n, indent)).join('')
 
   switch (type) {
+    case 'textImage': return content.map(n=>nodeToMd(n)).join('\n')+'\n'
+    case 'textImageBody': return children()
+    case 'image': return '!['+String(attrs.alt??'').replace(/[\[\]\\]/g, character=>'\\'+character)+'](<'+String(attrs.src??'').replace(/>/g,'%3E')+'>)\n'+(attrs.title?String(attrs.title)+'\n':'')
     case 'doc': return content.map((n) => nodeToMd(n)).join('\n')
     case 'paragraph': return children() ? `${children()}\n` : '\n'
     case 'heading': return `${'#'.repeat((attrs.level as number) ?? 2)} ${children()}\n`

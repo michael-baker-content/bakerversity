@@ -104,7 +104,7 @@ After adding a migration, run `npm run db:generate` and include both generated a
 
 ## Planned editor component system
 
-Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, and Technical; downloads use a shared format picker. Two-column compositions remain planned and are not yet available. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
+Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, and Technical; downloads use a shared format picker. The first [Text and image component](docs/text-image-component.md) is implemented with left/right image placement, stacked presentation and sequential exports; browser acceptance is pending. Unrestricted column layouts remain deferred. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
 
 ## Further documentation
 

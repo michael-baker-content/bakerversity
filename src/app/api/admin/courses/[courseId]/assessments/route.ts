@@ -1,3 +1,4 @@
+import { textImageError } from '@/lib/textImage.mjs'
 import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
@@ -70,6 +71,8 @@ export async function POST(
   const body = await req.json()
   const { title, assessment_type, module_id, is_graded, passing_score, intro_content } = body
 
+  const componentError=textImageError(intro_content)
+  if(componentError)return NextResponse.json({error:componentError},{status:400})
   if (!title?.trim()) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
   }

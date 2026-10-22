@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
+import ContentPublicationBadge from '@/components/ContentPublicationBadge'
 
 interface Page {
   id: string
@@ -12,6 +13,7 @@ interface Page {
   page_type: string
   module_id: string | null
   is_published: boolean
+  has_saved_changes?: boolean
   introduction: string | null
 }
 
@@ -28,6 +30,7 @@ interface Lesson {
   slug: string | null
   position: number
   is_published: boolean
+  has_saved_changes?: boolean
   module_id: string | null
 }
 
@@ -38,6 +41,7 @@ interface Assessment {
   assessment_type: 'quiz' | 'exam' | 'practice'
   is_graded: boolean
   is_published: boolean
+  has_saved_changes?: boolean
   module_id: string | null
   position: number
 }
@@ -269,13 +273,7 @@ function CollapsibleSection({
                     </span>
 
                     {/* Draft badge */}
-                    {!item.is_published && (
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '1px 7px',
-                        borderRadius: 'var(--radius-full)',
-                        background: 'var(--surface-2)', color: 'var(--text-3)', flexShrink: 0,
-                      }}>Draft</span>
-                    )}
+                    <ContentPublicationBadge published={item.is_published} updated={item.has_saved_changes} />
 
                     {/* Actions */}
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -418,12 +416,7 @@ function CourseLevelSection({ label, description, pages: initialPages, courseSlu
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--text)', minWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {page.title}
                 </span>
-                {!page.is_published && (
-                  <span style={{
-                    fontSize: 11, fontWeight: 600, padding: '1px 7px',
-                    borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)', flexShrink: 0,
-                  }}>Draft</span>
-                )}
+                <ContentPublicationBadge published={page.is_published} updated={page.has_saved_changes} />
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {page.slug && (
                     <Link href={`/courses/${courseSlug}/pages/${page.slug}`} target="_blank">
@@ -558,9 +551,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{lesson.title}</span>
-                  {!lesson.is_published && (
-                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)' }}>Draft</span>
-                  )}
+                  <ContentPublicationBadge published={lesson.is_published} updated={lesson.has_saved_changes} />
                   <Link href={`/admin/courses/${course.slug}/lessons/${lesson.id}/preview`} target="_blank" className="btn btn-ghost btn-sm">Preview ↗</Link>
                   <Link href={`/admin/courses/${course.slug}/lessons/${lesson.slug ?? lesson.id}`}>
                     <button className="btn btn-ghost btn-sm">Edit</button>
@@ -598,9 +589,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{assessment.title}</span>
-                  {!assessment.is_published && (
-                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)' }}>Draft</span>
-                  )}
+                  <ContentPublicationBadge published={assessment.is_published} updated={assessment.has_saved_changes} />
                   <Link href={`/admin/courses/${course.slug}/assessments/${assessment.id}`}>
                     <button className="btn btn-ghost btn-sm">Edit</button>
                   </Link>

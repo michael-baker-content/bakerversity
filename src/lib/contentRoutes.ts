@@ -1,3 +1,4 @@
+import { textImageError } from '@/lib/textImage.mjs'
 import { NextResponse } from 'next/server'
 import { adminAccess } from '@/lib/adminAccess'
 import type { Json } from '@/lib/database.types'
@@ -29,6 +30,8 @@ export async function writeContent(req: Request, courseId: string, itemId: strin
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const body = await req.json()
   if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid content' }, { status: 400 })
+  const componentError = textImageError(body.content) || textImageError(body.intro_content)
+  if(componentError)return NextResponse.json({error:componentError},{status:400})
   // Existing list publication toggles remain supported; editor saves carry versions.
   const publicationToggle = Object.keys(body).length === 1 && typeof body.is_published === 'boolean'
   if (!publicationToggle && !Number.isInteger(body.version)) {

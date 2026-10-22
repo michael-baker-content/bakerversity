@@ -1,20 +1,22 @@
 /** Author-facing insertion taxonomy. This does not define or restrict the document schema. */
-export type ElementCategory = 'media' | 'technical' | 'learning'
-export type InsertToolId = 'image' | 'table' | 'directory-tree' | 'formula' | 'activate-latex' | 'graph' | 'code' | 'terminal' | 'callout' | 'quiz'
+export type ElementCategory = 'media' | 'technical' | 'learning' | 'components'
+export type InsertToolId = 'text-image' | 'image' | 'table' | 'directory-tree' | 'formula' | 'activate-latex' | 'graph' | 'code' | 'terminal' | 'callout' | 'quiz'
 export interface InsertTool {
   id: InsertToolId
   label: string
   category: ElementCategory
   requiredPack?: string
-  kind: 'block' | 'action'
+  kind: 'block' | 'action' | 'component'
   nodeTypes: readonly string[]
+  parentContexts?: readonly string[]
 }
 export const ELEMENT_CATEGORIES: readonly { id: ElementCategory; label: string }[] = [
-  { id: 'media', label: 'Media' }, { id: 'learning', label: 'Learning' }, { id: 'technical', label: 'Technical' },
+  { id: 'media', label: 'Media' }, { id: 'learning', label: 'Learning' }, { id: 'technical', label: 'Technical' }, { id: 'components', label: 'Components' },
 ]
-// Parent-context restrictions belong to the future component contract, not today's unrestricted blocks.
-// No column support is advertised until schema, renderer and export acceptance checks pass.
+// Component parent contexts are enforced by schema, transaction and API validation.
+// Existing block insertion is unchanged outside components.
 export const INSERT_TOOLS: readonly InsertTool[] = [
+  { id:'text-image', label:'Text and image', category:'components', kind:'component', nodeTypes:['textImage'], parentContexts:['doc'] },
   { id:'image', label:'Image', category:'media', kind:'block', nodeTypes:['image'] },
   { id:'table', label:'Table', category:'technical', kind:'block', nodeTypes:['table'] },
   { id:'directory-tree', label:'Directory tree', category:'technical', kind:'block', nodeTypes:['directoryTree'] },

@@ -1,3 +1,4 @@
+import { courseUpdatedDrafts } from '@/lib/courseDraftStatus'
 import { NextResponse } from 'next/server'
 import { adminAccess } from '@/lib/adminAccess'
 type Context = { params: Promise<{courseId:string}> }
@@ -6,7 +7,10 @@ export async function GET(_req:Request,{params}:Context) {
   if(!ctx)return NextResponse.json({error:'Forbidden'},{status:403})
   const [items,modules]=await Promise.all([ctx.db.from('course_items').select('*,content_drafts(item_id)').eq('course_id',courseId).order('position'),ctx.db.from('modules').select('id,title,position').eq('course_id',courseId).order('position')])
   if(items.error||modules.error)return NextResponse.json({error:'Unable to load course sequence'},{status:500})
-  return NextResponse.json({items:items.data,modules:modules.data})
+  try {
+   const updated=await courseUpdatedDrafts(ctx.db,courseId)
+   return NextResponse.json({items:items.data.map(item=>({...item,has_saved_changes:updated.has(item.id)})),modules:modules.data})
+  }catch{return NextResponse.json({error:'Unable to load draft status'},{status:500})}
 }
 export async function POST(req:Request,{params}:Context) {
   const {courseId}=await params; const ctx=await adminAccess(courseId)

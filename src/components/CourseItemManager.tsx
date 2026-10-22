@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-type Item={id:string;kind:string;title:string;module_id:string|null;placement:string;position:number;status:string;is_required:boolean;content_drafts:unknown}
+type Item={id:string;kind:string;title:string;module_id:string|null;placement:string;position:number;status:string;is_required:boolean;content_drafts:unknown;has_saved_changes?:boolean}
 export default function CourseItemManager({courseId,courseSlug}:{courseId:string;courseSlug:string}) {
   const [items,setItems]=useState<Item[]>([])
   const [modules,setModules]=useState<{id:string;title:string;position:number}[]>([])
@@ -48,7 +48,7 @@ export default function CourseItemManager({courseId,courseSlug}:{courseId:string
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                         <span style={{ ...badgeStyle, background: 'var(--indigo-muted)', color: 'var(--indigo)', textTransform: 'capitalize' }}>{item.kind}</span>
                         <span style={{ ...badgeStyle, textTransform: 'capitalize' }}>{item.status}</span>
-                        {!!item.content_drafts && <span style={badgeStyle}>Saved draft</span>}
+                        {item.has_saved_changes && <span style={badgeStyle} title="Saved changes have not been published yet.">Updated</span>}
                         {!item.is_required && <span style={badgeStyle}>Optional</span>}
                       </div>
                     </div>

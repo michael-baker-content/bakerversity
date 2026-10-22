@@ -1,9 +1,10 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useState } from 'react'
+import './editor/textImage.css'
+import { useState, useId, useMemo } from 'react'
 import type { MafsGraphAttrs } from './MafsGraph'
-import { renderNode } from './renderer/renderNode'
+import { buildRenderPlan } from './renderer/renderNode'
 import { HtmlSegment } from './renderer/HtmlSegment'
 import type { PracticeQuizQuestion } from './editor/nodes'
 
@@ -11,39 +12,6 @@ const MafsGraph = dynamic(() => import('./MafsGraph'), { ssr: false })
 
 interface LessonRendererProps {
   content: Record<string, unknown>
-}
-
-type Segment =
-  | { type: 'html'; html: string }
-  | { type: 'graph'; attrs: MafsGraphAttrs }
-  | { type: 'practiceQuiz'; title: string; questions: PracticeQuizQuestion[] }
-
-function buildSegments(content: Record<string, unknown>): Segment[] {
-  const topNodes = (content.content as Record<string, unknown>[] | undefined) ?? []
-  const segments: Segment[] = []
-  let currentHtml = ''
-
-  for (const node of topNodes) {
-    const nodeType = node.type as string
-
-    if (nodeType === 'mafsGraph') {
-      if (currentHtml) { segments.push({ type: 'html', html: currentHtml }); currentHtml = '' }
-      segments.push({ type: 'graph', attrs: node.attrs as unknown as MafsGraphAttrs })
-    } else if (nodeType === 'practiceQuiz') {
-      if (currentHtml) { segments.push({ type: 'html', html: currentHtml }); currentHtml = '' }
-      const attrs = (node.attrs as Record<string, unknown>) ?? {}
-      segments.push({
-        type: 'practiceQuiz',
-        title: (attrs.title as string) ?? 'Practice Quiz',
-        questions: Array.isArray(attrs.questions) ? attrs.questions as PracticeQuizQuestion[] : [],
-      })
-    } else {
-      currentHtml += renderNode(node)
-    }
-  }
-
-  if (currentHtml) segments.push({ type: 'html', html: currentHtml })
-  return segments
 }
 
 // ── PracticeQuizPlayer — client-side interactive quiz ─────────────────────────
@@ -54,6 +22,7 @@ function PracticeQuizPlayer({ title, questions }: {
   title: string
   questions: PracticeQuizQuestion[]
 }) {
+  const quizId = useId()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
 
@@ -120,7 +89,7 @@ function PracticeQuizPlayer({ title, questions }: {
                       background: selected ? 'var(--indigo-muted)' : 'var(--surface)',
                       transition: 'border-color 0.1s, background 0.1s',
                     }}>
-                      <input type="radio" name={q.id} checked={selected} onChange={() => setAnswer(q.id, String(i))} style={{ accentColor: 'var(--indigo)', flexShrink: 0 }} />
+                      <input type="radio" name={quizId + q.id} checked={selected} onChange={() => setAnswer(q.id, String(i))} style={{ accentColor: 'var(--indigo)', flexShrink: 0 }} />
                       <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{String.fromCharCode(65 + i)}.</span>
                       {opt}
                     </label>
@@ -138,7 +107,7 @@ function PracticeQuizPlayer({ title, questions }: {
                       background: selected ? 'var(--indigo-muted)' : 'var(--surface)',
                       transition: 'border-color 0.1s, background 0.1s',
                     }}>
-                      <input type="radio" name={q.id} checked={selected} onChange={() => setAnswer(q.id, v)} style={{ accentColor: 'var(--indigo)', flexShrink: 0 }} />
+                      <input type="radio" name={quizId + q.id} checked={selected} onChange={() => setAnswer(q.id, v)} style={{ accentColor: 'var(--indigo)', flexShrink: 0 }} />
                       {v.charAt(0).toUpperCase() + v.slice(1)}
                     </label>
                   )
@@ -233,15 +202,18 @@ function PracticeQuizPlayer({ title, questions }: {
 // ── Main renderer ─────────────────────────────────────────────────────────────
 
 export default function LessonRenderer({ content }: LessonRendererProps) {
-  const segments = buildSegments(content)
+  const plan = useMemo(() => buildRenderPlan(content), [content])
+  // Remount the HTML owner and its portals together when the document changes.
+  const documentKey = JSON.stringify(content)
+  const islands = plan.islands.map((node, index) => {
+    const attrs = (node.attrs ?? {}) as Record<string, unknown>
+    if (node.type === 'mafsGraph') return <MafsGraph key={index} attrs={attrs as unknown as MafsGraphAttrs} />
+    return <PracticeQuizPlayer key={index} title={typeof attrs.title === 'string' ? attrs.title : 'Practice Quiz'} questions={Array.isArray(attrs.questions) ? attrs.questions as PracticeQuizQuestion[] : []} />
+  })
 
   return (
     <>
-      {segments.map((seg, i) => {
-        if (seg.type === 'graph') return <MafsGraph key={i} attrs={seg.attrs} />
-        if (seg.type === 'practiceQuiz') return <PracticeQuizPlayer key={i} title={seg.title} questions={seg.questions} />
-        return <HtmlSegment key={i} html={seg.html} />
-      })}
+      <HtmlSegment key={documentKey} html={plan.html} islands={islands} />
       <style>{`
         .lesson-content p { margin: 0 0 1rem; }
         .lesson-content h2 { font-size: 1.5rem; margin: 2rem 0 0.75rem; }

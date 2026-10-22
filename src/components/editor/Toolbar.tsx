@@ -18,6 +18,7 @@ interface ToolbarProps {
   filenameInput: string
   lintDiagnostics: { line: number; message: string; severity: 'error' | 'warning' }[]
   onFileClick: () => void
+  onTextImageClick: () => void
   onActivateLatex?: () => void
   onLatexButtonClick?: () => void
   onGraphButtonClick?: () => void
@@ -36,7 +37,7 @@ function ToolbarButton({ onClick, active, children, label }: { onClick: () => vo
 export function Toolbar({
   editor, packs, uploading, showCalloutPicker, showTerminalModal,
   terminalContent, filenameInput, lintDiagnostics,
-  onFileClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
+  onFileClick, onTextImageClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
   onInsertPracticeQuiz,
   setShowCalloutPicker, setShowTerminalModal, setTerminalContent, setFilenameInput,
 }: ToolbarProps) {
@@ -46,6 +47,7 @@ export function Toolbar({
   const tools = availableInsertTools(packs)
   const actions: Record<InsertToolId, () => void> = {
     image: onFileClick,
+    'text-image': onTextImageClick,
     table: () => { editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run() },
     'directory-tree': () => { editor.chain().focus().insertContent({type:'directoryTree',attrs:{source:'',title:'Directory tree'}}).run() },
     code: () => { editor.chain().focus().toggleCodeBlock().run() },
@@ -92,7 +94,7 @@ export function Toolbar({
                   {category.label}<span aria-hidden="true">{open ? '−' : '+'}</span>
                 </button>
                 <div id={groupId} className="editor-category-tools" data-open={open}>
-                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool"
+                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool" disabled={editor.isActive('textImage')}
                     aria-label={tool.id === 'formula' ? 'Formula — type $x$ or $$x$$ then Space, or insert with this tool' : undefined}
                     aria-expanded={tool.id === 'callout' ? showCalloutPicker : undefined}
                     aria-pressed={tool.kind === 'block' && tool.id !== 'callout' ? editor.isActive(tool.nodeTypes[0]) : undefined}

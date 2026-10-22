@@ -1,3 +1,4 @@
+import { courseUpdatedDrafts } from '@/lib/courseDraftStatus'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { notFound, redirect } from 'next/navigation'
@@ -51,6 +52,7 @@ export default async function AdminCourseDetailPage({
     { data: allAssessments },
     { data: selfEnrollment },
     { count: enrollmentCount },
+    updatedDrafts,
   ] = await Promise.all([
     supabase.from('modules')
       .select('id, title, description, slug, position')
@@ -76,6 +78,7 @@ export default async function AdminCourseDetailPage({
     supabase.from('enrollments')
       .select('*', { count: 'exact', head: true })
       .eq('course_id', course.id),
+    courseUpdatedDrafts(supabase,course.id),
   ])
 
   return (
@@ -151,9 +154,9 @@ export default async function AdminCourseDetailPage({
             conclusion_description: course.conclusion_description ?? null,
           }}
           modules={modules ?? []}
-          pages={coursePages ?? []}
-          lessons={allLessons ?? []}
-          assessments={(allAssessments ?? []).map(a => ({ ...a, assessment_type: a.assessment_type as import('@/lib/types').AssessmentType }))}
+          pages={(coursePages ?? []).map(item=>({...item,has_saved_changes:updatedDrafts.has(item.id)}))}
+          lessons={(allLessons ?? []).map(item=>({...item,has_saved_changes:updatedDrafts.has(item.id)}))}
+          assessments={(allAssessments ?? []).map(a => ({ ...a, has_saved_changes:updatedDrafts.has(a.id), assessment_type: a.assessment_type as import('@/lib/types').AssessmentType }))}
         />
       </div>
     </main>

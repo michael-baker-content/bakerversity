@@ -1,13 +1,13 @@
 # Editor components: implementation plan
 
-Status: checkpoint 1 implemented (catalog and grouped toolbar); browser review pending. Components are not available yet.
+Status: catalog, recursive rendering and the first Text and image component are implemented; browser acceptance pending. See [Text and image](text-image-component.md) for the narrowed first-release contract.
 Prepared: 2026-10-20.
 
 This is the kickoff checkpoint for a component system in Bakerversity. It records scope and acceptance criteria before implementation. It does not indicate that components are available or tested. Michael handles all Git commands and local server startup/shutdown.
 
 ## First release
 
-Introduce a shared editor taxonomy and one two-column component. Instructors can place supported content in either column, edit it within the existing document, and preview how it stacks on narrow screens. Preserve existing authoring, publication, recovery, and export behavior.
+The first implementation is the focused Text and image composition approved on 2026-10-21, with image-left and image-right options. General-purpose columns remain deferred. Introduce a shared editor taxonomy and one two-column component. Instructors can place supported content in either column, edit it within the existing document, and preview how it stacks on narrow screens. Preserve existing authoring, publication, recovery, and export behavior.
 
 Defer nested components, additional layout templates, arbitrary column counts, drag-to-resize, custom CSS, mobile-order overrides, reusable cross-lesson instances, and a general plugin framework.
 
@@ -27,7 +27,7 @@ Keep frequently used formatting visible. Group insertion controls by category; a
 
 Create a small typed element catalog with stable IDs, labels, categories, required course tools and supported parent contexts. Keep editor commands, rendering and export implementations in their existing layers; the catalog identifies capabilities rather than importing heavy UI/renderers into every consumer. Do not make the catalog a second competing Tiptap schema. Validate catalog/schema consistency in tests.
 
-## Document contract
+## Original general-column proposal (deferred)
 
 Proposed nodes:
 
@@ -45,7 +45,7 @@ The document JSON should fit existing draft/revision storage. No SQL migration i
 
 ## Rendering foundation
 
-Current `LessonRenderer.tsx` treats graphs and practice quizzes specially at the top level; other content flows through `renderer/renderNode.ts` and `HtmlSegment.tsx`. A nested interactive block cannot rely on that top-level segmentation.
+The original `LessonRenderer.tsx` handled graphs and practice quizzes only at the top level. Checkpoint 2 replaces that segmentation with recursive HTML rendering and React portal positions for interactive blocks; see the compatibility audit for verification and remaining work.
 
 First establish a recursive rendering boundary that preserves normal rich-text wrappers and delegates interactive blocks wherever they occur. Reuse it for published lessons, saved-draft previews, course pages and assessment content wherever those surfaces render the same document format. Inventory actual consumers before changing them.
 
