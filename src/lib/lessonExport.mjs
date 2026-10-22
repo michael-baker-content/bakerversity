@@ -4,6 +4,7 @@ export function htmlDownloadDocument(fragment) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lesson</title>
 <style>
+.slideshow-slide { margin:24px 0; break-inside:avoid; } .slideshow-slide img { max-height:520px; object-fit:contain; }
 
 .text-image,.text-image-editor { container-type:inline-size; min-width:0; margin:1.25rem 0; }
 .text-image-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }

@@ -1,4 +1,6 @@
 'use client'
+import {SlideshowNode,SlideshowSlide} from './editor/SlideshowNode'
+import {SlideshowDescription} from './editor/SlideshowExtension'
 import { TextImageNode } from './editor/TextImageNode'
 import { TextImageBody } from './editor/TextImageExtension'
 import { textImageError, imagePlainText } from '@/lib/textImage.mjs'
@@ -105,6 +107,7 @@ export default function TipTapEditor({
 
   const replacementInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
+  const [slideshowTarget,setSlideshowTarget]=useState<string|null>(null)
   const [textImagePlacement, setTextImagePlacement] = useState<'left'|'right'|null>(null)
   const componentLoadError = textImageError(content)
   const [componentEditError,setComponentEditError]=useState('')
@@ -129,7 +132,7 @@ export default function TipTapEditor({
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
-    StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
+    StarterKit.configure({ codeBlock: false, link: {openOnClick:false,autolink:false}, underline: false, trailingNode: false }),
     NoInputRules,
     Highlight.configure({ HTMLAttributes: { style: 'background-color:#fef08a;color:#1f2937' } }),
     TextLanguage,
@@ -152,7 +155,7 @@ export default function TipTapEditor({
     TerminalNode,
     ...(hasPythonLint ? [PythonLintExtension] : []),
     PracticeQuizNode,
-    DirectoryTreeNode, TextImageNode.configure({onInvalid:setComponentEditError}), TextImageBody,
+    DirectoryTreeNode, SlideshowNode, SlideshowSlide, SlideshowDescription, TextImageNode.configure({onInvalid:setComponentEditError}), TextImageBody,
   ]
 
   // ── Editor ─────────────────────────────────────────────────────────────────
@@ -258,10 +261,13 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor) return
     const track = ({transaction}: {transaction: import('@tiptap/pm/state').Transaction}) => {
+      const slideshowId=transaction.getMeta('addSlideshowImage')
+      if(typeof slideshowId==='string'){setSlideshowTarget(slideshowId);setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}
       const imagePosition=transaction.getMeta('editComponentImage')
       if(typeof imagePosition==='number'){
         const image=editor.state.doc.nodeAt(imagePosition)
         if(image?.type.name==='image'){
+          setSlideshowTarget(null)
           setTextImagePlacement(null)
           setImageModal({src:image.attrs.src,alt:image.attrs.alt??'',title:image.attrs.title??'',pos:imagePosition,width:image.attrs.width,height:image.attrs.height,creditName:image.attrs.creditName,creditUrl:image.attrs.creditUrl,alignment:image.attrs.alignment==='center'?'center':'left',maxWidth:imageMaxWidth(image.attrs.maxWidth)?.toString()??''})
         }
@@ -276,7 +282,7 @@ export default function TipTapEditor({
     }
     editor.on('transaction',track)
     return () => {editor.off('transaction',track)}
-  },[editor])
+  },[editor,courseId])
 
   // ── Image upload ───────────────────────────────────────────────────────────
   const handleImageUpload = useCallback(async (file: File, replace = false) => {
@@ -356,12 +362,16 @@ export default function TipTapEditor({
     let content: string
     if (format === 'html') {
       const document = new DOMParser().parseFromString(editor.getHTML(),'text/html')
-      document.querySelectorAll<HTMLImageElement>('[data-text-image] img[title]').forEach(image=>{
+      document.querySelectorAll<HTMLImageElement>('[data-text-image] img[title], [data-slideshow] img[title]').forEach(image=>{
         if(!image.title)return
         const figure=document.createElement('figure')
         figure.style.margin='0';figure.style.minWidth='0'
         const caption=document.createElement('figcaption');caption.textContent=image.title
         image.replaceWith(figure);figure.append(image,caption)
+      })
+      document.querySelectorAll<HTMLElement>('[data-slideshow] [data-inline-math], [data-slideshow] [data-block-math]').forEach(element=>{
+        const display=element.hasAttribute('data-block-math')
+        element.innerHTML=katex.renderToString(element.getAttribute(display?'data-block-math':'data-inline-math')??'',{throwOnError:false,displayMode:display,output:'mathml'})
       })
       content = htmlDownloadDocument(document.body.innerHTML)
     }
@@ -408,8 +418,9 @@ export default function TipTapEditor({
               terminalContent={terminalContent}
               filenameInput={filenameInput}
               lintDiagnostics={lintDiagnostics}
-              onTextImageClick={() => {setTextImagePlacement('right');if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
-              onFileClick={() => {setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
+              onSlideshowClick={() => {setSlideshowTarget('new');setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
+              onTextImageClick={() => {setSlideshowTarget(null);setTextImagePlacement('right');if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
+              onFileClick={() => {setSlideshowTarget(null);setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
               onLatexButtonClick={onLatexButtonClick}
               onActivateLatex={() => setShowLatexActivation(value => !value)}
               onGraphButtonClick={onGraphButtonClick}
@@ -535,7 +546,20 @@ export default function TipTapEditor({
                   if (!editor || uploading || !imageModal.alt.trim()) return
                   if (imageModal.pos === null) {
                     const image = {type:'image',attrs:{ alignment:imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}
-                    if(textImagePlacement){
+                    if(slideshowTarget){
+                      const slide={type:'slideshowSlide',content:[image,{type:'slideshowDescription',content:[{type:'paragraph'}]}]}
+                      let at:number
+                      if(slideshowTarget==='new'){
+                        const selection=editor.state.selection.$from;at=selection.depth?selection.after(1):selection.pos
+                        if(!editor.chain().focus().insertContentAt(at,{type:'slideshow',attrs:{id:crypto.randomUUID(),title:''},content:[slide]}).setTextSelection(at+5).run()){setImageError('Unable to insert slideshow here.');return}
+                      }else{
+                        let target:number|null=null
+                        editor.state.doc.forEach((node,pos)=>{if(node.type.name==='slideshow'&&node.attrs.id===slideshowTarget)target=pos+node.nodeSize-1})
+                        if(target===null){setImageError('The slideshow was removed. Close this window and insert a new slideshow.');return}
+                        at=target
+                        if(!editor.chain().focus().insertContentAt(at,slide).setTextSelection(at+4).run()){setImageError('Unable to add this slide.');return}
+                      }
+                    }else if(textImagePlacement){
                       const body={type:'textImageBody',content:[{type:'paragraph'}]}
                       const children=textImagePlacement==='left'?[image,body]:[body,image]
                       const selection=editor.state.selection.$from
@@ -552,10 +576,11 @@ export default function TipTapEditor({
                     }
                   }
                   setTextImagePlacement(null)
+                  setSlideshowTarget(null)
                   setImageModal(null)
                 }}
               >
-                {uploading ? 'Uploading…' : imageModal.pos === null ? textImagePlacement ? 'Insert component' : 'Insert image' : 'Update'}
+                {uploading ? 'Uploading…' : imageModal.pos === null ? slideshowTarget ? 'Add slide' : textImagePlacement ? 'Insert component' : 'Insert image' : 'Update'}
               </button>
               <button type="button" className="btn btn-ghost btn-sm" disabled={uploading} onClick={() => {setImageModal(null);setImageError('')}}>Cancel</button>
             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useId, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useId, useState, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { createCodeHighlighter } from '@/lib/codeHighlighting'
@@ -9,6 +9,9 @@ import { hastToHtml } from './renderNode'
 const lowlight = createCodeHighlighter()
 
 export function HtmlSegment({ html, islands = [] }: { html: string; islands?: ReactNode[] }) {
+  // React compares this object by identity. Replacing it on the portal-target
+  // state update resets innerHTML and detaches the nodes receiving the portals.
+  const htmlContent = useMemo(() => ({ __html: html }), [html])
   const ref = useRef<HTMLDivElement>(null)
   const tableId = useId()
   const [targets, setTargets] = useState<HTMLElement[]>([])
@@ -167,7 +170,7 @@ export function HtmlSegment({ html, islands = [] }: { html: string; islands?: Re
     <>
     <div
       ref={ref}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={htmlContent}
       className="lesson-content"
       style={{ fontSize: 16, lineHeight: 1.75 }}
     />

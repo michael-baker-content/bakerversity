@@ -18,6 +18,7 @@ interface ToolbarProps {
   filenameInput: string
   lintDiagnostics: { line: number; message: string; severity: 'error' | 'warning' }[]
   onFileClick: () => void
+  onSlideshowClick: () => void
   onTextImageClick: () => void
   onActivateLatex?: () => void
   onLatexButtonClick?: () => void
@@ -37,15 +38,19 @@ function ToolbarButton({ onClick, active, children, label }: { onClick: () => vo
 export function Toolbar({
   editor, packs, uploading, showCalloutPicker, showTerminalModal,
   terminalContent, filenameInput, lintDiagnostics,
-  onFileClick, onTextImageClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
+  onFileClick, onSlideshowClick, onTextImageClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
   onInsertPracticeQuiz,
   setShowCalloutPicker, setShowTerminalModal, setTerminalContent, setFilenameInput,
 }: ToolbarProps) {
+  const [linkOpen,setLinkOpen]=useState(false)
+  const [linkUrl,setLinkUrl]=useState('')
+  const validLink=/^(https?:\/\/|mailto:|\/(?!\/)|#)\S+/i.test(linkUrl.trim())
   const [insertOpen, setInsertOpen] = useState(false)
   const insertId = useId()
   const [openCategories, setOpenCategories] = useState<string[]>([])
   const tools = availableInsertTools(packs)
   const actions: Record<InsertToolId, () => void> = {
+    slideshow: onSlideshowClick,
     image: onFileClick,
     'text-image': onTextImageClick,
     table: () => { editor.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run() },
@@ -74,7 +79,7 @@ export function Toolbar({
         <select className="editor-tool editor-desktop-list" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
           <option value="">List</option><option value="bullet">Bullets</option><option value="ordered">Numbered</option>
         </select>
-      </>} extraFormatting={<><span className="editor-mobile-only"><ToolbarButton label="Inline code" onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>{'</>'}</ToolbarButton><select className="editor-tool" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
+      </>} extraFormatting={<><ToolbarButton label="Link" active={editor.isActive('link')} onClick={()=>{setLinkUrl(editor.getAttributes('link').href??'');setLinkOpen(!linkOpen)}}>Link</ToolbarButton><span className="editor-mobile-only"><ToolbarButton label="Inline code" onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>{'</>'}</ToolbarButton><select className="editor-tool" aria-label="List style" value={editor.isActive('bulletList') ? 'bullet' : editor.isActive('orderedList') ? 'ordered' : ''} onChange={e => { const value=e.target.value; if(value==='bullet' || (!value && editor.isActive('bulletList'))) editor.chain().focus().toggleBulletList().run(); else if(value==='ordered' || (!value && editor.isActive('orderedList'))) editor.chain().focus().toggleOrderedList().run() }}>
           <option value="">List</option><option value="bullet">Bullets</option><option value="ordered">Numbered</option>
         </select></span><ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>Quote</ToolbarButton></>} secondary={
         <div className="editor-insert-row" aria-label="Insert content" onKeyDown={e => {if(e.key==='Escape'){setInsertOpen(false);(e.currentTarget.querySelector('.editor-insert-toggle') as HTMLButtonElement)?.focus()}}}>
@@ -94,7 +99,7 @@ export function Toolbar({
                   {category.label}<span aria-hidden="true">{open ? '−' : '+'}</span>
                 </button>
                 <div id={groupId} className="editor-category-tools" data-open={open}>
-                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool" disabled={editor.isActive('textImage')}
+                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool" disabled={editor.isActive('textImage') || (editor.isActive('slideshow') && !['formula','activate-latex'].includes(tool.id))}
                     aria-label={tool.id === 'formula' ? 'Formula — type $x$ or $$x$$ then Space, or insert with this tool' : undefined}
                     aria-expanded={tool.id === 'callout' ? showCalloutPicker : undefined}
                     aria-pressed={tool.kind === 'block' && tool.id !== 'callout' ? editor.isActive(tool.nodeTypes[0]) : undefined}
@@ -108,6 +113,12 @@ export function Toolbar({
           </div>
         </div>
       } />
+      {linkOpen && <div className="editor-context" aria-label="Link settings">
+        <label>Link URL <input className="input" aria-label="Link URL" value={linkUrl} onChange={e=>setLinkUrl(e.target.value)} placeholder="https://"/></label>
+        <button type="button" className="editor-tool" disabled={!validLink} onClick={()=>{editor.chain().focus().extendMarkRange('link').setLink({href:linkUrl.trim()}).run();setLinkOpen(false)}}>Apply link</button>
+        <button type="button" className="editor-tool" onClick={()=>{editor.chain().focus().extendMarkRange('link').unsetLink().run();setLinkOpen(false)}}>Remove link</button>
+        <button type="button" className="editor-tool" onClick={()=>setLinkOpen(false)}>Cancel</button>
+      </div>}
       {showCalloutPicker && <div className="editor-context" aria-label="Callout types">
         <span className="editor-row-label">Callout</span>
         {CALLOUT_TYPES.map(t => <button type="button" className="editor-tool" key={t.value} onClick={() => {editor.chain().focus().insertContent({type:'callout',attrs:{type:t.value},content:[{type:'paragraph'}]}).run();setShowCalloutPicker(false)}}>{t.label}</button>)}

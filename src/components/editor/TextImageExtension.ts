@@ -13,16 +13,20 @@ export function textImageBoundarySelection(state: EditorState, pos: number, size
 
 export function textImageExitSelection(state: EditorState, direction: -1 | 1) {
  const selection=state.selection
- if(selection instanceof NodeSelection && selection.node.type.name==='textImage')return textImageBoundarySelection(state,selection.from,selection.node.nodeSize,direction)
+ if(selection instanceof NodeSelection && ['textImage','slideshow'].includes(selection.node.type.name))return textImageBoundarySelection(state,selection.from,selection.node.nodeSize,direction)
  const from=selection.$from
  let componentDepth=0,bodyDepth=0
  for(let depth=1;depth<=from.depth;depth++){
-  if(from.node(depth).type.name==='textImage')componentDepth=depth
-  if(from.node(depth).type.name==='textImageBody')bodyDepth=depth
+  if(['textImage','slideshow'].includes(from.node(depth).type.name))componentDepth=depth
+  if(['textImageBody','slideshowDescription'].includes(from.node(depth).type.name))bodyDepth=depth
  }
  if(!componentDepth)return null
  if(selection instanceof TextSelection){
   if(!selection.empty||!bodyDepth)return null
+  if(from.node(componentDepth).type.name==='slideshow'){
+   const slideIndex=from.index(componentDepth)
+   if(direction===-1&&slideIndex!==0||direction===1&&slideIndex!==from.node(componentDepth).childCount-1)return null
+  }
   const edge=Selection.findFrom(state.doc.resolve(direction===-1?from.start(bodyDepth):from.end(bodyDepth)),direction===-1?1:-1,true)
   if(!edge||edge.from!==selection.from)return null
  }else if(!(selection instanceof NodeSelection))return null
@@ -53,7 +57,7 @@ export const TextImageExtension = Node.create({
     const {state,view}=this.editor
     if(!(state.selection instanceof GapCursor))return false
     const from=state.selection.$from
-    if(from.depth!==0||![from.nodeBefore?.type.name,from.nodeAfter?.type.name].includes('textImage'))return false
+    if(from.depth!==0||![from.nodeBefore?.type.name,from.nodeAfter?.type.name].some(name=>name==='textImage'||name==='slideshow'))return false
     const transaction=state.tr.insert(from.pos,state.schema.nodes.paragraph.create())
     transaction.setSelection(TextSelection.create(transaction.doc,from.pos+1))
     view.dispatch(transaction.scrollIntoView())

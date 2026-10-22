@@ -1,6 +1,7 @@
+import {slideshowError} from './slideshow.mjs'
 /** Validate only this component contract; leave existing document types untouched. */
 export function textImageError(document) {
- let error=''
+ let error=slideshowError(document)
  const allowed=new Set(['paragraph','heading','bulletList','orderedList','listItem','text','hardBreak'])
  function visit(node,parent,inBody=false){
   if(!node||typeof node!=='object'||error)return

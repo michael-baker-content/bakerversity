@@ -119,3 +119,5 @@ Grouped editor tools are implemented as the first component-system checkpoint. T
 - [Tiptap 3 upgrade](docs/tiptap-3-upgrade.md)
 
 Older dated verification notes describe the state at that time, not the current database contents or deployment status.
+
+Image slideshow authoring and student playback: [component guide](docs/image-slideshow-component.md).

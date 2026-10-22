@@ -6,6 +6,9 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
   const children = () => content.map((n) => nodeToMd(n, indent)).join('')
 
   switch (type) {
+    case 'slideshow': return (attrs.title?'### '+String(attrs.title)+'\n\n':'')+content.map(n=>nodeToMd(n)).join('\n')+'\n'
+    case 'slideshowSlide': return content.map(n=>nodeToMd(n)).join('\n')+'\n'
+    case 'slideshowDescription': return children()
     case 'textImage': return content.map(n=>nodeToMd(n)).join('\n')+'\n'
     case 'textImageBody': return children()
     case 'image': return '!['+String(attrs.alt??'').replace(/[\[\]\\]/g, character=>'\\'+character)+'](<'+String(attrs.src??'').replace(/>/g,'%3E')+'>)\n'+(attrs.title?String(attrs.title)+'\n':'')
@@ -51,11 +54,12 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
       return '> **'+label+'**\n'+body.trimEnd().split('\n').map(line=>'> '+line).join('\n')+'\n'
     }
     case 'text': {
-      const marks = (node.marks as { type: string }[]) ?? []
+      const marks = (node.marks as { type: string; attrs?: {href?:string} }[]) ?? []
       let t = (node.text as string) ?? ''
       if (marks.some((m) => m.type === 'bold')) t = `**${t}**`
       if (marks.some((m) => m.type === 'italic')) t = `*${t}*`
       if (marks.some((m) => m.type === 'code')) t = `\`${t}\``
+      const link=marks.find(m=>m.type==='link');if(link?.attrs?.href)t='['+t+'](<'+link.attrs.href.replace(/>/g,'%3E')+'>)'
       return t
     }
     default: return children()

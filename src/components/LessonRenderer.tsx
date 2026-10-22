@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import {SlideshowPlayer} from './SlideshowPlayer'
 import './editor/textImage.css'
 import { useState, useId, useMemo } from 'react'
 import type { MafsGraphAttrs } from './MafsGraph'
@@ -207,6 +208,7 @@ export default function LessonRenderer({ content }: LessonRendererProps) {
   const documentKey = JSON.stringify(content)
   const islands = plan.islands.map((node, index) => {
     const attrs = (node.attrs ?? {}) as Record<string, unknown>
+    if (node.type === 'slideshow') return <SlideshowPlayer key={index} node={node}/>
     if (node.type === 'mafsGraph') return <MafsGraph key={index} attrs={attrs as unknown as MafsGraphAttrs} />
     return <PracticeQuizPlayer key={index} title={typeof attrs.title === 'string' ? attrs.title : 'Practice Quiz'} questions={Array.isArray(attrs.questions) ? attrs.questions as PracticeQuizQuestion[] : []} />
   })

@@ -60,6 +60,9 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
   const children = content.map(child => renderNode(child, interactive)).join('')
 
   switch (type) {
+    case 'slideshow': return '<section class="slideshow" data-slideshow>'+ (attrs.title?'<h3>'+escapeHtml(String(attrs.title))+'</h3>':'')+children+'</section>'
+    case 'slideshowSlide': return '<section class="slideshow-slide" data-slideshow-slide>'+children+'</section>'
+    case 'slideshowDescription': return '<div class="slide-description" data-slide-description>'+children+'</div>'
     case 'doc':       return children
     case 'textImage': return '<section data-text-image data-text-vertical-align="'+textImageVerticalAlign(attrs.textVerticalAlign)+'" class="text-image"><div class="text-image-grid">'+children+'</div></section>'
     case 'textImageBody': return '<div data-text-image-body class="text-image-body">'+children+'</div>'
@@ -157,7 +160,10 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
         if (mark.type === 'bold')   text = `<strong>${text}</strong>`
         if (mark.type === 'italic') text = `<em>${text}</em>`
         if (mark.type === 'code')   text = `<code>${text}</code>`
-        if (mark.type === 'link')   text = `<a href="${mark.attrs?.href}">${text}</a>`
+        if (mark.type === 'link') {
+          const href=String(mark.attrs?.href??'').trim()
+          if(/^(https?:|mailto:|\/|#)/i.test(href)&&!href.startsWith('//'))text = '<a href="'+escapeAttr(escapeHtml(href))+'">'+text+'</a>'
+        }
       }
       return text
     }
@@ -174,7 +180,7 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
 export function buildRenderPlan(document: Record<string, unknown>) {
   const islands: Record<string, unknown>[] = []
   const html = renderNode(document, node => {
-    if (node.type !== 'mafsGraph' && node.type !== 'practiceQuiz') return undefined
+    if (node.type !== 'mafsGraph' && node.type !== 'practiceQuiz' && node.type !== 'slideshow') return undefined
     const index = islands.push(node) - 1
     return '<div data-lesson-island="' + index + '" style="min-width:0"><p>Loading interactive content…</p></div>'
   })

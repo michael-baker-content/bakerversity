@@ -3,7 +3,7 @@ import {buildRenderPlan,renderNode} from '../src/components/renderer/renderNode.
 import {nestedContent} from './fixtures/nested-content.mjs'
 const before=JSON.stringify(nestedContent)
 const plan=buildRenderPlan(nestedContent)
-assert.deepEqual(plan.islands.map(n=>n.type),['practiceQuiz','practiceQuiz','mafsGraph'])
+assert.deepEqual(plan.islands.map(n=>n.type),['practiceQuiz','practiceQuiz','mafsGraph','slideshow'])
 assert.match(plan.html,/<div data-callout="note"[\s\S]*data-lesson-island="0"[\s\S]*<ul><li><p>List content<\/p><div data-lesson-island="1"/)
 assert.match(plan.html,/<table><tr><td><p>Graph cell<\/p><div data-lesson-island="2"/)
 assert.ok(plan.html.indexOf('Before nested content')<plan.html.indexOf('data-lesson-island="0"'))

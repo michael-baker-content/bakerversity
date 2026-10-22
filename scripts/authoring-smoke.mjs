@@ -20,7 +20,7 @@ try {
  for(const kind of ['lessons','pages','assessments'])for(const part of ['new',`[${kind==='lessons'?'lessonId':kind==='pages'?'pageId':'assessmentId'}]`]){
   const file=`src/app/admin/courses/[slug]/${kind}/${part}/page.tsx`;put(file,fs.readFileSync(path.join(repo,file),'utf8'))
  }
- put('src/app/renderer-check/page.tsx',`'use client';import {useState} from 'react';import LessonRenderer from '@/components/LessonRenderer';export default function Page(){const [content,setContent]=useState<Record<string,unknown>>(${JSON.stringify(nestedContent)});return <><button onClick={()=>setContent({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Replacement content'}]}]})}>Replace fixture</button><LessonRenderer content={content}/></>}`)
+ put('src/app/renderer-check/page.tsx',`'use client';import {useState} from 'react';import LessonRenderer from '@/components/LessonRenderer';export default function Page(){const [revision,setRevision]=useState(0);const [content,setContent]=useState<Record<string,unknown>>(${JSON.stringify(nestedContent)});return <><button onClick={()=>setRevision(value=>value+1)}>Refresh presentation {revision}</button><button onClick={()=>setContent({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Replacement content'}]}]})}>Replace fixture</button><LessonRenderer content={content}/></>}`)
  put('package.json','{"private":true}')
  put('tsconfig.json',fs.readFileSync(path.join(repo,'tsconfig.json'),'utf8'))
  put('next.config.mjs',"export default {transpilePackages:['mafs'],devIndicators:false}")
