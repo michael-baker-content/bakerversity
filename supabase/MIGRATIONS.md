@@ -46,3 +46,7 @@ The empty-database observations above are historical preflight records from Octo
 ## Course-specific asset names (pending owner application)
 
 Apply only migrations/202610200001_course_asset_names.sql after the six existing migrations and before deploying this release. It adds nullable course_assets.display_name with a length/nonblank constraint; existing rows fall back to assets.title. It does not rename storage objects, change URLs, remove content, or alter accounts. No manual backfill is required. See [asset names and downloads](../docs/asset-names.md).
+
+## Optional course asset tags
+
+Apply only `migrations/202610230001_course_asset_tags.sql` for this update, after the earlier course-asset migrations. It adds an empty-default tags array and validation, preserving files, names, captions and accounts. Apply before deploying the matching application. The generated schema.sql remains for fresh installations only.

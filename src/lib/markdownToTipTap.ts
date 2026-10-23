@@ -17,6 +17,8 @@ type TipTapNode = {
 type MdastNode = {
   type: string
   value?: string
+  identifier?: string
+  footnote?: {id:string;body:TipTapNode}
   depth?: number
   ordered?: boolean
   lang?: string
@@ -42,6 +44,9 @@ function convertInlineNodes(children: MdastNode[]): TipTapNode[] {
 
   for (const child of children) {
     switch (child.type) {
+      case 'footnoteReference':
+        if(child.footnote)nodes.push({type:'footnote',attrs:child.footnote})
+        break
       case 'text':
         if (child.value) nodes.push({ type: 'text', text: child.value })
         break
@@ -224,9 +229,28 @@ export function markdownToTipTap(markdown: string): Record<string, unknown> {
     .use(remarkMath)  // $...$ and $$...$$ math
 
   const tree = processor.parse(normalized)
+  const definitions=new Map<string,{id:string;body:TipTapNode}>()
+  const ast=tree.children as MdastNode[]
+  for(const node of ast){
+    if(node.type==='footnoteDefinition'&&node.identifier){
+      const nestedReference=(item:MdastNode):boolean=>item.type==='footnoteReference'||(item.children??[]).some(nestedReference)
+      if((node.children??[]).some(nestedReference))throw new Error('Footnotes cannot contain other footnote references.')
+      definitions.set(node.identifier,{id:crypto.randomUUID(),body:{type:'doc',content:(node.children??[]).map(convertBlockNode).filter((node):node is TipTapNode=>!!node)}})
+    }
+  }
+  function resolveNotes(node:MdastNode){
+    if(node.type==='footnoteReference'){
+      const definition=definitions.get(node.identifier??'')
+      if(!definition)throw new Error('A footnote reference is missing its definition.')
+      node.footnote=definition
+    }
+    node.children?.forEach(resolveNotes)
+  }
+  ast.forEach(resolveNotes)
   const content: TipTapNode[] = []
 
-  for (const node of (tree.children as MdastNode[])) {
+  for (const node of ast) {
+    if(node.type==='footnoteDefinition')continue
     const converted = convertBlockNode(node)
     if (converted) content.push(converted)
   }

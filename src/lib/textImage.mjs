@@ -1,8 +1,9 @@
+import {footnoteError} from './footnotes.mjs'
 import {slideshowError} from './slideshow.mjs'
 /** Validate only this component contract; leave existing document types untouched. */
 export function textImageError(document) {
- let error=slideshowError(document)
- const allowed=new Set(['paragraph','heading','bulletList','orderedList','listItem','text','hardBreak'])
+ let error=slideshowError(document)||footnoteError(document)
+ const allowed=new Set(['paragraph','heading','bulletList','orderedList','listItem','text','hardBreak','footnote'])
  function visit(node,parent,inBody=false){
   if(!node||typeof node!=='object'||error)return
   const children=Array.isArray(node.content)?node.content:[]
@@ -20,7 +21,7 @@ export function textImageError(document) {
    inBody=true
   }else if(inBody&&!allowed.has(node.type)){error='The component text area supports text, headings and lists only.';return}
   if(inBody){
-   const permitted={paragraph:['text','hardBreak'],heading:['text','hardBreak'],bulletList:['listItem'],orderedList:['listItem'],listItem:['paragraph','heading','bulletList','orderedList'],text:[],hardBreak:[]}[node.type]
+   const permitted={paragraph:['text','hardBreak','footnote'],heading:['text','hardBreak','footnote'],bulletList:['listItem'],orderedList:['listItem'],listItem:['paragraph','heading','bulletList','orderedList'],text:[],hardBreak:[]}[node.type]
    if(permitted && children.some(child=>!permitted.includes(child.type))){error='The component text structure is invalid.';return}
    if(['bulletList','orderedList','listItem'].includes(node.type)&&!children.length){error='Component lists cannot be empty.';return}
    if(node.type==='listItem'&&children[0]?.type!=='paragraph'){error='Each component list item must start with a paragraph.';return}

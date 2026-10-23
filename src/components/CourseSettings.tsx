@@ -21,6 +21,7 @@ interface Props {
 }
 
 const TOOL_OPTIONS = [
+  { value:'footnotes', label:'Footnotes', description:'Numbered notes with shared references and return links', requires:null },
   { value: 'math',        label: 'LaTeX math formulas', description: 'Inline and block math rendering via KaTeX',                   requires: null },
   { value: 'graph',       label: 'Interactive graphs',  description: 'Mafs graph editor for plotting functions',                     requires: null },
   { value: 'terminal',    label: 'Terminal blocks',      description: 'Styled terminal/bash output blocks',                           requires: null },

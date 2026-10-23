@@ -7,10 +7,10 @@ import StarterKit from '@tiptap/starter-kit'
 import Highlight from '@tiptap/extension-highlight'
 import {TextLanguage} from './TextLanguage'
 import {InlineMath,BlockMath} from './nodes'
-export default function SlideDescriptionEditor({content,onChange,disabled}:{content:JSONContent;onChange:(value:JSONContent)=>void;disabled:boolean}){
+export default function SlideDescriptionEditor({content,onChange,disabled,basicOnly=false,label='Slide description'}:{content:JSONContent;onChange:(value:JSONContent)=>void;disabled:boolean;basicOnly?:boolean;label?:string}){
  const linkPanelId=useId()
  const [linkOpen,setLinkOpen]=useState(false),[href,setHref]=useState('')
- const editor=useEditor({immediatelyRender:false,extensions:[StarterKit.configure({codeBlock:false,blockquote:false,horizontalRule:false,link:{openOnClick:false,autolink:false},trailingNode:false}),Highlight,TextLanguage,InlineMath,BlockMath],content,onUpdate:({editor})=>onChange(editor.getJSON()),editorProps:{handleDoubleClick:(view,_pos,event)=>{
+ const editor=useEditor({immediatelyRender:false,extensions:[StarterKit.configure({heading:basicOnly?false:undefined,codeBlock:false,blockquote:false,horizontalRule:false,link:{openOnClick:false,autolink:false,HTMLAttributes:{target:"_blank",rel:"noopener noreferrer"}},trailingNode:false}),...(basicOnly?[]:[Highlight,TextLanguage,InlineMath,BlockMath])],content,onUpdate:({editor})=>onChange(editor.getJSON()),editorProps:{handleDoubleClick:(view,_pos,event)=>{
   if(disabled)return false
   const anchor=(event.target as HTMLElement).closest('a')
   if(!anchor||!view.dom.contains(anchor))return false
@@ -20,7 +20,7 @@ export default function SlideDescriptionEditor({content,onChange,disabled}:{cont
   view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc,range.from,range.to)))
   setHref(anchor.getAttribute('href')??'');setLinkOpen(true)
   return true
- },attributes:{'aria-label':'Slide description',role:'textbox','aria-multiline':'true',style:'min-height:100px;padding:12px;outline:none'}}})
+ },attributes:{'aria-label':label,role:'textbox','aria-multiline':'true',style:'min-height:100px;padding:12px;outline:none'}}})
  // Cursor-only mark changes update stored marks without changing document content.
  // Subscribe to transactions so the toolbar reflects those changes immediately.
  const formatting=useEditorState({editor,selector:({editor})=>({
@@ -33,7 +33,7 @@ export default function SlideDescriptionEditor({content,onChange,disabled}:{cont
  const validLink=/^(https?:\/\/|mailto:|\/(?!\/)|#)\S+/i.test(href.trim())
  function applyLink(){
   if(!editor||disabled||!validLink)return
-  if(editor.chain().focus().extendMarkRange('link').setLink({href:href.trim()}).run())setLinkOpen(false)
+  if(editor.chain().focus().extendMarkRange('link').setLink({href:href.trim(),target:"_blank",rel:"noopener noreferrer"}).run())setLinkOpen(false)
  }
  function closeLink(){setLinkOpen(false);editor?.commands.focus()}
  return <div className="slide-description-editor" style={{display:'flex',flexDirection:'column',border:'1px solid var(--border)',borderRadius:8,marginBottom:16}}>

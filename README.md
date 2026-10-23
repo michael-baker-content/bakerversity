@@ -1,8 +1,39 @@
 # Bakerversity
 
-Bakerversity is an online course authoring platform for technical learning. It supports structured courses, rich lessons, reusable assets, and assessments. The current public offering is free; public courses can be read without an account. Recording progress and submitting assessments require sign-in.
+Bakerversity is an online course authoring platform for technical learning. Build lessons that combine code, mathematics, multilingual text, diagrams expressed as directory trees, images, and assessments in one visual editor. It is designed for explanations that need more than a video and a text box. The current public offering is free; public courses can be read without an account. Recording progress and submitting assessments require sign-in.
 
 Built with **Next.js 15**, **React 19**, **Tiptap 3**, **Supabase**, and **Clerk**, with KaTeX for mathematics and Mafs for graphs. Stripe webhook infrastructure is present; a complete commercial offering is not the current focus.
+
+## Why technical authors might use it
+
+- **Explain code and file formats:** syntax-highlighted code, terminal-style blocks, and editable directory trees suit programming, tooling, and localization lessons.
+- **Teach mathematical ideas:** KaTeX expressions and Mafs interactive graphs sit alongside the explanation, with tools enabled per course.
+- **Mix text and visual instruction:** text-and-image compositions, slideshows, callouts, tables, and shared footnotes support varied lesson structures and responsive reading.
+- **Work across languages:** label passages in English, Polish, German, Spanish, French, and Czech; use localization formats such as XLIFF, TMX, and TBX in code examples.
+- **Keep authoring manageable:** reusable course assets, optional asset tags, separate drafts/publications, revision history, and saved-draft lesson previews support ongoing course development.
+
+Localization engineering is the current teaching use case. Programming foundations and mathematics are also natural fits for these tools.
+
+### Content formats and boundaries
+
+The visual editor stores structured **Tiptap JSON in PostgreSQL**. Markdown, MDX, and plain-text files can be imported; Markdown is converted into editor nodes through a custom remark-based parser. Accepting an MDX file does not execute its JSX or provide an MDX component runtime. Course and module metadata are managed in the application, rather than through frontmatter or Git-backed lesson files.
+
+Authors can download HTML, Markdown, and plain text. Interactive components have sequential/static export representations; exports are not a complete course/database backup. Code and terminal blocks display examples; live code sandboxes, Jupyter notebook rendering, and Asciinema playback are not implemented.
+
+## Architecture and stack
+
+| Layer | Implementation |
+|---|---|
+| Application | Next.js 15 App Router, React 19, TypeScript |
+| Authoring | Tiptap 3 / ProseMirror with custom nodes and components |
+| Content rendering | Custom Tiptap JSON renderer; unified/remark for Markdown import |
+| Code and mathematics | Lowlight syntax highlighting, KaTeX math, Mafs graphs |
+| Database and files | Supabase PostgreSQL and Supabase Storage |
+| Authentication | Clerk; server-side instructor/admin authorization |
+| Styling | Custom CSS, shared theme variables, and next-themes |
+| Validation | Node regression tests, isolated PGlite database tests, Playwright browser smoke tests |
+
+The application is deployed on Vercel. A production Node deployment uses `npm run build` followed by `npm start`, with Supabase and Clerk configured separately. Docker images, AWS deployment templates, and a fully offline/self-contained installation are not supplied.
 
 ## Authoring
 
@@ -10,7 +41,7 @@ Built with **Next.js 15**, **React 19**, **Tiptap 3**, **Supabase**, and **Clerk
 - Save drafts separately from published content. Version checks protect against stale saves; recovery downloads help preserve work after uncertain responses.
 - Load earlier revisions into the editor for review before saving or publishing.
 - Preview a lesson's **saved draft**, including attached resources, without publishing. The preview is restricted to its instructor and admins. Its draft notice appears when the saved content/resources differ from publication, or the lesson is unpublished. Unsaved editor changes are not included.
-- Use course-enabled mathematics, interactive graphs, code blocks, terminal blocks, callouts, and inline practice quizzes. Writing tools include search/replace, highlighting, language annotations, and optional invisible characters.
+- Use course-enabled mathematics, interactive graphs, code blocks, terminal blocks, callouts, and inline practice quizzes. Writing tools include search/replace, highlighting, language annotations, and optional invisible characters. Authored links open in a new tab in reader views and HTML downloads; footnote references and return links navigate within the page.
 - Paste editable [directory trees](docs/directory-trees.md), with collapsible folders, file paths, notes, and highlighted entries.
 - Highlight localization formats including YAML, XML, TOML, XLIFF, TMX, TBX, Java properties, and INI, alongside Python, JavaScript/TypeScript, shell languages, SQL, Markdown, and other offered formats.
 
@@ -21,7 +52,7 @@ Course-page and assessment preview links still use their existing published view
 The course overview includes a standalone expandable **Course asset library**. It also appears in content editors and through the editor's **Image** button.
 
 - Upload multiple images/files into a course library and reuse them without uploading again.
-- Search names and original filenames, filter All files / Images / PDFs / Other files, and sort newest/oldest uploaded or Name A–Z. Search runs across the whole course library, updates after a short typing pause, and shows matching counts.
+- Search asset names, original filenames, and optional tags, filter All files / Images / PDFs / Other files, and sort newest/oldest uploaded or Name A–Z. Search runs across the whole course library, updates after a short typing pause, and shows matching counts.
 - Switch between tiles and a text list; the browser remembers your preference. Expand a file for actions and metadata; non-image tiles show the file extension.
 - Edit course-specific default alt text and captions. Selecting an image prefills those defaults; each placement can override them independently.
 - Replace an image while preserving its placement descriptions. Set a maximum width in pixels, with responsive sizing on smaller screens.
@@ -39,13 +70,37 @@ Inline practice quizzes are separate, ungraded lesson content and do not create 
 
 ## Local setup
 
-Use **Node.js 24** (matching GitHub Actions) and npm.
+Use **Node.js 24** (matching GitHub Actions) and npm. Start from a local checkout of this repository. A functioning authoring installation also needs a Supabase project and a Clerk application; there is no zero-configuration demo mode.
 
-1. Run `npm ci` to install the lockfile's dependencies.
-2. Copy `.env.example` to `.env.local` and configure Supabase and Clerk credentials. Never commit populated environment files.
-3. For an existing database, apply only unapplied migrations in chronological order using [the migration guide](supabase/MIGRATIONS.md). For a fresh database, use the generated `supabase/schema.sql`; do not then replay its included migrations.
-4. Configure Clerk's user-sync webhook at `/api/webhooks/clerk` and the required Supabase Storage buckets/policies for uploads. Database schema installation alone does not provision storage or external services. See [PDF uploads](docs/pdf-uploads.md) and [foundation architecture](docs/foundation.md).
-5. Start development with `npm run dev` when ready. The project owner controls local server startup and shutdown.
+Install dependencies and create the local configuration file:
+
+```sh
+npm ci
+```
+
+Copy `.env.example` to `.env.local` using your file manager, `Copy-Item .env.example .env.local` in PowerShell, or `cp .env.example .env.local` on macOS/Linux. Never commit populated environment files.
+
+| Required setting | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project endpoint and public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Privileged server-side database/storage operations |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk sign-in and server authentication |
+| `CLERK_WEBHOOK_SECRET` | Verifies Clerk user-sync events |
+
+Before authoring:
+
+1. **Install the database schema.** For a fresh database, use the generated `supabase/schema.sql`; do not then replay its included migrations. For an existing database, apply only unapplied migrations in chronological order using [the migration guide](supabase/MIGRATIONS.md).
+2. **Connect user synchronization.** Configure Clerk's webhook at `/api/webhooks/clerk` for `user.created`, `user.updated`, and `user.deleted`. Local webhook delivery needs a reachable development URL; Clerk cannot deliver directly to localhost. Set the endpoint's signing secret in `CLERK_WEBHOOK_SECRET`.
+3. **Grant authoring access.** Sign up and confirm your account appears in Supabase's `public.users` table. New accounts start as students. In the Supabase dashboard, identify your own row by Clerk ID and set its `role` to `instructor` (or `admin` for site administration). Sign-in alone does not grant authoring access.
+4. **Provision storage.** Create/configure the public `lesson-images` and `lesson-slides` buckets with appropriate MIME/size restrictions. Schema installation does not provision Storage or external services. Uploads are authorized by server handlers; never grant anonymous write access. See [PDF uploads](docs/pdf-uploads.md) and [foundation architecture](docs/foundation.md).
+
+Start the app when ready:
+
+```sh
+npm run dev
+```
+
+Open [localhost:3000](http://localhost:3000), sign in, and visit `/admin/courses`. Create a test course and lesson, save a draft, and open its preview to check the authoring path. Verify uploads separately after configuring Storage. Stop the development process with Ctrl+C.
 
 Development output uses `.next-dev`; production builds use `.next`. Both are ignored by Git. This separation prevents production builds from overwriting an active development server's generated chunks. `npm start` serves a completed production build.
 
@@ -75,7 +130,7 @@ npm run test:smoke
 
 **The smoke test starts a temporary local server.** Run it locally only when desired; otherwise rely on GitHub Actions. It uses isolated data and selected real UI components, with substitute authentication/API routing. It does not verify live Clerk, Supabase Storage, or Vercel configuration. See [authoring reliability](docs/authoring-reliability.md) for coverage and limitations.
 
-Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610200001_course_asset_names.sql`; apply it before deploying course-specific asset names and named downloads. The preceding `202610190001_course_assets.sql` migration was confirmed applied. Do not rerun preceding migrations.
+Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610230001_course_asset_tags.sql`, which adds optional course-specific asset tags. Consult the migration guide and your database migration history before applying anything.
 
 The legacy `npm run lint` script invokes interactive ESLint setup when no configuration is present. It is not part of the current CI checks; use the commands above. A standalone lint configuration remains separate work.
 
@@ -87,7 +142,7 @@ The legacy `npm run lint` script invokes interactive ESLint setup when no config
 | `src/app/courses/` | Student course, lesson, page, and assessment routes |
 | `src/app/api/admin/` | Authorized authoring and asset operations |
 | `src/components/TipTapEditor.tsx` | Rich editor, image placement, course-library integration |
-| `src/components/AssetLibrary.tsx` | Course asset browser, uploads, image defaults |
+| `src/components/AssetLibrary.tsx` | Course asset browser, uploads, image defaults, optional tags and shared search |
 | `src/components/LessonViewerPage.tsx` | Shared published/saved-draft lesson presentation |
 | `src/components/LessonAssets.tsx` | Published and authorized preview resource links |
 | `src/components/editor/`, `renderer/` | Editor extensions and student rendering |
@@ -105,6 +160,8 @@ After adding a migration, run `npm run db:generate` and include both generated a
 ## Editor components
 
 Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, Technical, and Components; downloads use a shared format picker. The [Text and image component](docs/text-image-component.md) supports left/right image placement, full-column images, vertical text alignment, stacked presentation and sequential exports. The [Slideshow component](docs/image-slideshow-component.md) supports manual student navigation and a unified slide-editing modal with course-library selection, image upload, required alt text, optional captions and basic description formatting. Advanced description tools remain deferred. Unrestricted column layouts remain deferred. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
+
+Footnotes can be enabled per course, with automatic numbering, shared references and basic rich-text notes. See the [footnote guide](docs/footnotes.md).
 
 ## Further documentation
 

@@ -8,7 +8,7 @@ for (const tool of INSERT_TOOLS) {
 }
 assert.deepEqual(availableInsertTools([]).map(t=>t.id),['slideshow','text-image','image','table','directory-tree','callout','quiz'])
 assert.deepEqual(availableInsertTools(['math']).filter(t=>t.requiredPack).map(t=>t.id),['formula','activate-latex'])
-assert.equal(availableInsertTools(['math','code','graph','terminal']).length,INSERT_TOOLS.length)
+assert.equal(availableInsertTools(['math','code','graph','terminal','footnotes']).length,INSERT_TOOLS.length)
 assert.deepEqual(availableInsertTools(['unknown']),availableInsertTools([]))
 assert.equal(INSERT_TOOLS.find(t=>t.id==='terminal').nodeTypes[0],'terminalBlock')
 assert.ok(!INSERT_TOOLS.some(t=>t.nodeTypes.includes('columns')))

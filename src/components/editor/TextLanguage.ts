@@ -1,4 +1,5 @@
 import { Mark } from '@tiptap/core'
+import { normalizeTextLanguage } from '../../lib/textLanguages.mjs'
 
 // An inline language override, independent of code-block syntax languages.
 export const TextLanguage = Mark.create({
@@ -8,11 +9,11 @@ export const TextLanguage = Mark.create({
     return {
       language: {
         default: null,
-        parseHTML: element => ['en', 'pl'].includes(element.getAttribute('lang') ?? '') ? element.getAttribute('lang') : null,
-        renderHTML: attributes => ['en', 'pl'].includes(attributes.language) ? { lang: attributes.language } : {},
+        parseHTML: element => normalizeTextLanguage(element.getAttribute('lang')),
+        renderHTML: attributes => normalizeTextLanguage(attributes.language) ? { lang: normalizeTextLanguage(attributes.language) } : {},
       },
     }
   },
-  parseHTML() { return [{ tag: 'span[lang="en"]' }, { tag: 'span[lang="pl"]' }] },
+  parseHTML() { return [{ tag: 'span[lang]', getAttrs: element => normalizeTextLanguage(element.getAttribute('lang')) ? null : false }] },
   renderHTML({ HTMLAttributes }) { return ['span', HTMLAttributes, 0] },
 })

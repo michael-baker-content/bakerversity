@@ -3,10 +3,12 @@ import type {JSONContent} from '@tiptap/core'
 import SlideDescriptionEditor from './SlideDescriptionEditor'
 import {useEffect,useRef,useState} from 'react'
 import {createPortal} from 'react-dom'
+import {parseAssetTags} from '../../lib/assetTags.mjs'
 import {requestJson} from '../../lib/authoring/request'
 import {imageMaxWidth} from '../../lib/imageWidth.mjs'
-export interface SlideImageDraft {description?:JSONContent;src:string;alt:string;title:string;pos:number|null;assetId?:string;assetName?:string;creditName?:string|null;creditUrl?:string|null;width?:number;height?:number;maxWidth?:string;alignment?:'left'|'center'}
+export interface SlideImageDraft {tags?:string[];description?:JSONContent;src:string;alt:string;title:string;pos:number|null;assetId?:string;assetName?:string;creditName?:string|null;creditUrl?:string|null;width?:number;height?:number;maxWidth?:string;alignment?:'left'|'center'}
 export default function SlideImageModal({initial,courseId,onSubmit,onClose,onChoose,onUnsplash}:{initial:SlideImageDraft;courseId?:string;onSubmit:(draft:SlideImageDraft,another:boolean)=>boolean;onClose:()=>void;onChoose:(draft:SlideImageDraft)=>void;onUnsplash:(draft:SlideImageDraft)=>void}){
+ const [tagInput,setTagInput]=useState((initial.tags??[]).join(', '))
  const [draft,setDraft]=useState(initial),[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[defaults,setDefaults]=useState(false),[another,setAnother]=useState(false)
  const dialog=useRef<HTMLDialogElement>(null),input=useRef<HTMLInputElement>(null),preview=useRef<string|null>(null)
  useEffect(()=>{dialog.current?.showModal();return ()=>{if(preview.current)URL.revokeObjectURL(preview.current)}},[])
@@ -15,16 +17,17 @@ export default function SlideImageModal({initial,courseId,onSubmit,onClose,onCho
   setBusy(true);setError('')
   let saved=draft
   try{
+   const tags=parseAssetTags(tagInput)
    if(file){
     const body=new FormData();body.append('file',file)
     const result=await requestJson<{asset_id:string;url:string}>('/api/admin/assets?kind=image'+(courseId?'&course_id='+encodeURIComponent(courseId):''),{method:'POST',body},'slide image upload')
     if(!result.url||!result.asset_id)throw new Error('The upload did not return an image. Check the library before retrying.')
     saved={...draft,src:result.url,assetId:result.asset_id};setDraft(saved);setFile(null)
    }
-   if(defaults&&saved.assetId&&courseId){
-    await requestJson('/api/admin/assets?course_id='+encodeURIComponent(courseId),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:saved.assetId,display_name:saved.assetName,alt_text:saved.alt.trim(),caption:saved.title})},'slide image details save')
+   if(saved.assetId&&courseId&&(defaults||JSON.stringify(tags)!==JSON.stringify(initial.tags??[]))){
+    await requestJson('/api/admin/assets?course_id='+encodeURIComponent(courseId),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:saved.assetId,tags,...(defaults?{display_name:saved.assetName,alt_text:saved.alt.trim(),caption:saved.title}:{})})},'slide image details save')
    }
-   if(!onSubmit({...saved,alt:saved.alt.trim()},another))setError('Unable to update the slideshow. Your settings are still here.')
+   if(!onSubmit({...saved,tags,alt:saved.alt.trim()},another))setError('Unable to update the slideshow. Your settings are still here.')
   }catch(e){setError(e instanceof Error?e.message:'Unable to save the slide.')}
   finally{setBusy(false)}
  }
@@ -41,10 +44,11 @@ export default function SlideImageModal({initial,courseId,onSubmit,onClose,onCho
   const selected=e.target.files?.[0];e.target.value='';if(!selected)return
   if(!['image/jpeg','image/png','image/webp','image/gif'].includes(selected.type)||selected.size>50*1024*1024){setError('Choose a JPEG, PNG, WebP or GIF image up to 50 MB.');return}
   if(preview.current)URL.revokeObjectURL(preview.current);preview.current=URL.createObjectURL(selected)
-  setFile(selected);setDefaults(true);setError('');setDraft(current=>({...current,src:preview.current!,assetId:undefined,assetName:selected.name,creditName:null,creditUrl:null,width:undefined,height:undefined}))
+  setFile(selected);setTagInput('');setDefaults(true);setError('');setDraft(current=>({...current,src:preview.current!,assetId:undefined,assetName:selected.name,tags:[],creditName:null,creditUrl:null,width:undefined,height:undefined}))
  }}/>
  {draft.creditName&&<p>Photo by {draft.creditName} on Unsplash</p>}
  {(draft.assetId||file)&&<label style={{display:'block',marginBottom:12}}>Asset name<input aria-label="Asset name" className="input" maxLength={200} value={draft.assetName??''} onChange={e=>{setDraft({...draft,assetName:e.target.value});setDefaults(true)}}/></label>}
+ {courseId&&(draft.assetId||file)&&<label style={{display:'block',marginBottom:12}}>Tags (optional)<input aria-label="Tags" className="input" placeholder="Separate tags with commas" value={tagInput} onChange={e=>setTagInput(e.target.value)}/></label>}
  <label style={{display:'block',marginBottom:12}}>Alt text (required)<textarea aria-label="Alt text" className="input" required maxLength={2000} rows={3} value={draft.alt} onChange={e=>setDraft({...draft,alt:e.target.value})}/></label>
  <label style={{display:'block',marginBottom:12}}>Caption (optional)<textarea aria-label="Caption" className="input" maxLength={5000} rows={2} value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></label>
  <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>Description (optional)</div>

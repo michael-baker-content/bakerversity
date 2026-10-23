@@ -1,3 +1,4 @@
+import {collectFootnotes} from './footnotes.mjs'
 import { directoryTreeText } from './directoryTree.mjs'
 function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): string {
   const type = node.type as string
@@ -6,6 +7,7 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
   const children = () => content.map((n) => nodeToMd(n, indent)).join('')
 
   switch (type) {
+    case 'footnote': return '[^'+String(attrs.id)+']'
     case 'slideshow': return (attrs.title?'### '+String(attrs.title)+'\n\n':'')+content.map(n=>nodeToMd(n)).join('\n')+'\n'
     case 'slideshowSlide': return content.map(n=>nodeToMd(n)).join('\n')+'\n'
     case 'slideshowDescription': return children()
@@ -67,6 +69,14 @@ function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): str
 }
 
 export function jsonToMarkdown(doc: Record<string, unknown>): string {
-  return nodeToMd(doc).trim()
+  const notes=collectFootnotes(doc)
+  // Stable IDs are internal; exported Markdown uses the displayed numbers.
+  const numbered=JSON.parse(JSON.stringify(doc))
+  const walk=(node:Record<string,unknown>)=>{
+    if(node.type==='footnote'){const attrs=node.attrs as {id:string};attrs.id=String(notes.find(note=>note.id===attrs.id)?.number??'?')}
+    for(const child of (node.content??[]) as Record<string,unknown>[])walk(child)
+  }
+  walk(numbered)
+  return nodeToMd(numbered).trim()+(notes.length?'\n\n'+notes.map(note=>'[^'+note.number+']: '+nodeToMd(note.body).trim().replace(/\n/g,'\n    ')).join('\n\n'):'')
 }
 

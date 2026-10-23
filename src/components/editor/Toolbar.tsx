@@ -18,6 +18,7 @@ interface ToolbarProps {
   filenameInput: string
   lintDiagnostics: { line: number; message: string; severity: 'error' | 'warning' }[]
   onFileClick: () => void
+  onFootnoteClick: () => void
   onSlideshowClick: () => void
   onTextImageClick: () => void
   onActivateLatex?: () => void
@@ -38,7 +39,7 @@ function ToolbarButton({ onClick, active, children, label }: { onClick: () => vo
 export function Toolbar({
   editor, packs, uploading, showCalloutPicker, showTerminalModal,
   terminalContent, filenameInput, lintDiagnostics,
-  onFileClick, onSlideshowClick, onTextImageClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
+  onFileClick, onFootnoteClick, onSlideshowClick, onTextImageClick, onActivateLatex, onLatexButtonClick, onGraphButtonClick, onInsertTerminal,
   onInsertPracticeQuiz,
   setShowCalloutPicker, setShowTerminalModal, setTerminalContent, setFilenameInput,
 }: ToolbarProps) {
@@ -50,6 +51,7 @@ export function Toolbar({
   const [openCategories, setOpenCategories] = useState<string[]>([])
   const tools = availableInsertTools(packs)
   const actions: Record<InsertToolId, () => void> = {
+    footnote: onFootnoteClick,
     slideshow: onSlideshowClick,
     image: onFileClick,
     'text-image': onTextImageClick,
@@ -99,7 +101,7 @@ export function Toolbar({
                   {category.label}<span aria-hidden="true">{open ? '−' : '+'}</span>
                 </button>
                 <div id={groupId} className="editor-category-tools" data-open={open}>
-                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool" disabled={editor.isActive('textImage') || (editor.isActive('slideshow') && !['formula','activate-latex'].includes(tool.id))}
+                  {categoryTools.map(tool => <button key={tool.id} type="button" className="editor-tool" disabled={(tool.id==='footnote'&&!editor.state.selection.$to.parent.type.contentMatch.matchType(editor.schema.nodes.footnote)) || (editor.isActive('textImage') && tool.id!=='footnote') || (editor.isActive('slideshow') && !['formula','activate-latex'].includes(tool.id))}
                     aria-label={tool.id === 'formula' ? 'Formula — type $x$ or $$x$$ then Space, or insert with this tool' : undefined}
                     aria-expanded={tool.id === 'callout' ? showCalloutPicker : undefined}
                     aria-pressed={tool.kind === 'block' && tool.id !== 'callout' ? editor.isActive(tool.nodeTypes[0]) : undefined}
@@ -115,7 +117,7 @@ export function Toolbar({
       } />
       {linkOpen && <div className="editor-context" aria-label="Link settings">
         <label>Link URL <input className="input" aria-label="Link URL" value={linkUrl} onChange={e=>setLinkUrl(e.target.value)} placeholder="https://"/></label>
-        <button type="button" className="editor-tool" disabled={!validLink} onClick={()=>{editor.chain().focus().extendMarkRange('link').setLink({href:linkUrl.trim()}).run();setLinkOpen(false)}}>Apply link</button>
+        <button type="button" className="editor-tool" disabled={!validLink} onClick={()=>{editor.chain().focus().extendMarkRange('link').setLink({href:linkUrl.trim(),target:"_blank",rel:"noopener noreferrer"}).run();setLinkOpen(false)}}>Apply link</button>
         <button type="button" className="editor-tool" onClick={()=>{editor.chain().focus().extendMarkRange('link').unsetLink().run();setLinkOpen(false)}}>Remove link</button>
         <button type="button" className="editor-tool" onClick={()=>setLinkOpen(false)}>Cancel</button>
       </div>}

@@ -1,4 +1,9 @@
 'use client'
+import {FootnoteNode} from './editor/FootnoteNode'
+import FootnotesPreview from './editor/FootnotesPreview'
+import FootnoteModal from './editor/FootnoteModal'
+import {collectFootnotes,footnoteSection,footnoteReference,footnoteText} from '../lib/footnotes.mjs'
+import {renderNode} from './renderer/renderNode'
 import {SlideshowNode,SlideshowSlide} from './editor/SlideshowNode'
 import {SlideshowDescription} from './editor/SlideshowExtension'
 import { TextImageNode } from './editor/TextImageNode'
@@ -58,7 +63,7 @@ const NoInputRules = Extension.create({
   addInputRules() { return [] },
 })
 
-export type EditorPack = 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
+export type EditorPack = 'footnotes' | 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
 interface TipTapEditorProps {
   courseId?: string
@@ -108,6 +113,7 @@ export default function TipTapEditor({
 
   const replacementInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
+  const [footnoteTarget,setFootnoteTarget]=useState<{id?:string;pos?:number}|null>(null)
   const [slideshowTarget,setSlideshowTarget]=useState<string|null>(null)
   const [textImagePlacement, setTextImagePlacement] = useState<'left'|'right'|null>(null)
   const componentLoadError = textImageError(content)
@@ -117,6 +123,7 @@ export default function TipTapEditor({
   const [imageModal, setImageModal] = useState<{
     src: string
     description?: import('@tiptap/core').JSONContent
+    tags?: string[]
     assetId?: string
     assetName?: string
     width?: number
@@ -136,7 +143,7 @@ export default function TipTapEditor({
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
-    StarterKit.configure({ codeBlock: false, link: {openOnClick:false,autolink:false}, underline: false, trailingNode: false }),
+    StarterKit.configure({ codeBlock: false, link: {openOnClick:false,autolink:false,HTMLAttributes:{target:"_blank",rel:"noopener noreferrer"}}, underline: false, trailingNode: false }),
     NoInputRules,
     Highlight.configure({ HTMLAttributes: { style: 'background-color:#fef08a;color:#1f2937' } }),
     TextLanguage,
@@ -159,7 +166,7 @@ export default function TipTapEditor({
     TerminalNode,
     ...(hasPythonLint ? [PythonLintExtension] : []),
     PracticeQuizNode,
-    DirectoryTreeNode, SlideshowNode, SlideshowSlide, SlideshowDescription, TextImageNode.configure({onInvalid:setComponentEditError}), TextImageBody,
+    DirectoryTreeNode, FootnoteNode, SlideshowNode, SlideshowSlide, SlideshowDescription, TextImageNode.configure({onInvalid:setComponentEditError}), TextImageBody,
   ]
 
   // ── Editor ─────────────────────────────────────────────────────────────────
@@ -265,6 +272,8 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor) return
     const track = ({transaction}: {transaction: import('@tiptap/pm/state').Transaction}) => {
+      const footnote=transaction.getMeta('editFootnote')
+      if(footnote)setFootnoteTarget(footnote)
       const slideshowId=transaction.getMeta('addSlideshowImage')
       if(typeof slideshowId==='string'){setSlideshowTarget(slideshowId);setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}
       const imagePosition=transaction.getMeta('editComponentImage')
@@ -377,9 +386,23 @@ export default function TipTapEditor({
         const display=element.hasAttribute('data-block-math')
         element.innerHTML=katex.renderToString(element.getAttribute(display?'data-block-math':'data-inline-math')??'',{throwOnError:false,displayMode:display,output:'mathml'})
       })
-      content = htmlDownloadDocument(document.body.innerHTML)
+      // Normalize old/imported link targets before adding in-page footnote navigation.
+      document.querySelectorAll('a[href]').forEach(link=>{
+        link.setAttribute('target','_blank')
+        link.setAttribute('rel','noopener noreferrer')
+      })
+      const notes=collectFootnotes(editor.getJSON());let occurrence=0
+      document.querySelectorAll('[data-footnote]').forEach(reference=>{
+        const note=notes.find(note=>note.id===reference.getAttribute('data-footnote'))
+        if(note)reference.outerHTML=footnoteReference(note.number,++occurrence,'download')
+      })
+      content = htmlDownloadDocument(document.body.innerHTML+footnoteSection(notes,(body:Record<string,unknown>)=>renderNode(body),'download'))
     }
-    else if (format === 'txt') content = editor.getText()
+    else if (format === 'txt') {
+      const notes=collectFootnotes(editor.getJSON())
+      content=editor.getText({textSerializers:{footnote:({node})=>'['+(notes.find(note=>note.id===node.attrs.id)?.number??'?')+']'}})
+      if(notes.length)content+='\n\nFootnotes\n'+notes.map(note=>note.number+'. '+footnoteText(note.body)).join('\n\n')
+    }
     else content = jsonToMarkdown(editor.getJSON() as Record<string, unknown>)
     const blob = new Blob([content], { type: format === 'html' ? 'text/html;charset=utf-8' : format === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -483,6 +506,7 @@ export default function TipTapEditor({
               terminalContent={terminalContent}
               filenameInput={filenameInput}
               lintDiagnostics={lintDiagnostics}
+              onFootnoteClick={()=>setFootnoteTarget({})}
               onSlideshowClick={() => {setSlideshowTarget('new');setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
               onTextImageClick={() => {setSlideshowTarget(null);setTextImagePlacement('right');if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
               onFileClick={() => {setSlideshowTarget(null);setTextImagePlacement(null);if(courseId)setLibraryMode('insert');else fileInputRef.current?.click()}}
@@ -513,6 +537,7 @@ export default function TipTapEditor({
         <EditorContent editor={editor} style={{ padding: '1rem', fontSize: 15, lineHeight: 1.7 }} />
       </div>
 
+      {editor&&<FootnotesPreview editor={editor}/>}
       {/* LaTeX edit modal — triggered by double-clicking a formula */}
       {editingLatex && (
         <LatexModal
@@ -546,20 +571,21 @@ export default function TipTapEditor({
           <AssetLibrary key={courseId} pickImmediately={slideFlow} courseId={courseId} initiallyOpen onPendingChanges={setLibraryDirty} onPickImage={asset=>{
             if(!canLeaveLibrary())return
             setImageError('')
-            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,assetId:asset.id,assetName:asset.title,creditName:null,creditUrl:null,width:undefined,height:undefined}:current)
-            else setImageModal({src:asset.url,assetId:asset.id,assetName:asset.title,alt:asset.alt_text??'',title:asset.caption??'',pos:null})
+            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,assetId:asset.id,assetName:asset.title,tags:asset.tags??[],creditName:null,creditUrl:null,width:undefined,height:undefined}:current)
+            else setImageModal({src:asset.url,assetId:asset.id,assetName:asset.title,tags:asset.tags??[],alt:asset.alt_text??'',title:asset.caption??'',pos:null})
             setLibraryMode(null)
           }} />
         </section>
       </div>}
       {unsplashMode && <UnsplashPicker onClose={()=>{setLibraryMode(unsplashMode);setUnsplashMode(null)}} onSelect={photo=>{
         setImageError('')
-        const selected={assetId:undefined,assetName:undefined,src:photo.regular,alt:(photo.alt??'').trim(),creditName:photo.photographer_name,creditUrl:photo.photographer_url,width:undefined,height:undefined}
+        const selected={assetId:undefined,assetName:undefined,tags:undefined,src:photo.regular,alt:(photo.alt??'').trim(),creditName:photo.photographer_name,creditUrl:photo.photographer_url,width:undefined,height:undefined}
         if(unsplashMode==='replace')setImageModal(current=>current?{...current,...selected}:current)
         else setImageModal({...selected,title:'',pos:null})
         setUnsplashMode(null)
       }} />}
       {imageModal && componentImage==='slideshow' && !unsplashMode && !libraryMode && <SlideImageModal initial={{...imageModal,description:imageModal.description??(imageModal.pos!==null?{type:'doc',content:editor?.state.doc.nodeAt(imageModal.pos+1)?.toJSON().content}:undefined)}} courseId={courseId} onSubmit={applyImage} onClose={()=>{setImageModal(null);setImageError('')}} onChoose={draft=>{setImageModal(draft);setLibraryMode('replace')}} onUnsplash={draft=>{setImageModal(draft);setUnsplashMode('replace')}}/>}
+      {editor&&footnoteTarget&&<FootnoteModal editor={editor} target={footnoteTarget} onClose={()=>setFootnoteTarget(null)}/>}
       {/* Image alt/caption modal */}
       {imageModal && componentImage!=='slideshow' && !unsplashMode && (
         <div style={{position:'fixed', inset:0, zIndex:1000, pointerEvents:'none'}}>

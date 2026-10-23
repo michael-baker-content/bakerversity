@@ -181,7 +181,7 @@ export default async function HomePage() {
                 {
                   icon: '語',
                   title: 'Multilingual text',
-                  body: 'English and Polish passages with language labels, bringing language-specific characters and writing into technical lessons.',
+                  body: 'English, Polish, German, Spanish, French, and Czech passages with language labels, bringing language-specific characters and writing into technical lessons.',
                   color: 'var(--amber)',
                 },
                 {

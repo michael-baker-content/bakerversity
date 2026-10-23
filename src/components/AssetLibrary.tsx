@@ -1,11 +1,12 @@
 'use client'
+import {parseAssetTags} from '@/lib/assetTags.mjs'
 import { useEffect, useState, useRef, useId } from 'react'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
-export type Asset = { id: string; title: string; download_url?: string | null; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
-type DescriptionDraft = {name:string;alt:string;caption:string}
+export type Asset = { tags?:string[]; id: string; title: string; download_url?: string | null; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
+type DescriptionDraft = {name:string;alt:string;caption:string;tags:string}
 type LibraryResults = Asset[] | {items:Asset[];total:number;courseTotal:number}
 function unpackResults(result:LibraryResults) {
   if(Array.isArray(result))return {items:result,total:null,courseTotal:null}
@@ -101,7 +102,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
     </>}
     <p role="status">{message}</p>
     {courseId && <div className="asset-search-controls">
-      <label>Search files<input className="input" type="search" maxLength={200} placeholder="Name or filename" value={search} disabled={busy} onChange={e=>{setSearch(e.target.value);if(!e.target.value)setQuery('')}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setQuery(search.trim())}}} /></label>
+      <label>Search files<input className="input" type="search" maxLength={200} placeholder="Name, filename or tag" value={search} disabled={busy} onChange={e=>{setSearch(e.target.value);if(!e.target.value)setQuery('')}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setQuery(search.trim())}}} /></label>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setQuery(search.trim())}>Search</button>
       <label><span id={labelId+'-type'}>File type</span><select aria-labelledby={labelId+'-type'} className="input" value={fileType} disabled={busy} onChange={e=>setFileType(e.target.value)}><option value="all">All files</option><option value="images">Images</option><option value="pdf">PDFs</option><option value="other">Other files</option></select></label>
       <label><span id={labelId+'-sort'}>Sort</span><select aria-labelledby={labelId+'-sort'} className="input" value={sort} disabled={busy} onChange={e=>setSort(e.target.value)}><option value="newest">Newest uploaded</option><option value="oldest">Oldest uploaded</option><option value="name">Name A–Z</option></select></label>
@@ -133,7 +134,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
           </summary>
           <div className="asset-browser-options">
             <div className="asset-file-meta"><span>{extension === 'FILE' && isImage ? 'Image' : extension}</span><span>{a.byte_size < 1048576 ? Math.max(1,Math.ceil(a.byte_size/1024))+' KB' : (a.byte_size/1048576).toFixed(1)+' MB'}</span></div>
-            {courseId && <AssetDetails asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(name,alt,caption)=>{knownNames.current[a.id]=name;setAssets(rows=>rows.map(row=>row.id===a.id?{...row,title:name,alt_text:alt,caption}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
+            {courseId && <AssetDetails asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(name,alt,caption,tags)=>{knownNames.current[a.id]=name;setAssets(rows=>rows.map(row=>row.id===a.id?{...row,title:name,alt_text:alt,caption,tags}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
             <div className="asset-file-actions">
               {a.download_url&&<a className="btn btn-ghost btn-sm" href={a.download_url}>Download</a>}
         {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy||!!descriptionDrafts[draftKey]} title={descriptionDrafts[draftKey]?'Save or discard the asset details before using this image':undefined} onClick={()=>onPickImage(a)}>Use image</button>}
@@ -197,20 +198,21 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
   </details>
 }
 
-function AssetDetails({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Asset;draft?:DescriptionDraft;onDraft:(draft:DescriptionDraft|null)=>void;endpoint:string;disabled:boolean;onSaved:(name:string,alt:string,caption:string)=>void}) {
- const original={name:asset.title,alt:asset.alt_text??'',caption:asset.caption??''}
+function AssetDetails({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Asset;draft?:DescriptionDraft;onDraft:(draft:DescriptionDraft|null)=>void;endpoint:string;disabled:boolean;onSaved:(name:string,alt:string,caption:string,tags:string[])=>void}) {
+ const original={name:asset.title,alt:asset.alt_text??'',caption:asset.caption??'',tags:(asset.tags??[]).join(', ')}
  const fields=draft??original
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
  const isImage=!!asset.mime_type?.startsWith('image/')
- function change(patch:Partial<DescriptionDraft>){const next={...fields,...patch};onDraft(next.name===original.name&&next.alt===original.alt&&next.caption===original.caption?null:next)}
+ function change(patch:Partial<DescriptionDraft>){const next={...fields,...patch};onDraft(next.name===original.name&&next.alt===original.alt&&next.caption===original.caption&&next.tags===original.tags?null:next)}
  return <section className="asset-description-editor" aria-label="Asset details">
  <h4>Asset details {draft&&<span style={{fontSize:11,fontWeight:400,color:'var(--amber-label)'}}> · Unsaved</span>}</h4>
  <label style={{gridColumn:'1 / -1'}}>Asset name<input className="input" aria-label="Asset name" required maxLength={200} value={fields.name} disabled={busy||disabled} onChange={e=>change({name:e.target.value})} /></label>
+ <label style={{gridColumn:'1 / -1'}}>Tags (optional)<input aria-label="Tags" className="input" placeholder="e.g. terminology, module 1, diagrams" value={fields.tags} disabled={busy||disabled} onChange={e=>change({tags:e.target.value})}/><span style={{fontSize:12,color:'var(--text-3)'}}>Separate tags with commas.</span></label>
  {isImage&&<><label>Alt text<textarea aria-label="Alt text" className="input" rows={3} maxLength={2000} value={fields.alt} disabled={busy||disabled} onChange={e=>change({alt:e.target.value})} /></label>
  <label>Caption <span className="asset-field-optional">(optional)</span><textarea aria-label="Caption" className="input" rows={3} maxLength={5000} value={fields.caption} disabled={busy||disabled} onChange={e=>change({caption:e.target.value})} /></label></>}
  <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled||!draft||!fields.name.trim()} onClick={async()=>{
    setBusy(true);setMessage('')
-   try{await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,display_name:fields.name,alt_text:fields.alt,caption:fields.caption})},'asset details save');onSaved(fields.name.trim(),fields.alt,fields.caption);setMessage('Details saved.')}
+   try{const tags=parseAssetTags(fields.tags);await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,display_name:fields.name,alt_text:fields.alt,caption:fields.caption,tags})},'asset details save');onSaved(fields.name.trim(),fields.alt,fields.caption,tags);setMessage('Details saved.')}
    catch(e){setMessage(e instanceof Error?e.message:'Save failed')}
    finally{setBusy(false)}
  }}>{busy?'Saving…':'Save details'}</button>

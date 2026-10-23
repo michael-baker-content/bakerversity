@@ -7,5 +7,6 @@ export const nestedContent={type:'doc',content:[
  {type:'table',content:[{type:'tableRow',content:[{type:'tableCell',content:[paragraph('Graph cell'),{type:'mafsGraph',attrs:{functions:[],xMin:-5,xMax:5,yMin:-5,yMax:5,showGrid:true,label:'Nested graph'}}]}]}]},
  {type:'directoryTree',attrs:{source:'root/\n└── file.txt',title:'Files'}},
  {type:'slideshow',attrs:{id:'fixture',title:'Slideshow fixture'},content:[1,2].map(n=>({type:'slideshowSlide',content:[{type:'image',attrs:{src:'/fixture-slide-'+n+'.png',alt:'Slide image '+n}},{type:'slideshowDescription',content:[paragraph('Slide description '+n),{type:'paragraph',content:[{type:'inlineMath',attrs:{latex:'x^2'}}]}]}]}))},
+ {type:'paragraph',content:[{type:'text',text:'Footnote example '},...[1,2].map(()=>({type:'footnote',attrs:{id:'reader-note',body:{type:'doc',content:[paragraph('Reader footnote text')]}}}))]},
  paragraph('After nested content')
 ]}

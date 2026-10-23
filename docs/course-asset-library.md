@@ -46,3 +46,11 @@ Run npm test for the search helper checks, including matches beyond 50 assets, U
 The library now shows exact matching/loaded counts, removes Load more when all matches are shown, and remembers tile/list preference in browser storage. Storage restrictions fall back to tiles without breaking the library. Unsaved image description edits survive filtering and pagination; they are marked Unsaved with a Discard edits action. Save/discard before using that image, and confirm before closing a picker with pending description changes. Existing resource selections remain unchanged by searches.
 
 Expanded browser smoke assertions cover live search, PDF filtering, result counts, view preference, and description edit preservation. Those assertions run in GitHub Actions; no local server was launched for this pass.
+
+## Optional tags
+
+Asset details include comma-separated tags for images and other files. Tags belong to the course, not the underlying storage object. Search files matches tags as well as the asset name and original filename, including in the image and slideshow pickers. Matching is case-insensitive. Blank tags and duplicate tags are removed; each asset supports up to 20 tags, each at most 50 characters.
+
+The slideshow image modal also edits tags. Tags save independently of the checkbox for default alt text and captions. Uploads start untagged unless tags are supplied through the modal. Existing libraries start with no tags.
+
+Apply migrations/202610230001_course_asset_tags.sql in Supabase before deploying the matching application.

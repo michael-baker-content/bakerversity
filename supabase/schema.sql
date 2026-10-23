@@ -1138,3 +1138,19 @@ alter table public.course_assets add constraint course_asset_display_name_valid
  check (display_name is null or (char_length(display_name) between 1 and 200 and display_name = btrim(display_name) and display_name <> ''));
 comment on column public.course_assets.display_name is 'Optional course-specific resource name. Null falls back to assets.title; renames affect published labels immediately.';
 commit;
+
+-- Optional course-specific asset tags. Existing library entries start untagged.
+begin;
+create function public.course_asset_tags_valid(value text[]) returns boolean
+language sql immutable set search_path = pg_catalog as $$
+ select value is not null and cardinality(value) <= 20
+ and (cardinality(value)=0 or array_ndims(value)=1)
+ and not exists (select 1 from unnest(value) tag where tag is null or char_length(tag) not between 1 and 50 or tag<>btrim(tag) or tag ~ '[[:cntrl:],]')
+ and (select count(*) from unnest(value) tag)=(select count(distinct lower(tag)) from unnest(value) tag);
+$$;
+revoke all on function public.course_asset_tags_valid(text[]) from public;
+grant execute on function public.course_asset_tags_valid(text[]) to service_role;
+alter table public.course_assets add column tags text[] not null default '{}';
+alter table public.course_assets add constraint course_asset_tags_valid check(public.course_asset_tags_valid(tags));
+comment on column public.course_assets.tags is 'Optional course-specific search tags; up to 20 distinct tags of 50 characters each.';
+commit;

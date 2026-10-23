@@ -2,6 +2,7 @@
 
 import { useId, useState, type ReactNode } from 'react'
 import type { Editor } from '@tiptap/react'
+import { textLanguages, normalizeTextLanguage } from '../../lib/textLanguages.mjs'
 
 export default function WritingTools({ editor, formatting, extraFormatting, secondary }: { editor: Editor; formatting?: ReactNode; extraFormatting?: ReactNode; secondary?: ReactNode }) {
   const [more, setMore] = useState(false)
@@ -10,7 +11,7 @@ export default function WritingTools({ editor, formatting, extraFormatting, seco
   const panelId = useId()
   const search = editor.storage.findAndReplace
   const visible = editor.storage.invisibleCharacters.visibility()
-  const language = editor.getAttributes('textLanguage').language ?? ''
+  const language = normalizeTextLanguage(editor.getAttributes('textLanguage').language) ?? ''
   const selected = !editor.state.selection.empty
   const count = search.results.length
   const button = 'btn btn-ghost btn-sm'
@@ -26,7 +27,7 @@ export default function WritingTools({ editor, formatting, extraFormatting, seco
           <button type="button" className="editor-tool" aria-expanded={open} aria-controls={panelId} onClick={() => {if(open)editor.commands.clearSearch();setOpen(!open);setMore(false)}}>Find</button>
           <button type="button" className="editor-tool" title="Show invisible characters: spaces and paragraph marks" aria-label="Show invisible characters" aria-pressed={visible} onMouseDown={e => e.preventDefault()} onClick={() => editor.commands.toggleInvisibleCharacters()}>¶</button>
           <select className="editor-tool editor-text-language" aria-label="Text language" value={language} disabled={!selected} title="Select text to label its language" onChange={e => {if(e.target.value)editor.chain().focus().setMark('textLanguage',{language:e.target.value}).run();else editor.chain().focus().unsetMark('textLanguage').run()}}>
-            <option value="">Language</option><option value="en">English</option><option value="pl">Polish</option>
+            <option value="">Language</option>{textLanguages.map(({code,label}) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
       </div>

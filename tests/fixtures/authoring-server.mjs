@@ -32,7 +32,8 @@ const files=[{id:'fixture-image',title:'Library diagram',original_filename:'diag
       const asset=files.find(row=>row.id===body.id)
       if(!asset)return reply({error:'Not found'},404)
       if(body.display_name)asset.title=body.display_name.trim()
-      asset.alt_text=body.alt_text;asset.caption=body.caption
+      if(body.alt_text!==undefined)asset.alt_text=body.alt_text;if(body.caption!==undefined)asset.caption=body.caption
+      if(body.tags!==undefined)asset.tags=body.tags
       return reply({ok:true})
     }
 
@@ -40,7 +41,7 @@ const files=[{id:'fixture-image',title:'Library diagram',original_filename:'diag
     return reply(url.searchParams.get('summary')==='1'?{items:matches,total:matches.length,courseTotal:files.length}:matches)
    }
    if(path.endsWith('/modules'))return reply([])
-   if(path===`/api/admin/courses/${course}`)return reply({editor_tools:['math','code','graph','terminal','lang-select','python-lint']})
+   if(path===`/api/admin/courses/${course}`)return reply({editor_tools:['footnotes','math','code','graph','terminal','lang-select','python-lint']})
    if(path.endsWith('/history'))return reply(await rows('select id,version,created_at,snapshot from content_revisions where item_id=$1 order by version desc',[path.split('/').at(-2)]))
    if(path.includes('/api/students/'))return reply(await scalar('select submit_assessment($1,$2,$3,$4)',[student,path.split('/').at(-2),body.answers,body.request_id]))
    const match=path.match(/^\/api\/admin\/courses\/[^/]+\/(lessons|pages|assessments)(?:\/([^/]+))?(?:\/questions(?:\/([^/]+))?)?$/)

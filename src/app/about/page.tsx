@@ -111,7 +111,7 @@ export default function AboutPage() {
             <dl style={{ margin: 0, display: 'grid', gap: '1.5rem', color: 'var(--text-2)', lineHeight: 1.8 }}>
               {[
                 { title: 'Explain with code and mathematics', text: 'Use syntax-highlighted code, inline and display LaTeX, and mathematical graphs to connect an idea with a worked example.' },
-                { title: 'Give the writing structure', text: 'Bring objectives, notes, tables, images, and supporting resources into the lesson. Language labels support passages in English and Polish.' },
+                { title: 'Give the writing structure', text: 'Bring objectives, notes, tables, images, and supporting resources into the lesson. Language labels support passages in English, Polish, German, Spanish, French, and Czech.' },
                 { title: 'Make room for practice and revision', text: 'Include practice quizzes and refine lessons as drafts before publishing updates. Good course content develops through revision.' },
               ].map((feature) => (
                 <div key={feature.title}>

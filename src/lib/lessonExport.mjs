@@ -45,5 +45,13 @@ pre[data-tree-color="amber"]{--tree-bg:#eee3ca;--tree-accent:#704800}
 
 /* Slides always center their images; ordinary images retain alignment controls. */
 .slideshow-slide img, .slideshow-slide figure, .slideshow-slide .media-image { margin-left:auto!important; margin-right:auto!important; }
+.footnote-reference {font-size:.75em;line-height:0;vertical-align:super;scroll-margin-top:100px;}
+.footnote-reference button {font:inherit;border:0;padding:2px 3px;background:transparent;color:var(--indigo);cursor:pointer;text-decoration:underline;}
+.footnote-reference a {scroll-margin-top:100px;}
+.footnotes {border-top:1px solid var(--border);margin-top:2rem;padding-top:1rem;font-size:.9em;}
+.footnotes li {scroll-margin-top:100px;margin-bottom:1rem;}
+.footnotes li:target {outline:2px solid var(--indigo);outline-offset:5px;}
+.footnote-returns {display:inline-flex;gap:8px;}
+@media print {.footnote-returns {display:none}}
 </style></head><body>${fragment}</body></html>`
 }

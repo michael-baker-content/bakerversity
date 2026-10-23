@@ -1,6 +1,6 @@
 /** Author-facing insertion taxonomy. This does not define or restrict the document schema. */
 export type ElementCategory = 'media' | 'technical' | 'learning' | 'components'
-export type InsertToolId = 'slideshow' | 'text-image' | 'image' | 'table' | 'directory-tree' | 'formula' | 'activate-latex' | 'graph' | 'code' | 'terminal' | 'callout' | 'quiz'
+export type InsertToolId = 'footnote' | 'slideshow' | 'text-image' | 'image' | 'table' | 'directory-tree' | 'formula' | 'activate-latex' | 'graph' | 'code' | 'terminal' | 'callout' | 'quiz'
 export interface InsertTool {
   id: InsertToolId
   label: string
@@ -16,6 +16,7 @@ export const ELEMENT_CATEGORIES: readonly { id: ElementCategory; label: string }
 // Component parent contexts are enforced by schema, transaction and API validation.
 // Existing block insertion is unchanged outside components.
 export const INSERT_TOOLS: readonly InsertTool[] = [
+  { id:'footnote', label:'Footnote', category:'learning', requiredPack:'footnotes', kind:'action', nodeTypes:['footnote'] },
   { id:'slideshow', label:'Slideshow', category:'components', kind:'component', nodeTypes:['slideshow'], parentContexts:['doc'] },
   { id:'text-image', label:'Text and image', category:'components', kind:'component', nodeTypes:['textImage'], parentContexts:['doc'] },
   { id:'image', label:'Image', category:'media', kind:'block', nodeTypes:['image'] },

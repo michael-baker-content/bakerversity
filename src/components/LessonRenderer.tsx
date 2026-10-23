@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import {SlideshowPlayer} from './SlideshowPlayer'
 import './editor/textImage.css'
+import './editor/footnotes.css'
 import { useState, useId, useMemo } from 'react'
 import type { MafsGraphAttrs } from './MafsGraph'
 import { buildRenderPlan } from './renderer/renderNode'
@@ -203,7 +204,8 @@ function PracticeQuizPlayer({ title, questions }: {
 // ── Main renderer ─────────────────────────────────────────────────────────────
 
 export default function LessonRenderer({ content }: LessonRendererProps) {
-  const plan = useMemo(() => buildRenderPlan(content), [content])
+  const footnoteScope=useId()
+  const plan = useMemo(() => buildRenderPlan(content,'lesson-'+footnoteScope), [content,footnoteScope])
   // Remount the HTML owner and its portals together when the document changes.
   const documentKey = JSON.stringify(content)
   const islands = plan.islands.map((node, index) => {

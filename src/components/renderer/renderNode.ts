@@ -1,3 +1,5 @@
+import { normalizeTextLanguage } from '../../lib/textLanguages.mjs'
+import {collectFootnotes,footnoteSection,footnoteReference} from '../../lib/footnotes.mjs'
 import { textImageVerticalAlign } from '../../lib/textImage.mjs'
 import { renderDirectoryTree } from '../../lib/directoryTree.mjs'
 import { imageMaxWidth } from '../../lib/imageWidth.mjs'
@@ -51,7 +53,16 @@ const CALLOUT_STYLES: Record<string, {
 }
 
 // Renders a single non-graph TipTap node to an HTML string
-export function renderNode(node: Record<string, unknown>, interactive?: (node: Record<string, unknown>) => string | undefined): string {
+export function renderNode(node: Record<string, unknown>, interactive?: (node: Record<string, unknown>) => string | undefined, footnotePrefix='lesson'): string {
+  if(node.type==='doc'){
+    const notes=collectFootnotes(node);let occurrence=0
+    const prefix=footnotePrefix.replace(/[^a-zA-Z0-9_-]/g,'')||'lesson'
+    const html=((node.content??[]) as Record<string,unknown>[]).map(child=>renderNode(child,item=>{
+      if(item.type==='footnote'){const attrs=item.attrs as {id:string};const note=notes.find(note=>note.id===attrs.id);return note?footnoteReference(note.number,++occurrence,prefix):''}
+      return interactive?.(item)
+    })).join('')
+    return html+footnoteSection(notes,(body:Record<string,unknown>)=>renderNode(body),prefix)
+  }
   const replacement = interactive?.(node)
   if (replacement !== undefined) return replacement
   const type = node.type as string
@@ -154,15 +165,16 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
       let text = escapeHtml((node.text as string) ?? '')
       for (const mark of marks) {
         if (mark.type === 'highlight') text = `<mark style="background-color:#fef08a;color:#1f2937">${text}</mark>`
-        if (mark.type === 'textLanguage' && (mark.attrs?.language === 'en' || mark.attrs?.language === 'pl')) {
-          text = `<span lang="${mark.attrs.language}">${text}</span>`
+        const textLanguage = mark.type === 'textLanguage' ? normalizeTextLanguage(mark.attrs?.language) : null
+        if (textLanguage) {
+          text = `<span lang="${textLanguage}">${text}</span>`
         }
         if (mark.type === 'bold')   text = `<strong>${text}</strong>`
         if (mark.type === 'italic') text = `<em>${text}</em>`
         if (mark.type === 'code')   text = `<code>${text}</code>`
         if (mark.type === 'link') {
           const href=String(mark.attrs?.href??'').trim()
-          if(/^(https?:|mailto:|\/|#)/i.test(href)&&!href.startsWith('//'))text = '<a href="'+escapeAttr(escapeHtml(href))+'">'+text+'</a>'
+          if(/^(https?:|mailto:|\/|#)/i.test(href)&&!href.startsWith('//'))text = '<a target="_blank" rel="noopener noreferrer" href="'+escapeAttr(escapeHtml(href))+'">'+text+'</a>'
         }
       }
       return text
@@ -177,12 +189,12 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
 }
 
 /** Build one HTML tree, preserving wrappers while reserving client-rendered block positions. */
-export function buildRenderPlan(document: Record<string, unknown>) {
+export function buildRenderPlan(document: Record<string, unknown>, prefix='lesson') {
   const islands: Record<string, unknown>[] = []
   const html = renderNode(document, node => {
     if (node.type !== 'mafsGraph' && node.type !== 'practiceQuiz' && node.type !== 'slideshow') return undefined
     const index = islands.push(node) - 1
     return '<div data-lesson-island="' + index + '" style="min-width:0"><p>Loading interactive content…</p></div>'
-  })
+  },prefix)
   return { html, islands }
 }
