@@ -6,6 +6,7 @@ export const textLanguages = [
   { code: 'es-ES', label: 'Spanish (es_es)' },
   { code: 'fr-FR', label: 'French (fr_fr)' },
   { code: 'cs-CZ', label: 'Czech (cs_cz)' },
+  { code: 'ja-JP', label: 'Japanese (ja-JP)' },
 ]
 
 /** @param {unknown} value @returns {string | null} */

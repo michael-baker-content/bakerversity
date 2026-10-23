@@ -44,11 +44,7 @@ export function footnoteError(document){
 export function footnoteReference(number,occurrence,prefix='lesson'){
  return '<sup class="footnote-reference"><a role="doc-noteref" id="'+prefix+'-fnref-'+occurrence+'" href="#'+prefix+'-fn-'+number+'" aria-label="Footnote '+number+'">'+number+'</a></sup>'
 }
-// Apply only to rendered note content, never reference or return anchors.
-export function footnoteBodyHtml(body,renderBody){
- return renderBody(body).replace(/<a href=/g,'<a target="_blank" rel="noopener noreferrer" href=')
-}
 export function footnoteSection(notes,renderBody,prefix='lesson'){
  if(!notes.length)return ''
- return '<section class="footnotes" role="doc-endnotes" aria-label="Footnotes"><h2>Footnotes</h2><ol>'+notes.map(note=>'<li id="'+prefix+'-fn-'+note.number+'" tabindex="-1">'+footnoteBodyHtml(note.body,renderBody)+ '<span class="footnote-returns">'+note.references.map((ref,index)=>'<a href="#'+prefix+'-fnref-'+ref+'" aria-label="Return to footnote '+note.number+' reference '+(index+1)+'">↩'+(note.references.length>1?index+1:'')+'</a>').join(' ')+'</span></li>').join('')+'</ol></section>'
+ return '<section class="footnotes" role="doc-endnotes" aria-label="Footnotes"><h2>Footnotes</h2><ol>'+notes.map(note=>'<li id="'+prefix+'-fn-'+note.number+'" tabindex="-1">'+renderBody(note.body)+ '<span class="footnote-returns">'+note.references.map((ref,index)=>'<a href="#'+prefix+'-fnref-'+ref+'" aria-label="Return to footnote '+note.number+' reference '+(index+1)+'">↩'+(note.references.length>1?index+1:'')+'</a>').join(' ')+'</span></li>').join('')+'</ol></section>'
 }

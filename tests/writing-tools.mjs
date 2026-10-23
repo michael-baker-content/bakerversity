@@ -31,17 +31,32 @@ assert.ok(hostile.includes('&lt;script&gt;'))
 console.log('PASS: language/highlight schema and learner rendering; Polish whole-word search across formatting; unsafe attributes excluded')
 
 // All additional languages survive saved JSON and render canonical HTML labels.
-for (const [code, text] of [['en-US','English'],['pl-PL','Polski'],['de-DE','Grüße'],['es-ES','español'],['fr-FR','français'],['cs-CZ','čeština']]) {
+for (const [code, text] of [['en-US','English'],['pl-PL','Polski'],['de-DE','Grüße'],['es-ES','español'],['fr-FR','français'],['cs-CZ','čeština'],['ja-JP','日本語の文章']]) {
   const fixture = {type:'doc',content:[{type:'paragraph',content:[{type:'text',text,marks:[{type:'textLanguage',attrs:{language:code}}]}]}]}
   const saved = schema.nodeFromJSON(fixture)
   saved.check()
   assert.ok(renderNode(saved.toJSON()).includes('<span lang="'+code+'">'+text+'</span>'))
   assert.ok(renderNode({type:'text',text,marks:[{type:'textLanguage',attrs:{language:code.toLowerCase().replace('-','_')}}]}).includes('lang="'+code+'"'))
 }
-console.log('PASS: German, Spanish, French and Czech language labels and locale normalization')
+console.log('PASS: Supported language labels and locale normalization')
 
 for(const href of ['https://example.com/','/courses','#section']){
  const html=renderNode({type:'text',text:'Link',marks:[{type:'link',attrs:{href,target:'_self'}}]})
  assert.ok(html.includes('target="_blank" rel="noopener noreferrer"'))
  assert.ok(!html.includes('_self'))
 }
+
+const {isEditorLink,editorLink}=await import('../src/lib/editorLinks.mjs')
+for(const href of ['https://example.com','http://example.com','mailto:author@example.com','/courses','#section'])assert.equal(isEditorLink(href),true)
+for(const href of ['javascript:alert(1)','//example.com','https:bad','https://example.com bad','','#'])assert.equal(isEditorLink(href),false)
+assert.deepEqual(editorLink(' https://example.com '),{href:'https://example.com',target:'_blank',rel:'noopener noreferrer'})
+const {CALLOUT_TYPES,calloutDefinition}=await import('../src/lib/callouts.mjs')
+for(const definition of CALLOUT_TYPES){
+ const html=renderNode({type:'callout',attrs:{type:definition.value},content:[]})
+ assert.ok(html.includes(definition.label))
+ assert.ok(html.includes(definition.icon))
+ assert.ok(html.includes(definition.bg))
+}
+assert.equal(calloutDefinition('unknown').value,'tip')
+assert.equal(calloutDefinition('warning').border,'var(--amber)')
+console.log('PASS: shared authored-link policy and callout definitions')

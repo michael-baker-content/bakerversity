@@ -27,7 +27,7 @@ Start by testing one short lesson in accessibility engineering or search evaluat
 - Code blocks present examples; they are not executable coding labs.
 - Mathematical graphs do not imply a general mapping or dashboard system.
 - Practice quizzes do not imply automated assessment of arbitrary code.
-- Current language labels support English, Polish, German, Spanish, French, and Czech; do not imply automatic translation or comprehensive multilingual course management.
+- Current language labels support English, Polish, German, Spanish, French, Czech, and Japanese; do not imply automatic translation or comprehensive multilingual course management.
 - Draft publishing supports course revision; do not imply collaborative editing or public author onboarding.
 - Do not advertise certificates, advanced progress tracking, or future courses as available.
 

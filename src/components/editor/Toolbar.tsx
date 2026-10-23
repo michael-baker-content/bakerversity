@@ -1,4 +1,5 @@
 'use client'
+import { editorLink, isEditorLink } from '../../lib/editorLinks.mjs'
 
 import React, { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -45,7 +46,7 @@ export function Toolbar({
 }: ToolbarProps) {
   const [linkOpen,setLinkOpen]=useState(false)
   const [linkUrl,setLinkUrl]=useState('')
-  const validLink=/^(https?:\/\/|mailto:|\/(?!\/)|#)\S+/i.test(linkUrl.trim())
+  const validLink=isEditorLink(linkUrl)
   const [insertOpen, setInsertOpen] = useState(false)
   const insertId = useId()
   const [openCategories, setOpenCategories] = useState<string[]>([])
@@ -117,7 +118,7 @@ export function Toolbar({
       } />
       {linkOpen && <div className="editor-context" aria-label="Link settings">
         <label>Link URL <input className="input" aria-label="Link URL" value={linkUrl} onChange={e=>setLinkUrl(e.target.value)} placeholder="https://"/></label>
-        <button type="button" className="editor-tool" disabled={!validLink} onClick={()=>{editor.chain().focus().extendMarkRange('link').setLink({href:linkUrl.trim(),target:"_blank",rel:"noopener noreferrer"}).run();setLinkOpen(false)}}>Apply link</button>
+        <button type="button" className="editor-tool" disabled={!validLink} onClick={()=>{editor.chain().focus().extendMarkRange('link').setLink(editorLink(linkUrl)).run();setLinkOpen(false)}}>Apply link</button>
         <button type="button" className="editor-tool" onClick={()=>{editor.chain().focus().extendMarkRange('link').unsetLink().run();setLinkOpen(false)}}>Remove link</button>
         <button type="button" className="editor-tool" onClick={()=>setLinkOpen(false)}>Cancel</button>
       </div>}

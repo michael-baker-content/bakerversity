@@ -1,3 +1,5 @@
+import { isEditorLink, editorLinkAttributes } from '../../lib/editorLinks.mjs'
+import { calloutDefinition } from '../../lib/callouts.mjs'
 import { normalizeTextLanguage } from '../../lib/textLanguages.mjs'
 import {collectFootnotes,footnoteSection,footnoteReference} from '../../lib/footnotes.mjs'
 import { textImageVerticalAlign } from '../../lib/textImage.mjs'
@@ -40,17 +42,6 @@ export function hastToHtml(node: {
   return ''
 }
 
-const CALLOUT_STYLES: Record<string, {
-  icon: string; label: string; border: string; bg: string; labelColor: string
-}> = {
-  tip:     { icon: '💡', label: 'Tip',             border: 'var(--success)', bg: 'var(--success-bg)',         labelColor: 'var(--success)' },
-  info:    { icon: 'ℹ️', label: 'Did you know?',   border: 'var(--indigo)',  bg: 'var(--indigo-muted)',        labelColor: 'var(--indigo)' },
-  warning: { icon: '⚠️', label: 'Warning',         border: 'var(--amber)',   bg: 'var(--amber-muted)',         labelColor: 'var(--amber-label)' },
-  note:    { icon: '📝', label: 'Note',            border: 'var(--text-2)',  bg: 'var(--surface-2)',           labelColor: 'var(--text-2)' },
-  objectives: { icon: '🎯', label: 'Objectives', border: 'var(--indigo)', bg: 'var(--indigo-muted)', labelColor: 'var(--indigo)' },
-  reading: { icon: '📚', label: 'Further reading', border: 'var(--indigo)',  bg: 'var(--indigo-muted)',        labelColor: 'var(--indigo)' },
-  alert:   { icon: '🚨', label: 'Alert',           border: 'var(--danger)',  bg: 'var(--danger-bg, #fee2e2)', labelColor: 'var(--danger)' },
-}
 
 // Renders a single non-graph TipTap node to an HTML string
 export function renderNode(node: Record<string, unknown>, interactive?: (node: Record<string, unknown>) => string | undefined, footnotePrefix='lesson'): string {
@@ -99,12 +90,12 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
     }
     case 'callout': {
       const calloutType = (attrs.type as string) ?? 'tip'
-      const s = CALLOUT_STYLES[calloutType] ?? CALLOUT_STYLES.tip
+      const s = calloutDefinition(calloutType)
       // children is the TipTap-managed content (paragraphs, math, etc.)
       return `<div data-callout="${escapeAttr(calloutType)}" style="border-left:4px solid ${s.border};background:${s.bg};border-radius:0 6px 6px 0;padding:0.875rem 1rem;margin:1rem 0;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="font-size:14px;">${s.icon}</span>
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:${s.labelColor};">${s.label}</span>
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:${s.color};">${s.label}</span>
         </div>
         <div style="font-size:15px;line-height:1.65;color:var(--text);">${children}</div>
       </div>`
@@ -174,7 +165,7 @@ export function renderNode(node: Record<string, unknown>, interactive?: (node: R
         if (mark.type === 'code')   text = `<code>${text}</code>`
         if (mark.type === 'link') {
           const href=String(mark.attrs?.href??'').trim()
-          if(/^(https?:|mailto:|\/|#)/i.test(href)&&!href.startsWith('//'))text = '<a target="_blank" rel="noopener noreferrer" href="'+escapeAttr(escapeHtml(href))+'">'+text+'</a>'
+          if(isEditorLink(href))text = '<a target="'+editorLinkAttributes.target+'" rel="'+editorLinkAttributes.rel+'" href="'+escapeAttr(escapeHtml(href))+'">'+text+'</a>'
         }
       }
       return text

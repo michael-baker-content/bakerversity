@@ -9,7 +9,7 @@ Built with **Next.js 15**, **React 19**, **Tiptap 3**, **Supabase**, and **Clerk
 - **Explain code and file formats:** syntax-highlighted code, terminal-style blocks, and editable directory trees suit programming, tooling, and localization lessons.
 - **Teach mathematical ideas:** KaTeX expressions and Mafs interactive graphs sit alongside the explanation, with tools enabled per course.
 - **Mix text and visual instruction:** text-and-image compositions, slideshows, callouts, tables, and shared footnotes support varied lesson structures and responsive reading.
-- **Work across languages:** label passages in English, Polish, German, Spanish, French, and Czech; use localization formats such as XLIFF, TMX, and TBX in code examples.
+- **Work across languages:** label passages in English, Polish, German, Spanish, French, Czech, and Japanese; use localization formats such as XLIFF, TMX, and TBX in code examples.
 - **Keep authoring manageable:** reusable course assets, optional asset tags, separate drafts/publications, revision history, and saved-draft lesson previews support ongoing course development.
 
 Localization engineering is the current teaching use case. Programming foundations and mathematics are also natural fits for these tools.
@@ -177,3 +177,5 @@ Footnotes can be enabled per course, with automatic numbering, shared references
 
 Older dated verification notes describe the state at that time, not the current database contents or deployment status.
 
+
+Shared editor policies live in `src/lib/editorLinks.mjs` (authored-link validation and new-tab behavior), `src/lib/callouts.mjs` (callout labels, icons, and colors), and `src/lib/textLanguages.mjs` (text-language options). Update these definitions rather than duplicating rules in individual editors or the student renderer.

@@ -1,4 +1,5 @@
 'use client'
+import { editorLinkOptions, editorLinkAttributes } from '../lib/editorLinks.mjs'
 import {FootnoteNode} from './editor/FootnoteNode'
 import FootnotesPreview from './editor/FootnotesPreview'
 import FootnoteModal from './editor/FootnoteModal'
@@ -143,7 +144,7 @@ export default function TipTapEditor({
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
-    StarterKit.configure({ codeBlock: false, link: {openOnClick:false,autolink:false,HTMLAttributes:{target:"_blank",rel:"noopener noreferrer"}}, underline: false, trailingNode: false }),
+    StarterKit.configure({ codeBlock: false, link: editorLinkOptions, underline: false, trailingNode: false }),
     NoInputRules,
     Highlight.configure({ HTMLAttributes: { style: 'background-color:#fef08a;color:#1f2937' } }),
     TextLanguage,
@@ -388,8 +389,8 @@ export default function TipTapEditor({
       })
       // Normalize old/imported link targets before adding in-page footnote navigation.
       document.querySelectorAll('a[href]').forEach(link=>{
-        link.setAttribute('target','_blank')
-        link.setAttribute('rel','noopener noreferrer')
+        link.setAttribute('target',editorLinkAttributes.target)
+        link.setAttribute('rel',editorLinkAttributes.rel)
       })
       const notes=collectFootnotes(editor.getJSON());let occurrence=0
       document.querySelectorAll('[data-footnote]').forEach(reference=>{
