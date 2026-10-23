@@ -17,7 +17,7 @@ export function SlideshowPlayer({node}:{node:ContentNode}){
  },[active,slides])
  useEffect(()=>{root.current?.querySelectorAll('[data-active="true"] img').forEach(image=>image.setAttribute('loading','eager'))},[active])
  if(!slides.length)return null
- return <section ref={root} className="slideshow slideshow-player" aria-roledescription="carousel" aria-label={title||'Image slideshow'} tabIndex={0} onKeyDown={event=>{
+ return <section ref={root} className="slideshow slideshow-player" aria-roledescription="carousel" aria-label={title||'Slideshow'} tabIndex={0} onKeyDown={event=>{
   if(event.target!==event.currentTarget)return
   if(event.key==='ArrowRight'){event.preventDefault();setActive(Math.min(slides.length-1,active+1))}
   if(event.key==='ArrowLeft'){event.preventDefault();setActive(Math.max(0,active-1))}

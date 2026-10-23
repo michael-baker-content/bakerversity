@@ -20,3 +20,6 @@
 @media print { .slideshow-player .slideshow-slide {display:block!important;break-inside:avoid} .slideshow-navigation {display:none} .slideshow {overflow:visible} }
 
 .slideshow-editor {position:relative;overflow:visible;}
+
+/* Slides always center their images; ordinary images retain alignment controls. */
+.slideshow-slide img, .slideshow-slide figure, .slideshow-slide .media-image { margin-left:auto!important; margin-right:auto!important; }

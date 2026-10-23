@@ -38,5 +38,12 @@ pre[data-tree-color="amber"]{--tree-bg:#eee3ca;--tree-accent:#704800}
 [data-text-vertical-align="center"] { --text-image-justify:center; }
 [data-text-vertical-align="bottom"] { --text-image-justify:flex-end; }
 
+
+/* Component layout owns image sizing, including older saved image settings. */
+.text-image-grid img { display:block; width:100%!important; max-width:100%!important; height:auto; margin-left:auto!important; margin-right:auto!important; }
+.text-image-grid figure, .text-image-grid .media-image { width:100%!important; max-width:100%!important; margin-left:auto!important; margin-right:auto!important; }
+
+/* Slides always center their images; ordinary images retain alignment controls. */
+.slideshow-slide img, .slideshow-slide figure, .slideshow-slide .media-image { margin-left:auto!important; margin-right:auto!important; }
 </style></head><body>${fragment}</body></html>`
 }

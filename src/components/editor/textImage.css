@@ -30,3 +30,7 @@
 [data-text-vertical-align="bottom"] { --text-image-justify:flex-end; }
 
 .text-image-alignment { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); }
+
+/* Component layout owns image sizing, including older saved image settings. */
+.text-image-grid img { display:block; width:100%!important; max-width:100%!important; height:auto; margin-left:auto!important; margin-right:auto!important; }
+.text-image-grid figure, .text-image-grid .media-image { width:100%!important; max-width:100%!important; margin-left:auto!important; margin-right:auto!important; }

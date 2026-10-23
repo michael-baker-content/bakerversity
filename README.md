@@ -102,9 +102,9 @@ The legacy `npm run lint` script invokes interactive ESLint setup when no config
 
 After adding a migration, run `npm run db:generate` and include both generated artifacts. Do not edit them manually.
 
-## Planned editor component system
+## Editor components
 
-Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, and Technical; downloads use a shared format picker. The first [Text and image component](docs/text-image-component.md) is implemented with left/right image placement, stacked presentation and sequential exports; browser acceptance is pending. Unrestricted column layouts remain deferred. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
+Grouped editor tools are implemented as the first component-system checkpoint. The responsive toolbar groups insertion tools into Media, Learning, Technical, and Components; downloads use a shared format picker. The [Text and image component](docs/text-image-component.md) supports left/right image placement, full-column images, vertical text alignment, stacked presentation and sequential exports. The [Slideshow component](docs/image-slideshow-component.md) supports manual student navigation and a unified slide-editing modal with course-library selection, image upload, required alt text, optional captions and basic description formatting. Advanced description tools remain deferred. Unrestricted column layouts remain deferred. See [toolbar behavior](docs/editor-toolbar.md) and the [compatibility audit](docs/editor-components-audit.md). See the [implementation plan](docs/editor-components-plan.md) and [acceptance checklist](docs/editor-components-acceptance.md) for scope, delivery checkpoints and release criteria.
 
 ## Further documentation
 
@@ -120,4 +120,3 @@ Grouped editor tools are implemented as the first component-system checkpoint. T
 
 Older dated verification notes describe the state at that time, not the current database contents or deployment status.
 
-Image slideshow authoring and student playback: [component guide](docs/image-slideshow-component.md).

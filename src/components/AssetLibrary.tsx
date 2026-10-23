@@ -12,8 +12,8 @@ function unpackResults(result:LibraryResults) {
   if(!Array.isArray(result.items)||!Number.isInteger(result.total)||!Number.isInteger(result.courseTotal))throw new Error('Unable to read library results.')
   return result
 }
-interface Props { onPendingChanges?: (pending:boolean)=>void; onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
-export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
+interface Props { pickImmediately?: boolean; onPendingChanges?: (pending:boolean)=>void; onPickImage?: (asset:Asset)=>void; initiallyOpen?: boolean; courseId?: string; value?: ResourceSelection[]; onChange?: (value: ResourceSelection[]) => void; disabled?: boolean }
+export default function AssetLibrary({ pickImmediately = false, onPendingChanges, onPickImage, initiallyOpen = false, courseId, value = [], onChange, disabled = false }: Props) {
   const labelId = useId()
   const [descriptionDrafts,setDescriptionDrafts]=useState<Record<string,DescriptionDraft>>({})
   const hasDescriptionEdits=Object.keys(descriptionDrafts).length>0
@@ -23,7 +23,7 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
   const [courseTotal,setCourseTotal]=useState<number|null>(null)
   const [search,setSearch]=useState('')
   const [query,setQuery]=useState('')
-  const [fileType,setFileType]=useState('all')
+  const [fileType,setFileType]=useState(pickImmediately?'images':'all')
   const [sort,setSort]=useState('newest')
   const [loading,setLoading]=useState(false)
   const [loadError,setLoadError]=useState('')
@@ -86,7 +86,7 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
   }
   return <details open={initiallyOpen || undefined} style={{ margin: '16px 0', padding: 16, border: '1px solid var(--border)', borderRadius: 8 }}><summary>Course asset library</summary>
     <p>Manage images and files for this course. Uploaded files have public URLs. Attaching a file to an item follows that item’s draft and publication settings.</p>
-    <input aria-label="Upload course resource" type="file" multiple disabled={busy || disabled || !courseId} onChange={e => { void upload(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+    {!pickImmediately && <input aria-label="Upload course resource" type="file" multiple disabled={busy || disabled || !courseId} onChange={e => { void upload(Array.from(e.target.files ?? [])); e.target.value = '' }} />}
     {onChange && <>
       <p>Resource selections are saved with this item. Uploading or copying a link does not publish an attachment.</p>
       <label><span id={labelId+'-purpose'}>Resource purpose</span><select aria-labelledby={labelId+'-purpose'} className="input" value={purpose} disabled={disabled} onChange={e => setPurpose(e.target.value as ResourcePurpose)}>{resourcePurposes.map(p => <option key={p}>{p}</option>)}</select></label>
@@ -121,6 +121,7 @@ export default function AssetLibrary({ onPendingChanges, onPickImage, initiallyO
       const isImage=!!a.mime_type?.startsWith('image/')
       const filename=a.original_filename || a.title
       const extension=filename.includes('.') ? filename.split('.').pop()!.slice(0,12).toUpperCase() : 'FILE'
+      if(pickImmediately)return <article key={a.id} className="asset-browser-card"><button type="button" className="asset-browser-summary" style={{width:'100%',border:0,textAlign:'left',background:'transparent',color:'inherit'}} disabled={disabled||busy||!isImage} aria-label={'Choose '+a.title} onClick={()=>onPickImage?.(a)}><span className="asset-browser-preview" aria-hidden="true">{isImage?<img src={a.url} alt="" loading="lazy"/>:<span>{extension}</span>}</span><span className="asset-browser-name">{a.title}</span></button></article>
       return <article key={a.id} className="asset-browser-card">
         <details className="asset-browser-details">
           <summary className="asset-browser-summary">

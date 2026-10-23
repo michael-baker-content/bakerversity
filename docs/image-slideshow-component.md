@@ -1,8 +1,8 @@
-# Image slideshow component
+# Slideshow component
 
-Insert **Components → Image slideshow**. Choose or upload the first image using the course library and provide alt text. The component is full width, with an optional title. Each slide has an image, optional image caption, and an editable description.
+Insert **Components → Slideshow**. Choose or upload the first image using the course library and provide alt text. The component is full width, with an optional title. Each slide has an image, optional image caption, and an editable description.
 
-Authors see all slides while editing. Click a description to use the normal formatting, link, and (when enabled for the course) Formula and Activate LaTeX tools. Add image uses the same library; Image settings replaces an image or edits its alt text/caption. Move earlier/later moves the entire slide, including its description. Removing the final slide is disabled; Remove slideshow deletes the component. Undo remains available.
+Authors see previews of all slides while editing. Click Edit slide to open a single modal for its image, alt text, optional caption, size and description. The description editor starts with bold, italic, lists and links; advanced tools are deferred. Add image opens the course asset picker; clicking an image opens this modal directly, without an inline asset-details form. Upload image prepares a new file locally and adds it to the course library on submission. Updating course-library defaults is optional. Choose another image after adding returns to the picker for the next slide. Cancel discards unsubmitted slide edits. Move earlier/later moves the entire slide, including its description. Removing the final slide is disabled; Remove slideshow deletes the component. Undo remains available.
 
 Students use Previous/Next, or focus the slideshow and use left/right arrows. Navigation stops at the ends. There is no autoplay. Images remain uncropped in a bounded area; the next image is prepared in the background. All slides appear when printing. HTML and Markdown downloads contain a sequential gallery; plain text includes the title, descriptions, formulas, captions and image URLs. Images are linked, not bundled into downloads.
 
@@ -14,4 +14,6 @@ The shared save/import validator checks structure and required alt text. Slidesh
 
 ## Verification
 
-Pure schema, validation, undo, export and renderer tests are in tests/slideshow.mjs. Browser smoke coverage includes insertion, adding/reordering slides, save/reload, student navigation, math and print visibility. Browser smoke is intended for CI; it is not run locally because the project owner manages local servers.
+Pure schema, validation, undo, export and renderer tests are in tests/slideshow.mjs. Browser smoke coverage includes insertion, adding/reordering slides, modal cancellation, formatting toggles, links, keyboard focus order, editing an empty title after reload, student navigation, math and print visibility. Browser smoke is intended for CI; it is not run locally because the project owner manages local servers.
+
+Slideshow images are always centered; the slide modal does not offer alignment choices. The title is optional. Tab moves from Caption to the description text, then its formatting controls. Links are styled and can be edited by double-clicking linked text.

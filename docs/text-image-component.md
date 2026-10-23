@@ -31,3 +31,5 @@ HTML download retains the responsive layout, alt text and visible captions. Mark
 Local checks cover schema round trips, both child orders, structural undo, root-only transaction filtering, invalid source/alt text, unsupported nested content, student HTML, export schema structure, Markdown and plain-text output.
 
 GitHub browser smoke coverage adds image selection, placement, text editing, side switching, stacked preview, unwrap/undo, draft save/reload and publication. It has not been run locally. Remaining manual acceptance: desktop/mobile light and dark views, image replacement, dragging, keyboard navigation, saved-draft/student views, and downloaded HTML layout. No local server was started for this work.
+
+Images fill their column automatically; alignment and maximum-width controls are hidden inside this component. Conversion to regular content defaults the image to centered, with normal image settings available again.

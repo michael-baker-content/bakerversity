@@ -18,7 +18,7 @@ function TextImageView({node,editor,getPos,selected,updateAttributes}:NodeViewPr
  function unwrap(){
   const pos=position();if(pos===undefined)return
   const blocks: ProseMirrorNode[]=[]
-  for(let i=0;i<node.childCount;i++){const child=node.child(i);if(child.type.name==='textImageBody')child.forEach(block=>blocks.push(block));else blocks.push(child)}
+  for(let i=0;i<node.childCount;i++){const child=node.child(i);if(child.type.name==='textImageBody')child.forEach(block=>blocks.push(block));else blocks.push(child.type.create({...child.attrs,alignment:'center'},child.content,child.marks))}
   editor.chain().focus().command(({tr})=>{closeHistory(tr).replaceWith(pos,pos+node.nodeSize,blocks);return true}).run()
  }
  function moveOutside(direction:-1|1,event:React.MouseEvent){

@@ -16,7 +16,7 @@ export const ELEMENT_CATEGORIES: readonly { id: ElementCategory; label: string }
 // Component parent contexts are enforced by schema, transaction and API validation.
 // Existing block insertion is unchanged outside components.
 export const INSERT_TOOLS: readonly InsertTool[] = [
-  { id:'slideshow', label:'Image slideshow', category:'components', kind:'component', nodeTypes:['slideshow'], parentContexts:['doc'] },
+  { id:'slideshow', label:'Slideshow', category:'components', kind:'component', nodeTypes:['slideshow'], parentContexts:['doc'] },
   { id:'text-image', label:'Text and image', category:'components', kind:'component', nodeTypes:['textImage'], parentContexts:['doc'] },
   { id:'image', label:'Image', category:'media', kind:'block', nodeTypes:['image'] },
   { id:'table', label:'Table', category:'technical', kind:'block', nodeTypes:['table'] },

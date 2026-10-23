@@ -10,8 +10,8 @@ function SlideshowView({node,editor,getPos,updateAttributes,deleteNode}:NodeView
  <div contentEditable={false} aria-hidden="true" className="text-image-boundary text-image-boundary-before" onMouseDown={event=>boundary(-1,event)}/>
  <div contentEditable={false} aria-hidden="true" className="text-image-boundary text-image-boundary-after" onMouseDown={event=>boundary(1,event)}/>
  <div contentEditable={false} className="slideshow-controls">
- <span data-drag-handle>Image slideshow</span>
- <label>Title <input aria-label="Slideshow title" value={node.attrs.title} onChange={e=>updateAttributes({title:e.target.value})}/></label>
+ <span data-drag-handle>Slideshow</span>
+ <label>Title <input aria-label="Slideshow title" placeholder="Add a title (optional)" value={node.attrs.title??''} onChange={e=>updateAttributes({title:e.target.value})}/></label>
  <button type="button" className="editor-tool" onClick={()=>editor.view.dispatch(editor.state.tr.setMeta('addSlideshowImage',node.attrs.id))}>Add image</button>
  <button type="button" className="editor-tool" onClick={deleteNode}>Remove slideshow</button>
  </div><NodeViewContent /></NodeViewWrapper>
@@ -29,11 +29,11 @@ function SlideView({node,editor,getPos}:NodeViewProps){
  return <NodeViewWrapper className="slideshow-slide">
  <div contentEditable={false} className="slideshow-controls" onMouseDown={e=>e.preventDefault()}>
  <span>Slide {index+1} of {count}</span>
- <button type="button" className="editor-tool" onClick={()=>{const at=getPos();if(at!==undefined)editor.view.dispatch(editor.state.tr.setMeta('editComponentImage',at+1))}}>Image settings</button>
+ <button type="button" className="editor-tool" onClick={()=>{const at=getPos();if(at!==undefined)editor.view.dispatch(editor.state.tr.setMeta('editComponentImage',at+1))}}>Edit slide</button>
  <button type="button" className="editor-tool" disabled={index===0} onClick={()=>move(-1)}>Move earlier</button>
  <button type="button" className="editor-tool" disabled={index===count-1} onClick={()=>move(1)}>Move later</button>
  <button type="button" className="editor-tool" disabled={count===1} onClick={remove}>Remove slide</button>
- </div><NodeViewContent /></NodeViewWrapper>
+ </div><NodeViewContent contentEditable={false} /></NodeViewWrapper>
 }
 export const SlideshowNode=SlideshowExtension.extend({addNodeView(){return ReactNodeViewRenderer(SlideshowView)}})
 export const SlideshowSlide=SlideshowSlideExtension.extend({addNodeView(){return ReactNodeViewRenderer(SlideView)}})

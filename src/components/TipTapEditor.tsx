@@ -7,6 +7,7 @@ import { textImageError, imagePlainText } from '@/lib/textImage.mjs'
 import { jsonToMarkdown } from '@/lib/lessonMarkdown'
 import { htmlDownloadDocument } from '@/lib/lessonExport.mjs'
 import AssetLibrary from './AssetLibrary'
+import SlideImageModal, {type SlideImageDraft} from './editor/SlideImageModal'
 import { DirectoryTreeNode } from './editor/DirectoryTreeNode'
 import UnsplashPicker from './UnsplashPicker'
 import LatexActivation from './editor/LatexActivationPanel'
@@ -115,6 +116,9 @@ export default function TipTapEditor({
   // Image modal — shown after upload and on double-click of existing image
   const [imageModal, setImageModal] = useState<{
     src: string
+    description?: import('@tiptap/core').JSONContent
+    assetId?: string
+    assetName?: string
     width?: number
     height?: number
     creditName?: string | null
@@ -390,6 +394,67 @@ export default function TipTapEditor({
 
   if(componentLoadError)return <div role="alert"><p>{componentLoadError} The original document has not been changed.</p><button type="button" className="btn btn-secondary" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='content-recovery.json';a.click();URL.revokeObjectURL(url)}}>Download original content</button></div>
 
+  let componentImage: 'textImage'|'slideshow'|null = null
+  if(imageModal?.pos===null)componentImage=textImagePlacement?'textImage':slideshowTarget?'slideshow':null
+  else if(editor && imageModal && imageModal.pos<=editor.state.doc.content.size){
+    const resolved=editor.state.doc.resolve(imageModal.pos)
+    for(let depth=1;depth<=resolved.depth;depth++){
+      const name=resolved.node(depth).type.name
+      if(name==='textImage'||name==='slideshow')componentImage=name
+    }
+  }
+
+  function applyImage(imageModal:SlideImageDraft,another=false):boolean {
+                  if (!editor || uploading || !imageModal.alt.trim()) return false
+                  let nextSlideshow=slideshowTarget
+                  if (imageModal.pos === null) {
+                    const image = {type:'image',attrs:{ alignment:componentImage?'center':imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:componentImage==='textImage'?null:imageMaxWidth(imageModal.maxWidth) }}
+                    if(slideshowTarget){
+                      const slide={type:'slideshowSlide',content:[image,{type:'slideshowDescription',content:imageModal.description?.content??[{type:'paragraph'}]}]}
+                      let at:number
+                      if(slideshowTarget==='new'){
+                        const selection=editor.state.selection.$from;at=selection.depth?selection.after(1):selection.pos
+                        if(!editor.chain().focus().insertContentAt(at,{type:'slideshow',attrs:{id:(nextSlideshow=crypto.randomUUID()),title:''},content:[slide]}).setTextSelection(at+5).run()){setImageError('Unable to insert slideshow here.');return false}
+                      }else{
+                        let target:number|null=null
+                        editor.state.doc.forEach((node,pos)=>{if(node.type.name==='slideshow'&&node.attrs.id===slideshowTarget)target=pos+node.nodeSize-1})
+                        if(target===null){setImageError('The slideshow was removed. Close this window and insert a new slideshow.');return false}
+                        at=target
+                        if(!editor.chain().focus().insertContentAt(at,slide).setTextSelection(at+4).run()){setImageError('Unable to add this slide.');return false}
+                      }
+                    }else if(textImagePlacement){
+                      const body={type:'textImageBody',content:[{type:'paragraph'}]}
+                      const children=textImagePlacement==='left'?[image,body]:[body,image]
+                      const selection=editor.state.selection.$from
+                      const at=selection.depth ? selection.after(1) : selection.pos
+                      const textAt=at+(textImagePlacement==='left'?4:3)
+                      if(!editor.chain().focus().insertContentAt(at,{type:'textImage',content:children}).setTextSelection(textAt).run()){setImageError('Unable to insert the component here.');return false}
+                    }else editor.chain().focus().insertContent(image).run()
+                  } else {
+                    const node = editor.state.doc.nodeAt(imageModal.pos)
+                    if(node?.type.name!=='image')return false
+                    if (node?.type.name === 'image') {
+                      editor.chain().focus().setNodeSelection(imageModal.pos)
+                        .updateAttributes('image', { alignment:componentImage?'center':imageModal.alignment??'left', creditName:imageModal.creditName??null, creditUrl:imageModal.creditUrl??null, maxWidth:componentImage==='textImage'?null:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt.trim(), title: imageModal.title })
+                        .run()
+                    }
+                  }
+                  if(imageModal.pos!==null && componentImage==='slideshow' && imageModal.description){
+                    const at=imageModal.pos+1
+                    const old=editor.state.doc.nodeAt(at)
+                    if(old?.type.name==='slideshowDescription'){
+                      const description=editor.schema.nodeFromJSON({type:'slideshowDescription',content:imageModal.description.content??[{type:'paragraph'}]})
+                      editor.view.dispatch(editor.state.tr.replaceWith(at,at+old.nodeSize,description))
+                    }
+                  }
+                  setTextImagePlacement(null)
+                  setSlideshowTarget(another?nextSlideshow:null)
+                  if(another&&nextSlideshow)setLibraryMode('insert')
+                  setImageModal(null)
+                  return true
+  }
+
+  const slideFlow=!!slideshowTarget||componentImage==='slideshow'
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="editor-shell" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'visible', background: 'var(--surface)', position: 'relative' }}>
@@ -441,7 +506,8 @@ export default function TipTapEditor({
       )}
       <div
         ref={editorRef}
-        onClick={() => editor?.commands.focus()}
+        // Only blank outer space should refocus the document. Embedded controls own their focus.
+        onClick={event => {if(event.target===event.currentTarget)editor?.commands.focus()}}
         style={{ minHeight: editable ? 400 : undefined, cursor: editable ? 'text' : 'default' }}
       >
         <EditorContent editor={editor} style={{ padding: '1rem', fontSize: 15, lineHeight: 1.7 }} />
@@ -474,27 +540,28 @@ export default function TipTapEditor({
       {libraryMode && courseId && <div style={{position:'fixed',inset:0,zIndex:1100,background:'rgba(0,0,0,.35)',display:'flex',alignItems:'center',justifyContent:'center'}}>
         <section role="dialog" aria-label="Choose course image" style={{background:'var(--surface)',padding:20,borderRadius:12,width:720,maxWidth:'94vw',maxHeight:'85dvh',overflowY:'auto'}}>
           <h3>Choose a course image</h3>
-          <button type="button" className="btn btn-primary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;const replacing=libraryMode==='replace';setLibraryMode(null);(replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
+          <button type="button" className="btn btn-primary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;const replacing=libraryMode==='replace';setLibraryMode(null);if(slideFlow){if(!replacing)setImageModal({src:'',alt:'',title:'',pos:null})}else (replacing?replacementInputRef:fileInputRef).current?.click()}}>Upload new image</button>{' '}
           <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{if(!canLeaveLibrary())return;setUnsplashMode(libraryMode);setLibraryMode(null)}}>Search Unsplash</button>{' '}
           <button type="button" className="btn btn-ghost btn-sm" onClick={()=>{if(canLeaveLibrary())setLibraryMode(null)}}>Close library</button>
-          <AssetLibrary key={courseId} courseId={courseId} initiallyOpen onPendingChanges={setLibraryDirty} onPickImage={asset=>{
+          <AssetLibrary key={courseId} pickImmediately={slideFlow} courseId={courseId} initiallyOpen onPendingChanges={setLibraryDirty} onPickImage={asset=>{
             if(!canLeaveLibrary())return
             setImageError('')
-            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,creditName:null,creditUrl:null,width:undefined,height:undefined}:current)
-            else setImageModal({src:asset.url,alt:asset.alt_text??'',title:asset.caption??'',pos:null})
+            if(libraryMode==='replace')setImageModal(current=>current?{...current,src:asset.url,assetId:asset.id,assetName:asset.title,creditName:null,creditUrl:null,width:undefined,height:undefined}:current)
+            else setImageModal({src:asset.url,assetId:asset.id,assetName:asset.title,alt:asset.alt_text??'',title:asset.caption??'',pos:null})
             setLibraryMode(null)
           }} />
         </section>
       </div>}
       {unsplashMode && <UnsplashPicker onClose={()=>{setLibraryMode(unsplashMode);setUnsplashMode(null)}} onSelect={photo=>{
         setImageError('')
-        const selected={src:photo.regular,alt:(photo.alt??'').trim(),creditName:photo.photographer_name,creditUrl:photo.photographer_url,width:undefined,height:undefined}
+        const selected={assetId:undefined,assetName:undefined,src:photo.regular,alt:(photo.alt??'').trim(),creditName:photo.photographer_name,creditUrl:photo.photographer_url,width:undefined,height:undefined}
         if(unsplashMode==='replace')setImageModal(current=>current?{...current,...selected}:current)
         else setImageModal({...selected,title:'',pos:null})
         setUnsplashMode(null)
       }} />}
+      {imageModal && componentImage==='slideshow' && !unsplashMode && !libraryMode && <SlideImageModal initial={{...imageModal,description:imageModal.description??(imageModal.pos!==null?{type:'doc',content:editor?.state.doc.nodeAt(imageModal.pos+1)?.toJSON().content}:undefined)}} courseId={courseId} onSubmit={applyImage} onClose={()=>{setImageModal(null);setImageError('')}} onChoose={draft=>{setImageModal(draft);setLibraryMode('replace')}} onUnsplash={draft=>{setImageModal(draft);setUnsplashMode('replace')}}/>}
       {/* Image alt/caption modal */}
-      {imageModal && !unsplashMode && (
+      {imageModal && componentImage!=='slideshow' && !unsplashMode && (
         <div style={{position:'fixed', inset:0, zIndex:1000, pointerEvents:'none'}}>
           <div role="dialog" aria-label="Image settings"
             style={{position:'absolute', right:16, bottom:16, pointerEvents:'auto', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'1.5rem', width:400, maxWidth:'calc(100vw - 32px)', maxHeight:'calc(100dvh - 32px)', overflowY:'auto', boxShadow:'var(--shadow-lg)'}}>
@@ -529,55 +596,21 @@ export default function TipTapEditor({
               />
             </div>
             {textImagePlacement && imageModal.pos===null && <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}><legend>Image placement</legend><div style={{display:'flex',gap:8}}>{(['left','right'] as const).map(side=><button key={side} type="button" className="editor-tool" aria-pressed={textImagePlacement===side} onClick={()=>setTextImagePlacement(side)}>Image {side}</button>)}</div></fieldset>}
-            <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}>
+            {!componentImage && <fieldset style={{border:0,padding:0,margin:'0 0 16px'}}>
               <legend style={{fontSize:12,fontWeight:600,marginBottom:6}}>Image alignment</legend>
               <div style={{display:'flex',gap:8}}>
                 {(['left','center'] as const).map(alignment=><button type="button" key={alignment} className="btn btn-secondary btn-sm image-alignment-option" aria-pressed={(imageModal.alignment??'left')===alignment} onClick={()=>setImageModal(current=>current?{...current,alignment}:current)}>{alignment==='left'?'Align left':'Center image'}</button>)}
               </div>
-            </fieldset>
-            <label style={{display:'block',fontSize:12,fontWeight:600,marginBottom:16}}>Maximum width (px)
+            </fieldset>}
+            {componentImage!=='textImage' && <label style={{display:'block',fontSize:12,fontWeight:600,marginBottom:16}}>Maximum width (px)
               <input className="input" type="number" min={1} max={10000} step={1} placeholder="No limit" value={imageModal.maxWidth ?? ''} onChange={e=>setImageModal(current=>current?{...current,maxWidth:e.target.value}:current)} />
-            </label>
+            </label>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button"
                 className="btn btn-primary btn-sm"
-                disabled={uploading || !imageModal.alt.trim() || (!!imageModal.maxWidth && imageMaxWidth(imageModal.maxWidth) === null)}
+                disabled={uploading || !imageModal.alt.trim() || (componentImage!=='textImage' && !!imageModal.maxWidth && imageMaxWidth(imageModal.maxWidth) === null)}
                 onClick={() => {
-                  if (!editor || uploading || !imageModal.alt.trim()) return
-                  if (imageModal.pos === null) {
-                    const image = {type:'image',attrs:{ alignment:imageModal.alignment??'left', creditName:imageModal.creditName, creditUrl:imageModal.creditUrl, src: imageModal.src, alt: imageModal.alt.trim(), title: imageModal.title, width: imageModal.width, height: imageModal.height, maxWidth:imageMaxWidth(imageModal.maxWidth) }}
-                    if(slideshowTarget){
-                      const slide={type:'slideshowSlide',content:[image,{type:'slideshowDescription',content:[{type:'paragraph'}]}]}
-                      let at:number
-                      if(slideshowTarget==='new'){
-                        const selection=editor.state.selection.$from;at=selection.depth?selection.after(1):selection.pos
-                        if(!editor.chain().focus().insertContentAt(at,{type:'slideshow',attrs:{id:crypto.randomUUID(),title:''},content:[slide]}).setTextSelection(at+5).run()){setImageError('Unable to insert slideshow here.');return}
-                      }else{
-                        let target:number|null=null
-                        editor.state.doc.forEach((node,pos)=>{if(node.type.name==='slideshow'&&node.attrs.id===slideshowTarget)target=pos+node.nodeSize-1})
-                        if(target===null){setImageError('The slideshow was removed. Close this window and insert a new slideshow.');return}
-                        at=target
-                        if(!editor.chain().focus().insertContentAt(at,slide).setTextSelection(at+4).run()){setImageError('Unable to add this slide.');return}
-                      }
-                    }else if(textImagePlacement){
-                      const body={type:'textImageBody',content:[{type:'paragraph'}]}
-                      const children=textImagePlacement==='left'?[image,body]:[body,image]
-                      const selection=editor.state.selection.$from
-                      const at=selection.depth ? selection.after(1) : selection.pos
-                      const textAt=at+(textImagePlacement==='left'?4:3)
-                      if(!editor.chain().focus().insertContentAt(at,{type:'textImage',content:children}).setTextSelection(textAt).run()){setImageError('Unable to insert the component here.');return}
-                    }else editor.chain().focus().insertContent(image).run()
-                  } else {
-                    const node = editor.state.doc.nodeAt(imageModal.pos)
-                    if (node?.type.name === 'image') {
-                      editor.chain().focus().setNodeSelection(imageModal.pos)
-                        .updateAttributes('image', { alignment:imageModal.alignment??'left', creditName:imageModal.creditName??null, creditUrl:imageModal.creditUrl??null, maxWidth:imageMaxWidth(imageModal.maxWidth), src:imageModal.src, width:imageModal.width, height:imageModal.height, alt: imageModal.alt.trim(), title: imageModal.title })
-                        .run()
-                    }
-                  }
-                  setTextImagePlacement(null)
-                  setSlideshowTarget(null)
-                  setImageModal(null)
+                  applyImage(imageModal)
                 }}
               >
                 {uploading ? 'Uploading…' : imageModal.pos === null ? slideshowTarget ? 'Add slide' : textImagePlacement ? 'Insert component' : 'Insert image' : 'Update'}
