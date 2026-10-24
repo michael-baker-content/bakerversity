@@ -2,6 +2,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import {canCreateCourse,canManageSite} from '@/lib/accessPolicy.mjs'
 import type { Course, User } from '@/lib/types'
 
 export default async function AdminCoursesPage() {
@@ -16,14 +17,13 @@ export default async function AdminCoursesPage() {
     .eq('clerk_id', clerkUser.id)
     .single<User>()
 
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
+  if (!user || !canCreateCourse(user)) {
     redirect('/dashboard')
   }
 
-  const { data: courses } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('instructor_id', user.id)
+  let query = supabase.from('courses').select('*')
+  if (!canManageSite(user)) query=query.eq('instructor_id',user.id)
+  const { data: courses } = await query
     .order('created_at', { ascending: false })
     .returns<Course[]>()
 

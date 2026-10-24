@@ -1,3 +1,4 @@
+import {canEditCourse} from '@/lib/accessPolicy.mjs'
 import LessonAssets from '@/components/LessonAssets'
 import { createServiceClient } from '@/lib/supabase'
 import { currentUser } from '@clerk/nextjs/server'
@@ -48,7 +49,7 @@ export default async function CoursePageViewer({
     : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
-  isInstructor = dbUser?.role === 'admin' || (dbUser?.role === 'instructor' && course.instructor_id === dbUser.id)
+  isInstructor = canEditCourse(dbUser,course)
   if (!isInstructor && !course.is_published) notFound()
 
   // Auth gate

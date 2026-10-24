@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
+import {canManageSite} from '@/lib/accessPolicy.mjs'
 import { NextResponse } from 'next/server'
 
 // ── GET — fetch all text_response answers across instructor's courses ─────────
@@ -10,20 +11,14 @@ export async function GET() {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase
-    .from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   // Get all courses this instructor owns
-  const { data: courses, error: coursesError } = await supabase
-    .from('courses')
-    .select('id, title, slug')
-    .eq('instructor_id', user.id)
+  let query=supabase.from('courses').select('id, title, slug')
+  if(!canManageSite(user))query=query.eq('instructor_id',user.id)
+  const { data: courses, error: coursesError } = await query
 
   if (coursesError) return NextResponse.json({error:'Unable to load assessment responses. Please retry.'},{status:502})
   if (!courses?.length) return NextResponse.json({ responses: [] })
@@ -160,14 +155,9 @@ export async function POST(req: Request) {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase
-    .from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   const { assessment_attempt_id, question_id, student_id, feedback_text } = await req.json()
 
@@ -175,6 +165,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  const {data:attempt}=await supabase.from('assessment_attempts').select('assessment_id, user_id').eq('id',assessment_attempt_id).single()
+  if(!attempt || attempt.user_id!==student_id)return NextResponse.json({error:'Forbidden'},{status:403})
+  const {data:assessment}=await supabase.from('assessments').select('course_id').eq('id',attempt.assessment_id).single()
+  if(!assessment || !await authorAccessFor(clerkUser.id,assessment.course_id))return NextResponse.json({error:'Forbidden'},{status:403})
+  const {data:question}=await supabase.from('assessment_questions').select('id').eq('id',question_id).eq('assessment_id',attempt.assessment_id).single()
+  if(!question)return NextResponse.json({error:'Question not found'},{status:404})
   // Strip any HTML from feedback before storing — instructors are trusted
   // but defence-in-depth applies here too
   const safeFeedback = String(feedback_text).replace(/<[^>]*>/g, '').trim()

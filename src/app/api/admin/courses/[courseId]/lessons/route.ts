@@ -1,6 +1,6 @@
-import { textImageError } from '@/lib/textImage.mjs'
+import {documentError} from '@/lib/documentValidation.mjs'
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
 import { NextResponse } from 'next/server'
 
 function toSlug(title: string): string {
@@ -20,30 +20,14 @@ export async function POST(
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
+  const access = await authorAccessFor(clerkUser.id, courseId)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, role')
-    .eq('clerk_id', clerkUser.id)
-    .single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  const { data: course } = await supabase
-    .from('courses')
-    .select('id')
-    .eq('id', courseId)
-    .eq('instructor_id', user.id)
-    .single()
-
-  if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
 
   const { title, content, module_id, introduction } = await req.json()
 
-  const componentError=textImageError(content)
+  const componentError=documentError(content)
   if(componentError)return NextResponse.json({error:componentError},{status:400})
   if (!title) return NextResponse.json({ error: 'Title is required' }, { status: 400 })
 

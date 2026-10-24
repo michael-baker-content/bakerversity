@@ -1,7 +1,8 @@
 import { Node } from '@tiptap/core'
 import { Plugin, Selection, TextSelection, NodeSelection, type EditorState } from '@tiptap/pm/state'
 import { GapCursor } from '@tiptap/pm/gapcursor'
-import { textImageError, textImageVerticalAlign } from '../../lib/textImage.mjs'
+import {documentError} from '../../lib/documentValidation.mjs'
+import {textImageVerticalAlign} from '../../lib/textImage.mjs'
 
 /** Select outside the component without inserting or changing content. */
 export function textImageBoundarySelection(state: EditorState, pos: number, size: number, direction: -1 | 1) {
@@ -68,7 +69,7 @@ export const TextImageExtension = Node.create({
  addOptions(){return {onInvalid:(_message:string)=>{}}},
  addProseMirrorPlugins(){return [new Plugin({filterTransaction:transaction=>{
   if(!transaction.docChanged)return true
-  const error=textImageError(transaction.doc.toJSON())
+  const error=documentError(transaction.doc.toJSON())
   if(error)this.options?.onInvalid?.(error)
   return !error
  }})]},

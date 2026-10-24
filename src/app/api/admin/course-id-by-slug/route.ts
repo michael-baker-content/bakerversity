@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
+import { canEditCourse } from '@/lib/accessPolicy.mjs'
 import { NextResponse } from 'next/server'
 
 // GET /api/admin/course-id-by-slug?slug=intro-to-algebra
@@ -11,26 +12,17 @@ export async function GET(req: Request) {
   const slug = searchParams.get('slug')
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 })
 
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, role')
-    .eq('clerk_id', clerkUser.id)
-    .single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id')
+    .select('id, instructor_id')
     .eq('slug', slug)
-    .eq('instructor_id', user.id)
     .single()
 
-  if (!course) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!canEditCourse(user,course)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  return NextResponse.json({ id: course.id })
+  return NextResponse.json({ id: course!.id })
 }

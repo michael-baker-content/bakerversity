@@ -1,5 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
 import { NextResponse } from 'next/server'
 
 // GET /api/admin/lesson-id-by-slug?courseId=xxx&slug=solving-linear-equations
@@ -15,17 +15,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'courseId and slug required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, role')
-    .eq('clerk_id', clerkUser.id)
-    .single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id, courseId)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   const { data: lesson } = await supabase
     .from('lessons')

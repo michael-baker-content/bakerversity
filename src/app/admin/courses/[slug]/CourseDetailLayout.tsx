@@ -82,7 +82,6 @@ function CollapsibleSection({
   courseId,
   initialLessons,
   initialAssessments,
-  allModules,
   defaultOpen = true,
 }: {
   id: string
@@ -92,7 +91,6 @@ function CollapsibleSection({
   courseId: string
   initialLessons: Lesson[]
   initialAssessments: Assessment[]
-  allModules: Module[]
   defaultOpen?: boolean
 }) {
   const router = useRouter()
@@ -513,7 +511,6 @@ export default function CourseDetailLayout({ course, modules, pages, lessons, as
           courseId={course.id}
           initialLessons={lessons.filter((l) => l.module_id === mod.id)}
           initialAssessments={assessments.filter((a) => a.module_id === mod.id)}
-          allModules={modules}
         />
       ))}
 

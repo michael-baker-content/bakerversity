@@ -1,5 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
 import { NextResponse } from 'next/server'
 import { markdownToTipTap } from '@/lib/markdownToTipTap'
 
@@ -11,17 +11,7 @@ export async function POST(req: Request) {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Verify instructor role
-  const supabase = createServiceClient()
-  const { data: user } = await supabase
-    .from('users')
-    .select('role')
-    .eq('clerk_id', clerkUser.id)
-    .single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  if(!await authorAccessFor(clerkUser.id))return NextResponse.json({error:'Forbidden'},{status:403})
 
   const formData = await req.formData()
   const file = formData.get('file') as File | null

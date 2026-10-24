@@ -1,17 +1,16 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
+import { resolveAuthorAccess } from './accessPolicy.mjs'
 
-export async function adminAccess(courseId?: string) {
-  const clerk = await currentUser()
-  if (!clerk) return null
-  const db = createServiceClient()
-  const { data: user } = await db.from('users').select('id, role').eq('clerk_id', clerk.id).single()
-  if (!user || !['instructor', 'admin'].includes(user.role)) return null
-  if (courseId) {
-    const { data: course } = await db.from('courses').select('instructor_id').eq('id', courseId).single()
-    if (!course || (user.role !== 'admin' && course.instructor_id !== user.id)) return null
-  }
-  return { db, user }
+// The caller supplies a server-authenticated Clerk ID, never a request-body ID.
+export async function authorAccessFor(clerkId:string,courseId?:string){
+ const db=createServiceClient()
+ const user=await resolveAuthorAccess(db,clerkId,courseId)
+ return user ? {db,user:user as {id:string;role:string}} : null
+}
+export async function adminAccess(courseId?:string){
+ const clerk=await currentUser()
+ return clerk ? authorAccessFor(clerk.id,courseId) : null
 }
 
 export async function learnerAccess() {

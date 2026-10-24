@@ -5,7 +5,8 @@ import Image from '@tiptap/extension-image'
 import {EditorState} from '@tiptap/pm/state'
 import {history,undo} from '@tiptap/pm/history'
 import {TextImageExtension,TextImageBody} from '../src/components/editor/TextImageExtension.ts'
-import {textImageError,imagePlainText} from '../src/lib/textImage.mjs'
+import {documentError} from '../src/lib/documentValidation.mjs'
+import {imagePlainText} from '../src/lib/textImage.mjs'
 import {renderNode} from '../src/components/renderer/renderNode.ts'
 import {jsonToMarkdown} from '../src/lib/lessonMarkdown.ts'
 import {htmlDownloadDocument} from '../src/lib/lessonExport.mjs'
@@ -14,7 +15,7 @@ const image={type:'image',attrs:{src:'/diagram.png',alt:'Diagram',title:'Image c
 const body={type:'textImageBody',content:[{type:'heading',attrs:{level:2},content:[{type:'text',text:'Heading'}]},{type:'paragraph',content:[{type:'text',text:'Body text',marks:[{type:'bold'}]}]}]}
 for(const children of [[image,body],[body,image]]){
  const value={type:'doc',content:[{type:'textImage',content:children}]}
- assert.equal(textImageError(value),'')
+ assert.equal(documentError(value),'')
  const doc=schema.nodeFromJSON(value);doc.check()
  assert.deepEqual(schema.nodeFromJSON(doc.toJSON()).toJSON(),doc.toJSON())
  const plain=getText(doc,{textSerializers:getTextSerializersFromSchema(schema)})
@@ -37,16 +38,16 @@ for(const children of [[image,body],[body,image]]){
  const result=state.applyTransaction(state.tr.replaceWith(0,state.doc.content.size,illegal))
  assert.equal(result.transactions.length,0)
 }
-assert.ok(textImageError({type:'doc',content:[{type:'callout',content:[{type:'textImage',content:[image,body]}]}]}))
-assert.ok(textImageError({type:'doc',content:[{type:'textImage',content:[image]}]}))
-assert.ok(textImageError({type:'doc',content:[{type:'textImage',content:[{...image,attrs:{src:'/x',alt:' '}},body]}]}))
-assert.ok(textImageError({type:'doc',content:[{type:'textImage',content:[image,{type:'textImageBody',content:[{type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph'},{type:'codeBlock'}]}]}]}]}]}))
-assert.equal(textImageError({type:'doc',content:[{type:'codeBlock'}]}),'')
+assert.ok(documentError({type:'doc',content:[{type:'callout',content:[{type:'textImage',content:[image,body]}]}]}))
+assert.ok(documentError({type:'doc',content:[{type:'textImage',content:[image]}]}))
+assert.ok(documentError({type:'doc',content:[{type:'textImage',content:[{...image,attrs:{src:'/x',alt:' '}},body]}]}))
+assert.ok(documentError({type:'doc',content:[{type:'textImage',content:[image,{type:'textImageBody',content:[{type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph'},{type:'codeBlock'}]}]}]}]}]}))
+assert.equal(documentError({type:'doc',content:[{type:'codeBlock'}]}),'')
 assert.match(htmlDownloadDocument('fixture'),/grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/)
 assert.match(htmlDownloadDocument('fixture'),/@container \(max-width: 540px\)/)
 console.log('PASS: text/image schema, both reading orders, undo, root-only filtering, validation, rendering and Markdown')
 
-assert.ok(textImageError({type:'doc',content:[{type:'textImage',content:[null]}]}))
+assert.ok(documentError({type:'doc',content:[{type:'textImage',content:[null]}]}))
 
 // Navigating out never inserts empty paragraphs; typing at a gap creates one on demand.
 const {Selection,TextSelection,NodeSelection}=await import('@tiptap/pm/state')
@@ -66,7 +67,7 @@ for(const children of [[image,body],[body,image]]){
   assert.deepEqual(state.doc.toJSON(),doc.toJSON())
   const typed=state.apply(state.tr.insertText('Outside'))
   assert.equal((direction===-1?typed.doc.firstChild:typed.doc.lastChild).type.name,'paragraph')
-  assert.equal(textImageError(typed.doc.toJSON()),'')
+  assert.equal(documentError(typed.doc.toJSON()),'')
   const editor={get state(){return state},view:{dispatch(tr){state=state.apply(tr)}}}
   const keys=TextImageExtension.config.addKeyboardShortcuts.call({editor})
   assert.equal(keys.Enter(),true)
@@ -96,7 +97,7 @@ for(const alignment of ['top','center','bottom']){
  assert.equal(schema.nodeFromJSON(doc.toJSON()).firstChild.attrs.textVerticalAlign,alignment)
  assert.equal(doc.firstChild.type.spec.toDOM(doc.firstChild)[1]['data-text-vertical-align'],alignment)
  assert.ok(renderNode(doc.toJSON()).includes('data-text-vertical-align="'+alignment+'"'))
- assert.equal(textImageError(value),'')
+ assert.equal(documentError(value),'')
 }
 assert.equal(schema.nodeFromJSON({type:'textImage',content:[image,body]}).attrs.textVerticalAlign,'top')
 assert.ok(renderNode({type:'textImage',attrs:{textVerticalAlign:'bad" onclick="bad'},content:[image,body]}).includes('data-text-vertical-align="top"'))

@@ -2,6 +2,7 @@
 import {parseAssetTags} from '@/lib/assetTags.mjs'
 import { useEffect, useState, useRef, useId } from 'react'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
+import {uploadCourseAsset,saveAssetMetadata} from '@/lib/authoring/assets'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
@@ -69,9 +70,8 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
     for(const file of files){
       setMessage('Uploading '+(completed+failures.length+1)+' of '+files.length+': '+file.name)
       try {
-        const body=new FormData();body.append('file',file)
         const image=['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)
-        await requestJson(endpoint+(courseId?'&':'?')+'kind='+(image?'image':'resource'),{method:'POST',body},'resource upload')
+        await uploadCourseAsset(file,courseId,image?'image':'resource')
         completed++
       } catch(e){failures.push(file.name+': '+(e instanceof Error?e.message:'Upload failed'))}
     }
@@ -212,7 +212,7 @@ function AssetDetails({asset,draft,onDraft,endpoint,disabled,onSaved}:{asset:Ass
  <label>Caption <span className="asset-field-optional">(optional)</span><textarea aria-label="Caption" className="input" rows={3} maxLength={5000} value={fields.caption} disabled={busy||disabled} onChange={e=>change({caption:e.target.value})} /></label></>}
  <button type="button" className="btn btn-secondary btn-sm" disabled={busy||disabled||!draft||!fields.name.trim()} onClick={async()=>{
    setBusy(true);setMessage('')
-   try{const tags=parseAssetTags(fields.tags);await requestJson(endpoint,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:asset.id,display_name:fields.name,alt_text:fields.alt,caption:fields.caption,tags})},'asset details save');onSaved(fields.name.trim(),fields.alt,fields.caption,tags);setMessage('Details saved.')}
+   try{const tags=parseAssetTags(fields.tags);await saveAssetMetadata(endpoint,{id:asset.id,display_name:fields.name,alt_text:fields.alt,caption:fields.caption,tags});onSaved(fields.name.trim(),fields.alt,fields.caption,tags);setMessage('Details saved.')}
    catch(e){setMessage(e instanceof Error?e.message:'Save failed')}
    finally{setBusy(false)}
  }}>{busy?'Saving…':'Save details'}</button>

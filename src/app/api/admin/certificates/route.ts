@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
+import { canManageSite } from '@/lib/accessPolicy.mjs'
 import { NextResponse } from 'next/server'
 
 const supabase = createServiceClient()
@@ -10,7 +11,7 @@ async function assertAdmin(clerkId: string) {
     .select('role')
     .eq('clerk_id', clerkId)
     .single()
-  return data?.role === 'admin' || data?.role === 'instructor'
+  return canManageSite(data)
 }
 
 // GET /api/admin/certificates — list all certificates

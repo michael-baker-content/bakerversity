@@ -97,7 +97,6 @@ function emptyForm(): QuestionFormState {
 
 function QuestionForm({
   initial,
-  assessmentId,
   courseId,
   onSave,
   onCancel,
@@ -105,7 +104,6 @@ function QuestionForm({
   editorPacks,
 }: {
   initial: QuestionFormState
-  assessmentId: string
   courseId: string
   onSave: (data: QuestionFormState) => Promise<void>
   onCancel: () => void
@@ -484,7 +482,6 @@ function QuestionRow({
           </p>
           <QuestionForm
             initial={initialForm}
-            assessmentId={assessmentId}
             courseId={courseId}
             onSave={handleSave}
             onCancel={() => setEditing(false)}
@@ -740,7 +737,6 @@ export default function EditAssessmentPage() {
             <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700 }}>New question</h3>
             <QuestionForm
               initial={emptyForm()}
-              assessmentId={assessmentId}
               courseId={courseId ?? ''}
               onSave={handleAddQuestion}
               onCancel={() => setAddingQuestion(false)}

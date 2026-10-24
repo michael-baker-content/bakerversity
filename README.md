@@ -179,3 +179,5 @@ Older dated verification notes describe the state at that time, not the current 
 
 
 Shared editor policies live in `src/lib/editorLinks.mjs` (authored-link validation and new-tab behavior), `src/lib/callouts.mjs` (callout labels, icons, and colors), and `src/lib/textLanguages.mjs` (text-language options). Update these definitions rather than duplicating rules in individual editors or the student renderer.
+
+See [access control](docs/access-control.md) for owner/admin authoring permissions, enrollment separation, and authorization test coverage.

@@ -7,7 +7,7 @@ import {history,undo} from '@tiptap/pm/history'
 import {FootnoteExtension} from '../src/components/editor/FootnoteExtension.ts'
 import {TextImageExtension,TextImageBody} from '../src/components/editor/TextImageExtension.ts'
 import {collectFootnotes,footnoteError,footnoteText} from '../src/lib/footnotes.mjs'
-import {textImageError} from '../src/lib/textImage.mjs'
+import {documentError} from '../src/lib/documentValidation.mjs'
 import {renderNode,buildRenderPlan} from '../src/components/renderer/renderNode.ts'
 import {jsonToMarkdown} from '../src/lib/lessonMarkdown.ts'
 import {markdownToTipTap} from '../src/lib/markdownToTipTap.ts'
@@ -17,7 +17,7 @@ const ref=(id,text)=>({type:'footnote',attrs:{id,body:body(text)}})
 const doc={type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'First'},ref('shared','Shared note'),{type:'text',text:' second'},ref('other','Other note'),ref('shared','Shared note')]}]}
 const notes=collectFootnotes(doc)
 assert.deepEqual(notes.map(n=>[n.id,n.number,n.references]),[['shared',1,[1,3]],['other',2,[2]]])
-assert.equal(footnoteError(doc),'');assert.equal(textImageError(doc),'')
+assert.equal(footnoteError(doc),'');assert.equal(documentError(doc),'')
 const html=renderNode(doc,undefined,'page-a')
 assert.equal((html.match(/role="doc-noteref"/g)??[]).length,3)
 assert.match(html,/id="page-a-fn-1"/);assert.match(html,/href="#page-a-fnref-3"/)
@@ -48,7 +48,7 @@ const tr=state.tr;state.doc.descendants((node,pos)=>{if(node.type.name==='footno
 state=state.apply(tr);assert.match(footnoteText(collectFootnotes(state.doc.toJSON())[0].body),/Edited/)
 assert.ok(undo(state,tr=>state=state.apply(tr)));assert.deepEqual(state.doc.toJSON(),parsed.toJSON())
 const nested={type:'doc',content:[{type:'textImage',content:[{type:'image',attrs:{src:'/a.png',alt:'Image'}},{type:'textImageBody',content:doc.content}]}]}
-assert.equal(textImageError(nested),'');schema.nodeFromJSON(nested).check();assert.match(renderNode(nested),/role="doc-endnotes"/)
+assert.equal(documentError(nested),'');schema.nodeFromJSON(nested).check();assert.match(renderNode(nested),/role="doc-endnotes"/)
 assert.equal(availableInsertTools([]).some(t=>t.id==='footnote'),false)
 assert.equal(availableInsertTools(['footnotes']).some(t=>t.id==='footnote'),true)
 console.log('PASS: shared footnotes, numbering, removal, rich text, scoped anchors, Markdown round-trip, validation, undo and course gating')

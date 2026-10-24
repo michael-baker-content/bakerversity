@@ -1,4 +1,5 @@
 import { courseUpdatedDrafts } from '@/lib/courseDraftStatus'
+import {canCreateCourse,canEditCourse} from '@/lib/accessPolicy.mjs'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
 import { notFound, redirect } from 'next/navigation'
@@ -20,7 +21,11 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
-  const { data } = await supabase.from('courses').select('title').eq('slug', slug).single()
+  const {userId}=await auth()
+  if(!userId)return {title:'Course — Admin'}
+  const {data:user}=await supabase.from('users').select('id, role').eq('clerk_id',userId).single()
+  const { data:course } = await supabase.from('courses').select('title, instructor_id').eq('slug', slug).single()
+  const data=canEditCourse(user,course)?course:null
   return { title: data ? `${data.title} — Admin | Bakerversity` : 'Course — Admin' }
 }
 
@@ -35,15 +40,15 @@ export default async function AdminCourseDetailPage({
 
   const { data: user } = await supabase
     .from('users').select('id, role').eq('clerk_id', clerkId).single()
-  if (!user || (user.role !== 'admin' && user.role !== 'instructor')) redirect('/dashboard')
+  if (!user || !canCreateCourse(user)) redirect('/dashboard')
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, thumbnail_attribution, intro_description, conclusion_description, editor_tools')
+    .select('instructor_id, id, title, slug, description, is_published, is_public, price_cents, thumbnail_url, thumbnail_attribution, intro_description, conclusion_description, editor_tools')
     .eq('slug', slug)
     .single()
 
-  if (!course) notFound()
+  if (!course || !canEditCourse(user,course)) notFound()
 
   const [
     { data: modules },

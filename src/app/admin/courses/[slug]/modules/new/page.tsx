@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ModuleForm from '@/components/ModuleForm'
 
 export default function NewModulePage() {
   const router = useRouter()
@@ -60,45 +61,9 @@ export default function NewModulePage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>New module</h1>
 
-      <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div>
-          <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
-          <input
-            className="input"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            autoFocus
-          />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Description <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
-          <textarea
-            className="input"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="Brief description shown on the course page…"
-          />
-        </div>
-
-        {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
-            {saving ? 'Saving…' : 'Add module'}
-          </button>
-          <Link href={`/admin/courses/${slug}`}>
-            <button type="button" className="btn btn-ghost">Cancel</button>
-          </Link>
-        </div>
-      </form>
+      <ModuleForm title={title} description={description} error={error} saving={saving}
+        disabled={!courseId} submitLabel="Add module" autoFocus={true}
+        cancelHref={`/admin/courses/${slug}`} onTitleChange={setTitle} onDescriptionChange={setDescription} onSubmit={handleSave} />
     </main>
   )
-}
-
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)',
 }

@@ -1,6 +1,6 @@
-import { textImageError } from '@/lib/textImage.mjs'
+import {documentError} from '@/lib/documentValidation.mjs'
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
 import { NextResponse } from 'next/server'
 import type { AssessmentType } from '@/lib/types'
 
@@ -24,13 +24,9 @@ export async function GET(
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
-  const { data: user } = await supabase
-    .from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id, courseId)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   const { data, error } = await supabase
     .from('assessments')
@@ -55,23 +51,15 @@ export async function POST(
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
-  const { data: user } = await supabase
-    .from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
+  const access = await authorAccessFor(clerkUser.id, courseId)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  // Verify the instructor owns this course
-  const { data: course } = await supabase
-    .from('courses').select('id').eq('id', courseId).eq('instructor_id', user.id).single()
-  if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
 
   const body = await req.json()
   const { title, assessment_type, module_id, is_graded, passing_score, intro_content } = body
 
-  const componentError=textImageError(intro_content)
+  const componentError=documentError(intro_content)
   if(componentError)return NextResponse.json({error:componentError},{status:400})
   if (!title?.trim()) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })

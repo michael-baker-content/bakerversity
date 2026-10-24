@@ -6,7 +6,7 @@ import {EditorState,Selection} from '@tiptap/pm/state'
 import {history,undo} from '@tiptap/pm/history'
 import {SlideshowExtension,SlideshowSlideExtension,SlideshowDescription} from '../src/components/editor/SlideshowExtension.ts'
 import {TextImageExtension,TextImageBody,textImageExitSelection} from '../src/components/editor/TextImageExtension.ts'
-import {textImageError} from '../src/lib/textImage.mjs'
+import {documentError} from '../src/lib/documentValidation.mjs'
 import {renderNode,buildRenderPlan} from '../src/components/renderer/renderNode.ts'
 import {jsonToMarkdown} from '../src/lib/lessonMarkdown.ts'
 const math=(name,inline)=>Node.create({name,inline,group:inline?'inline':'block',atom:true,addAttributes(){return {latex:{default:''}}}})
@@ -14,7 +14,7 @@ const schema=getSchema([StarterKit,Image,TextImageExtension,TextImageBody,Slides
 const paragraph=text=>({type:'paragraph',content:[{type:'text',text}]})
 const slide=(n)=>({type:'slideshowSlide',content:[{type:'image',attrs:{src:'/image'+n+'.png',alt:'Image '+n,title:'Caption '+n}},{type:'slideshowDescription',content:[paragraph('Description '+n),{type:'paragraph',content:[{type:'inlineMath',attrs:{latex:'x^2'}},{type:'text',text:'Reference',marks:[{type:'link',attrs:{href:'https://example.com/'}}]}]},{type:'blockMath',attrs:{latex:'y=2'}}]}]})
 const value={type:'doc',content:[{type:'slideshow',attrs:{id:'test',title:'Examples'},content:[slide(1),slide(2)]}]}
-assert.equal(textImageError(value),'')
+assert.equal(documentError(value),'')
 const doc=schema.nodeFromJSON(value);doc.check()
 assert.deepEqual(schema.nodeFromJSON(doc.toJSON()).toJSON(),doc.toJSON())
 const text=getText(doc,{textSerializers:getTextSerializersFromSchema(schema)})
@@ -29,9 +29,9 @@ state=state.applyTransaction(state.tr.replaceWith(0,doc.content.size,reordered))
 assert.equal(state.doc.firstChild.firstChild.firstChild.attrs.alt,'Image 2')
 assert.ok(undo(state,tr=>state=state.apply(tr)));assert.deepEqual(state.doc.toJSON(),doc.toJSON())
 for(const mutate of [v=>v.content[0].content[0].content[0].attrs.alt='',v=>v.content[0].content=[],v=>v.content[0].content[0].content.reverse(),v=>v.content[0].content[0].content[1].content.push({type:'codeBlock'}),v=>v.content[0].content=[null]]){
- const invalid=structuredClone(value);mutate(invalid);assert.ok(textImageError(invalid))
+ const invalid=structuredClone(value);mutate(invalid);assert.ok(documentError(invalid))
 }
-assert.ok(textImageError({type:'doc',content:[{type:'blockquote',content:value.content}]}))
+assert.ok(documentError({type:'doc',content:[{type:'blockquote',content:value.content}]}))
 const end=Selection.findFrom(state.doc.resolve(state.doc.content.size),-1,true)
 state=state.apply(state.tr.setSelection(end));assert.equal(textImageExitSelection(state,1)?.from,doc.content.size)
 assert.equal(state.applyTransaction(state.tr.replaceWith(0,doc.content.size,schema.nodes.blockquote.create(null,doc.firstChild))).transactions.length,0)

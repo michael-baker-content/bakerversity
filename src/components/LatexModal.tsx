@@ -66,7 +66,6 @@ const LATEX_CATEGORIES = [
   },
 ]
 
-export { LATEX_CATEGORIES }
 
 function renderLatex(latex: string, displayMode: boolean): string {
   try { return katex.renderToString(latex, { throwOnError: false, displayMode }) }

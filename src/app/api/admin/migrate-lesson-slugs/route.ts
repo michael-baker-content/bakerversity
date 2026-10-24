@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase'
+import { canManageSite } from '@/lib/accessPolicy.mjs'
 import { NextResponse } from 'next/server'
 
 function toSlug(title: string): string {
@@ -26,7 +27,7 @@ export async function POST() {
     .eq('clerk_id', clerkUser.id)
     .single()
 
-  if (!user || user.role !== 'admin' && user.role !== 'instructor') {
+  if (!canManageSite(user)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

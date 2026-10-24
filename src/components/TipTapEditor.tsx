@@ -1,4 +1,5 @@
 'use client'
+import {uploadCourseAsset} from '@/lib/authoring/assets'
 import { editorLinkOptions, editorLinkAttributes } from '../lib/editorLinks.mjs'
 import {FootnoteNode} from './editor/FootnoteNode'
 import FootnotesPreview from './editor/FootnotesPreview'
@@ -9,7 +10,8 @@ import {SlideshowNode,SlideshowSlide} from './editor/SlideshowNode'
 import {SlideshowDescription} from './editor/SlideshowExtension'
 import { TextImageNode } from './editor/TextImageNode'
 import { TextImageBody } from './editor/TextImageExtension'
-import { textImageError, imagePlainText } from '@/lib/textImage.mjs'
+import {documentError} from '@/lib/documentValidation.mjs'
+import {imagePlainText} from '@/lib/textImage.mjs'
 import { jsonToMarkdown } from '@/lib/lessonMarkdown'
 import { htmlDownloadDocument } from '@/lib/lessonExport.mjs'
 import AssetLibrary from './AssetLibrary'
@@ -117,7 +119,7 @@ export default function TipTapEditor({
   const [footnoteTarget,setFootnoteTarget]=useState<{id?:string;pos?:number}|null>(null)
   const [slideshowTarget,setSlideshowTarget]=useState<string|null>(null)
   const [textImagePlacement, setTextImagePlacement] = useState<'left'|'right'|null>(null)
-  const componentLoadError = textImageError(content)
+  const componentLoadError = documentError(content)
   const [componentEditError,setComponentEditError]=useState('')
 
   // Image modal — shown after upload and on double-click of existing image
@@ -248,7 +250,7 @@ export default function TipTapEditor({
   useEffect(() => {
     if (!editor || !onEditorReady) return
     onEditorReady((doc: Record<string, unknown>) => {
-      const componentError=textImageError(doc)
+      const componentError=documentError(doc)
       if(componentError){alert(componentError);return}
       const nodes = (doc.content as Record<string, unknown>[] | undefined) ?? []
       nodes.forEach((node) => {
@@ -304,17 +306,12 @@ export default function TipTapEditor({
     setUploading(true)
     setImageError('')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/admin/upload'+(courseId?'?course_id='+encodeURIComponent(courseId):''), { method: 'POST', body: formData })
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Upload failed.') }
-      const { url } = await res.json()
-      if (typeof url !== 'string' || !url) throw new Error('Upload did not return an image URL.')
+      const {url,asset_id}=await uploadCourseAsset(file,courseId)
       // Show modal to set alt text and caption before inserting
       let dimensions: { width?: number; height?: number } = {}
       try { const bitmap = await createImageBitmap(file); dimensions = { width: bitmap.width, height: bitmap.height }; bitmap.close() } catch { /* Older browsers still insert the image. */ }
-      if (replace) setImageModal(current => current ? {...current, src:url, creditName:null, creditUrl:null, width:dimensions.width, height:dimensions.height} : current)
-      else setImageModal({ src: url, ...dimensions, alt: '', title: '', pos: null })
+      if (replace) setImageModal(current => current ? {...current, src:url, assetId:asset_id, assetName:file.name, tags:[], creditName:null, creditUrl:null, width:dimensions.width, height:dimensions.height} : current)
+      else setImageModal({ src: url, assetId:asset_id, assetName:file.name, tags:[], ...dimensions, alt: '', title: '', pos: null })
     } catch (error) { const message = error instanceof Error ? error.message : 'Upload failed. Please try again.'; if (replace) setImageError(message); else alert(message) }
     finally { setUploading(false) }
   }, [editor,courseId])

@@ -1,3 +1,4 @@
+import {authorAccessFor} from '@/lib/adminAccess'
 import { currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
@@ -11,6 +12,7 @@ const ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY
 export async function GET(req: Request) {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if(!await authorAccessFor(clerkUser.id))return NextResponse.json({error:'Forbidden'},{status:403})
 
   if (!ACCESS_KEY) {
     return NextResponse.json({ error: 'Unsplash API key not configured' }, { status: 500 })
@@ -62,6 +64,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if(!await authorAccessFor(clerkUser.id))return NextResponse.json({error:'Forbidden'},{status:403})
 
   if (!ACCESS_KEY) {
     return NextResponse.json({ error: 'Unsplash API key not configured' }, { status: 500 })

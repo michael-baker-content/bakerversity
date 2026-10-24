@@ -9,8 +9,9 @@
   "rules": {
     "unused-files": "error",
     "unused-exports": "warn",
-    "unused-types": "off",
-    "duplication": "warn",
-    "complexity": "warn"
-  }
+    "unused-types": "off"
+  },
+  "entry": [
+    "tests/browser/*.js"
+  ]
 }

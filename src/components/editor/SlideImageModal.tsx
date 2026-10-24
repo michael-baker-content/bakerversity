@@ -4,7 +4,7 @@ import SlideDescriptionEditor from './SlideDescriptionEditor'
 import {useEffect,useRef,useState} from 'react'
 import {createPortal} from 'react-dom'
 import {parseAssetTags} from '../../lib/assetTags.mjs'
-import {requestJson} from '../../lib/authoring/request'
+import {uploadCourseAsset,saveAssetMetadata,assetEndpoint} from '../../lib/authoring/assets'
 import {imageMaxWidth} from '../../lib/imageWidth.mjs'
 export interface SlideImageDraft {tags?:string[];description?:JSONContent;src:string;alt:string;title:string;pos:number|null;assetId?:string;assetName?:string;creditName?:string|null;creditUrl?:string|null;width?:number;height?:number;maxWidth?:string;alignment?:'left'|'center'}
 export default function SlideImageModal({initial,courseId,onSubmit,onClose,onChoose,onUnsplash}:{initial:SlideImageDraft;courseId?:string;onSubmit:(draft:SlideImageDraft,another:boolean)=>boolean;onClose:()=>void;onChoose:(draft:SlideImageDraft)=>void;onUnsplash:(draft:SlideImageDraft)=>void}){
@@ -19,13 +19,11 @@ export default function SlideImageModal({initial,courseId,onSubmit,onClose,onCho
   try{
    const tags=parseAssetTags(tagInput)
    if(file){
-    const body=new FormData();body.append('file',file)
-    const result=await requestJson<{asset_id:string;url:string}>('/api/admin/assets?kind=image'+(courseId?'&course_id='+encodeURIComponent(courseId):''),{method:'POST',body},'slide image upload')
-    if(!result.url||!result.asset_id)throw new Error('The upload did not return an image. Check the library before retrying.')
+    const result=await uploadCourseAsset(file,courseId)
     saved={...draft,src:result.url,assetId:result.asset_id};setDraft(saved);setFile(null)
    }
    if(saved.assetId&&courseId&&(defaults||JSON.stringify(tags)!==JSON.stringify(initial.tags??[]))){
-    await requestJson('/api/admin/assets?course_id='+encodeURIComponent(courseId),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:saved.assetId,tags,...(defaults?{display_name:saved.assetName,alt_text:saved.alt.trim(),caption:saved.title}:{})})},'slide image details save')
+    await saveAssetMetadata(assetEndpoint(courseId),{id:saved.assetId,tags,...(defaults?{display_name:saved.assetName,alt_text:saved.alt.trim(),caption:saved.title}:{})})
    }
    if(!onSubmit({...saved,tags,alt:saved.alt.trim()},another))setError('Unable to update the slideshow. Your settings are still here.')
   }catch(e){setError(e instanceof Error?e.message:'Unable to save the slide.')}

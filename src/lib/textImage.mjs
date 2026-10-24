@@ -1,8 +1,6 @@
-import {footnoteError} from './footnotes.mjs'
-import {slideshowError} from './slideshow.mjs'
 /** Validate only this component contract; leave existing document types untouched. */
 export function textImageError(document) {
- let error=slideshowError(document)||footnoteError(document)
+ let error=''
  const allowed=new Set(['paragraph','heading','bulletList','orderedList','listItem','text','hardBreak','footnote'])
  function visit(node,parent,inBody=false){
   if(!node||typeof node!=='object'||error)return

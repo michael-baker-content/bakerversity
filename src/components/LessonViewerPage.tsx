@@ -1,3 +1,4 @@
+import {canEditCourse} from '@/lib/accessPolicy.mjs'
 import { lessonDraftDiffers } from '@/lib/lessonPreview.mjs'
 import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
 import { LessonHeading, LessonPager } from '@/components/LessonPresentation'
@@ -47,7 +48,7 @@ export default async function renderLesson({params,draftPreviewId}: {params:Prom
     : courseQuery.eq('is_published', true)
   ).single<Course>()
   if (!course) notFound()
-  isInstructor = dbUser?.role === 'admin' || (dbUser?.role === 'instructor' && course.instructor_id === dbUser.id)
+  isInstructor = canEditCourse(dbUser,course)
   if (!isInstructor && !course.is_published) notFound()
   if (draftPreviewId && !isInstructor) notFound()
 

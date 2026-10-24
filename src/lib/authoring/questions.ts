@@ -1,4 +1,4 @@
-import { textImageError } from '../textImage.mjs'
+import {documentError} from '../documentValidation.mjs'
 /** Keep the chosen answer attached to its option when rows are removed or compacted. */
 export function removeAnswerOption(options: string[], correct: string, index: number) {
   const selected = correct === '' ? -1 : Number(correct)
@@ -21,7 +21,7 @@ export function hasQuestionContent(value: unknown): boolean {
   return Array.isArray(node.content) && node.content.some(hasQuestionContent)
 }
 export function normaliseQuestion(value: Record<string, unknown>) {
-  const componentError=textImageError(value.content)||textImageError(value.explanation_content)
+  const componentError=documentError(value.content)||documentError(value.explanation_content)
   if(componentError)throw new Error(componentError)
   const type = value.question_type
   if (!['multiple_choice','true_false','short_answer','text_response'].includes(String(type))) throw new Error('Choose a supported question type.')

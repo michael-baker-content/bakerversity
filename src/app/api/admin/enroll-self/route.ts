@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { createServiceClient } from '@/lib/supabase'
+import { authorAccessFor } from '@/lib/adminAccess'
+import { canEditCourse } from '@/lib/accessPolicy.mjs'
 import { NextResponse } from 'next/server'
 
 // POST — toggle enrollment in own course
@@ -8,22 +9,17 @@ export async function POST(req: Request) {
   const clerkUser = await currentUser()
   if (!clerkUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
-
-  const { data: user } = await supabase
-    .from('users').select('id, role').eq('clerk_id', clerkUser.id).single()
-
-  if (!user || (user.role !== 'instructor' && user.role !== 'admin')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const access = await authorAccessFor(clerkUser.id)
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const {db:supabase,user}=access
 
   const { courseId } = await req.json()
 
-  // Verify they own the course
+  // Author preview enrollment is separate from ordinary learner enrollment.
   const { data: course } = await supabase
-    .from('courses').select('id, title').eq('id', courseId).eq('instructor_id', user.id).single()
+    .from('courses').select('id, instructor_id').eq('id', courseId).single()
 
-  if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+  if (!canEditCourse(user,course)) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
 
   // Check existing enrollment
   const { data: existing } = await supabase
