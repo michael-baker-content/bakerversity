@@ -53,9 +53,9 @@ export function renderDirectoryTree(source, title='Directory tree', copyFolders=
   const list = rows => `<ul>${rows.map(row=>{
     const name = `<span class="directory-icon" aria-hidden="true">${row.folder?'▱':'▤'}</span><span class="directory-name">${escape(row.name)}</span>${row.highlight?'<span class="directory-focus">Focus</span>':''}${row.note?`<span class="directory-note">${escape(row.note)}</span>`:''}`
     const button = !row.folder || copyFolders === true ? copy(row.path,`Copy path ${row.path}`) : ''
-    const children = row.children.length ? list(row.children) : '<span class="directory-note">Empty folder</span>'
+    const children = row.children.length ? list(row.children) : ''
     if (row.folder && !collapsible) return `<li${row.highlight?' class="directory-highlight"':''}><div class="directory-folder">${name}${button}</div>${children}</li>`
-    return `<li${row.highlight?' class="directory-highlight"':''}>${row.folder?`<details open><summary>${name}${button}</summary>${row.children.length?list(row.children):'<span class="directory-note">Empty folder</span>'}</details>`:`<div class="directory-file">${name}${button}</div>`}</li>`
+    return `<li${row.highlight?' class="directory-highlight"':''}>${row.folder?`<details open><summary>${name}${button}</summary>${row.children.length?list(row.children):''}</details>`:`<div class="directory-file">${name}${button}</div>`}</li>`
   }).join('')}</ul>`
   return `<section class="directory-tree" data-tree-color="${directoryTreeColor(color)}" aria-label="${escape(heading)}"><div class="directory-header"><strong>${escape(heading)}</strong><button type="button" class="directory-copy" data-directory-copy="${escape(raw)}">Copy tree</button><span role="status" class="directory-status"></span></div><div class="directory-scroll" tabindex="0" role="region" aria-label="Directory structure">${error?`<pre>${escape(raw)}</pre>`:list(entries)}</div></section>`
 }

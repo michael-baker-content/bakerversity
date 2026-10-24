@@ -1,4 +1,6 @@
 'use client'
+import { recoveryOptions } from '@/lib/authoring/recovery'
+import {importedLearningSettings} from '@/lib/authoring/importMetadata'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -122,12 +124,18 @@ export default function EditLessonPage() {
     setLoadAttempt(n => n + 1)
   }
 
-  function downloadRecovery() {
-    const blob = new Blob([JSON.stringify({ format: 'bakerversity-lesson-recovery', formatVersion: 1, courseId, lessonId: lessonUuid, basedOnVersion: session.state.version, fields: JSON.parse(snapshot) }, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'lesson-recovery.json'; a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
+
+  const recovery=recoveryOptions('lesson', {title,introduction,content,metadata,slidesUrl,slidesTitle,slidesDescription,resources},v=>{
+    if(v.title!==undefined)setTitle(v.title);
+    if(v.introduction!==undefined)setIntroduction(v.introduction);
+    if(v.content!==undefined)setContent(v.content);
+    if(v.metadata!==undefined)setMetadata(current=>({...current,...v.metadata}));
+    if(v.resources!==undefined)setResources(v.resources);
+    if(v.slidesUrl!==undefined){setSlidesUrl(v.slidesUrl);setSlidesType(v.slidesUrl.includes('docs.google.com')?'google-slides':v.slidesUrl?'pdf':'none');}
+    if(v.slidesTitle!==undefined)setSlidesTitle(v.slidesTitle);
+    if(v.slidesDescription!==undefined)setSlidesDescription(v.slidesDescription);
+    setSaveAction('draft');setHasSaved(false);setEditorKey(k=>k+1)
+  },courseId,!ready||saving||deleting||slidesUploading)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -177,7 +185,7 @@ export default function EditLessonPage() {
 
       <h1 style={{ margin: '0 0 1rem' }}>Edit lesson</h1>
       <p role="status" aria-live="polite">{saving ? 'Saving… You can continue editing.' : session.dirty ? 'You have unsaved changes.' : session.state.status === 'saved' ? 'Changes saved.' : 'No unsaved changes.'}</p>
-      {session.state.message && ['failed', 'conflict', 'uncertain'].includes(session.state.status) && <div role="alert"><p>{session.state.message}</p>{['conflict', 'uncertain'].includes(session.state.status) && <p>Further saves are paused until you reload. The recovery file contains your current fields for reference; automatic import is not available.</p>}<button type="button" className="btn btn-ghost" onClick={downloadRecovery}>Download recovery copy</button> <button type="button" className="btn btn-ghost" onClick={reloadLatest}>Reload latest version</button></div>}
+      {session.state.message && ['failed', 'conflict', 'uncertain'].includes(session.state.status) && <div role="alert"><p>{session.state.message}</p>{['conflict', 'uncertain'].includes(session.state.status) && <p>Further saves are paused until you reload. Use Download → Recovery copy before reloading, then Import from file → Restore recovery copy.</p>}<button type="button" className="btn btn-ghost" onClick={reloadLatest}>Reload latest version</button></div>}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Title */}
@@ -227,15 +235,15 @@ export default function EditLessonPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <label style={labelStyle}>Content</label>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <MarkdownImport
+              <MarkdownImport recovery={recovery} metadataFields={['title','introduction','estimated_minutes','activity_type','is_required']} onMetadata={values=>{if(values.title!==undefined)setTitle(values.title);if(values.introduction!==undefined)setIntroduction(values.introduction);setMetadata(current=>({...current,...importedLearningSettings(values)}));}}
                 hasExistingContent={Object.keys(content).length > 0}
                 onInsert={(doc) => insertFnRef.current?.(doc)}
               />
-              <EditorDownload onDownload={format => exportRef.current?.(format)} />
+              <EditorDownload recovery={recovery} onDownload={format => exportRef.current?.(format)} />
             </div>
           </div>
           {ready && (
-            <TipTapEditor courseId={courseId ?? undefined}
+            <TipTapEditor exportMetadata={{title,kind:'lesson',slug:lessonSlug,course_slug:slug,item_id:lessonUuid,module_id:moduleId,introduction,...metadata}} courseId={courseId ?? undefined}
               key={editorKey}
               packs={(editorTools as import('@/components/TipTapEditor').EditorPack[])}
               content={Object.keys(content).length > 0 ? content : undefined}

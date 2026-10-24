@@ -3,8 +3,10 @@
 import { useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
+import type { RecoveryOptions } from '@/lib/authoring/recovery'
+
 type Format = 'html' | 'markdown' | 'txt'
-export default function EditorDownload({ onDownload }: { onDownload: (format: Format) => void }) {
+export default function EditorDownload({ onDownload, recovery }: { onDownload?: (format: Format) => void; recovery?: RecoveryOptions }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   return <>
@@ -14,8 +16,9 @@ export default function EditorDownload({ onDownload }: { onDownload: (format: Fo
       onClick={event => { if (event.target === event.currentTarget) { const bounds=event.currentTarget.getBoundingClientRect(); if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom) dialog.current?.close() } }}>
       <h2 id={titleId} style={{margin:'0 0 16px',fontSize:20}}>Download content</h2>
       <div style={{display:'grid',gap:8}}>
-        {([{format:'html',label:'HTML (.html)'},{format:'markdown',label:'Markdown (.md)'},{format:'txt',label:'Plain text (.txt)'}] as const).map(option =>
+        {onDownload && ([{format:'html',label:'HTML (.html)'},{format:'markdown',label:'Markdown (.md)'},{format:'txt',label:'Plain text (.txt)'}] as const).map(option =>
           <button key={option.format} type="button" className="btn btn-secondary" onClick={() => { onDownload(option.format); dialog.current?.close() }}>{option.label}</button>)}
+        {recovery && <button type="button" className="btn btn-secondary" onClick={()=>{recovery.download();dialog.current?.close()}}>Recovery copy (.json)</button>}
       </div>
       <button type="button" className="btn btn-ghost btn-sm" style={{marginTop:16}} onClick={() => dialog.current?.close()}>Cancel</button>
     </dialog>,document.body)}

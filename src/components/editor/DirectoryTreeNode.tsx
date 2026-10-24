@@ -1,4 +1,5 @@
 'use client'
+import {technicalInputProps} from '../../lib/technicalInput.mjs'
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useId, useState } from 'react'
 import { DirectoryTreeExtension } from './DirectoryTreeExtension'
@@ -21,7 +22,7 @@ function DirectoryTreeView({node,updateAttributes,editor,selected}:NodeViewProps
         <label>Tree title<input className="input" value={title} maxLength={200} onChange={e=>updateAttributes({title:e.target.value})} /></label>
         <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={node.attrs.collapsible === true} onChange={e=>updateAttributes({collapsible:e.target.checked})} />Allow folders to expand and collapse</label>
         <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={node.attrs.copyFolders === true} onChange={e=>updateAttributes({copyFolders:e.target.checked})} />Show folder copy buttons</label>
-        <div className="directory-source-field"><label htmlFor={sourceId}>Directory tree source</label><textarea id={sourceId} className="input" rows={10} spellCheck={false} maxLength={30000} value={source} onChange={e=>updateAttributes({source:e.target.value})} placeholder={'project-root/\n├── assets/\n└── index.html'} /></div>
+        <div className="directory-source-field"><label htmlFor={sourceId}>Directory tree source</label><textarea id={sourceId} className="input" rows={10} {...technicalInputProps} maxLength={30000} value={source} onChange={e=>updateAttributes({source:e.target.value})} placeholder={'project-root/\n├── assets/\n└── index.html'} /></div>
         <p>Paste a tree with ├── and └── branches (or |-- and `--). Add “ # description” after a name for a note. Put “! ” before a name to highlight it.</p>
         {error && <p role="alert">{error} Your source text is preserved.</p>}
       </div>}

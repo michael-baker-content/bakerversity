@@ -1,5 +1,7 @@
 'use client'
 
+import type {RecoveryOptions} from '@/lib/authoring/recovery'
+import type {ImportMetadata} from '@/lib/authoring/importMetadata'
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import MarkdownImport from './MarkdownImport'
@@ -12,7 +14,12 @@ const TipTapEditor = dynamic(() => import('./TipTapEditor'), { ssr:false })
 const LatexModal = dynamic(() => import('./LatexModal'), { ssr:false })
 const MafsGraphEditor = dynamic(() => import('./MafsGraphEditor'), { ssr:false })
 
-export default function CoursePageContentEditor({courseId,content,onChange}:{
+export default function CoursePageContentEditor({courseId,content,onChange,exportMetadata,onImportMetadata,metadataFields,recovery,resetKey}:{
+  resetKey?:number
+  recovery?:RecoveryOptions
+  onImportMetadata?:(values:ImportMetadata)=>void
+  metadataFields?:(keyof ImportMetadata)[]
+  exportMetadata?:Record<string,string|number|boolean|null|undefined>
   courseId:string|null
   content:Record<string,unknown>
   onChange:(content:Record<string,unknown>)=>void
@@ -41,11 +48,11 @@ export default function CoursePageContentEditor({courseId,content,onChange}:{
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:8}}>
       <span style={{fontSize:13,fontWeight:600}}>Content</span>
       <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6}}>
-        <MarkdownImport hasExistingContent={Object.keys(content).length>0} onInsert={doc=>insert.current?.(doc)} />
-        <EditorDownload onDownload={format => exportContent.current?.(format)} />
+        <MarkdownImport recovery={recovery} metadataFields={metadataFields} onMetadata={onImportMetadata} hasExistingContent={Object.keys(content).length>0} onInsert={doc=>insert.current?.(doc)} />
+        <EditorDownload recovery={recovery} onDownload={format => exportContent.current?.(format)} />
       </div>
     </div>
-    <TipTapEditor courseId={courseId??undefined} packs={config.packs} content={Object.keys(content).length?content:undefined} onChange={onChange}
+    <TipTapEditor key={resetKey} exportMetadata={exportMetadata} courseId={courseId??undefined} packs={config.packs} content={Object.keys(content).length?content:undefined} onChange={onChange}
       onEditorReady={fn=>{insert.current=fn}} onExportReady={fn=>{exportContent.current=fn}}
       onLatexButtonClick={()=>setShowMath(true)} onInsertLatex={fn=>{insertMath.current=fn}}
       onGraphButtonClick={()=>setShowGraph(true)} onInsertGraph={fn=>{insertGraph.current=fn}} />

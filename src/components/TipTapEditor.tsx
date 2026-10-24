@@ -1,4 +1,5 @@
 'use client'
+import {technicalHtmlAttributes} from '../lib/technicalInput.mjs'
 import {uploadCourseAsset} from '@/lib/authoring/assets'
 import { editorLinkOptions, editorLinkAttributes } from '../lib/editorLinks.mjs'
 import {FootnoteNode} from './editor/FootnoteNode'
@@ -12,6 +13,7 @@ import { TextImageNode } from './editor/TextImageNode'
 import { TextImageBody } from './editor/TextImageExtension'
 import {documentError} from '@/lib/documentValidation.mjs'
 import {imagePlainText} from '@/lib/textImage.mjs'
+import {markdownWithFrontmatter} from '@/lib/markdownFrontmatter.mjs'
 import { jsonToMarkdown } from '@/lib/lessonMarkdown'
 import { htmlDownloadDocument } from '@/lib/lessonExport.mjs'
 import AssetLibrary from './AssetLibrary'
@@ -69,6 +71,7 @@ const NoInputRules = Extension.create({
 export type EditorPack = 'footnotes' | 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
 interface TipTapEditorProps {
+  exportMetadata?: Record<string, string | number | boolean | null | undefined>
   courseId?: string
   content?: Record<string, unknown>
   onChange?: (content: Record<string, unknown>) => void
@@ -84,6 +87,7 @@ interface TipTapEditorProps {
 
 export default function TipTapEditor({
   courseId,
+  exportMetadata,
   content,
   onChange,
   editable = true,
@@ -146,7 +150,7 @@ export default function TipTapEditor({
 
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
-    StarterKit.configure({ codeBlock: false, link: editorLinkOptions, underline: false, trailingNode: false }),
+    StarterKit.configure({ code: {HTMLAttributes:technicalHtmlAttributes}, codeBlock: false, link: editorLinkOptions, underline: false, trailingNode: false }),
     NoInputRules,
     Highlight.configure({ HTMLAttributes: { style: 'background-color:#fef08a;color:#1f2937' } }),
     TextLanguage,
@@ -401,7 +405,7 @@ export default function TipTapEditor({
       content=editor.getText({textSerializers:{footnote:({node})=>'['+(notes.find(note=>note.id===node.attrs.id)?.number??'?')+']'}})
       if(notes.length)content+='\n\nFootnotes\n'+notes.map(note=>note.number+'. '+footnoteText(note.body)).join('\n\n')
     }
-    else content = jsonToMarkdown(editor.getJSON() as Record<string, unknown>)
+    else content = markdownWithFrontmatter(jsonToMarkdown(editor.getJSON() as Record<string, unknown>), {...exportMetadata,course_id:courseId})
     const blob = new Blob([content], { type: format === 'html' ? 'text/html;charset=utf-8' : format === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -409,7 +413,7 @@ export default function TipTapEditor({
     a.download = format === 'html' ? 'lesson.html' : format === 'txt' ? 'lesson.txt' : 'lesson.md'
     a.click()
     URL.revokeObjectURL(url)
-  }, [editor])
+  }, [editor,exportMetadata,courseId])
 
   useEffect(() => { onExportReady?.(exportAs) }, [exportAs, onExportReady])
 

@@ -1,3 +1,4 @@
+import {technicalHtmlAttributes} from '../../lib/technicalInput.mjs'
 import { Node, Extension, mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { createCodeHighlighter } from '@/lib/codeHighlighting'
@@ -125,6 +126,7 @@ export const TerminalNode = Node.create({
 export const ExtendedCodeBlock = CodeBlockLowlight.configure({
   lowlight,
   defaultLanguage: 'python',
+  HTMLAttributes: technicalHtmlAttributes,
 }).extend({
   addAttributes() {
     return {

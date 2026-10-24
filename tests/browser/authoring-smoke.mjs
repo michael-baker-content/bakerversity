@@ -10,6 +10,35 @@ export async function authoringSmoke(page,origin,fixtureOrigin) {
  await page.getByRole('link',{name:'Smoke lesson',exact:true}).click()
  const title=page.locator('input[type=text]').first()
  await title.fill('Saved lesson draft')
+ // Downloads use the current title, including edits that have not been saved.
+ await page.getByRole('button',{name:'Download',exact:true}).first().click()
+ const downloadEvent=page.waitForEvent('download')
+ await page.getByRole('button',{name:'Markdown (.md)',exact:true}).click()
+ const markdownDownload=await downloadEvent
+ const chunks=[]
+ for await(const chunk of await markdownDownload.createReadStream())chunks.push(chunk)
+ const markdown=Buffer.concat(chunks).toString('utf8')
+ assert.ok(markdown.startsWith('---\n'))
+ assert.ok(markdown.includes('title: "Saved lesson draft"'))
+ assert.ok(markdown.includes('kind: "lesson"'))
+ // Recovery files restore unsaved fields locally without a save request.
+ await page.getByRole('button',{name:'Download',exact:true}).first().click()
+ const recoveryDownloadEvent=page.waitForEvent('download')
+ await page.getByRole('button',{name:'Recovery copy (.json)',exact:true}).click()
+ const recoveryDownload=await recoveryDownloadEvent
+ const recoveryChunks=[]
+ for await(const chunk of await recoveryDownload.createReadStream())recoveryChunks.push(chunk)
+ const recoveryBuffer=Buffer.concat(recoveryChunks)
+ assert.equal(JSON.parse(recoveryBuffer.toString('utf8')).fields.title,'Saved lesson draft')
+ await title.fill('Temporary replacement')
+ let recoveryWrites=0
+ const countRecoveryWrites=request=>{if(['POST','PATCH','PUT','DELETE'].includes(request.method()))recoveryWrites++}
+ page.on('request',countRecoveryWrites)
+ await page.locator('input[accept=".json,application/json"]').setInputFiles({name:'lesson-recovery.json',mimeType:'application/json',buffer:recoveryBuffer})
+ await page.getByRole('status').filter({hasText:'Restored · Not saved'}).waitFor()
+ assert.equal(await title.inputValue(),'Saved lesson draft')
+ assert.equal(recoveryWrites,0)
+ page.off('request',countRecoveryWrites)
  // Category disclosures must not close the parent menu; keyboard activation keeps tools reachable.
  const desktopViewport = page.viewportSize()
  await page.setViewportSize({width:390,height:844})

@@ -1,10 +1,12 @@
 'use client'
+import MarkdownImport from '@/components/MarkdownImport'
+import EditorDownload from '@/components/EditorDownload'
+import { recoveryOptions } from '@/lib/authoring/recovery'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
-import { downloadRecovery } from '@/lib/authoring/recovery'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import type { AssessmentType } from '@/lib/types'
 
@@ -66,6 +68,12 @@ export default function NewAssessmentPage() {
 
   const creationFields = {title,assessment_type:assessmentType,module_id:moduleId,is_graded:isGraded,passing_score:passingScore}
   useUnsavedChanges(!!title.trim() || createUncertain)
+  const recovery=recoveryOptions('assessment',creationFields,v=>{
+    if(v.title!==undefined)setTitle(v.title);
+    if(v.assessment_type!==undefined)setAssessmentType(v.assessment_type);
+    if(v.is_graded!==undefined)setIsGraded(v.is_graded);
+    if(v.passing_score!==undefined)setPassingScore(v.passing_score);
+  },courseId,loading||!courseId)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!courseId || loading || createUncertain) return
@@ -91,9 +99,9 @@ export default function NewAssessmentPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>New assessment</h1>
 
-      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><MarkdownImport recovery={recovery} recoveryOnly /><EditorDownload recovery={recovery} /></div>
         {/* Title */}
         <div>
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>

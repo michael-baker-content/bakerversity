@@ -1,4 +1,5 @@
 'use client'
+import {technicalInputProps} from '../../lib/technicalInput.mjs'
 import { editorLink, isEditorLink } from '../../lib/editorLinks.mjs'
 
 import React, { useId, useState } from 'react'
@@ -166,9 +167,7 @@ export function Toolbar({
                   placeholder={`name.${LANG_EXTENSIONS[editor.getAttributes('codeBlock').language ?? 'python'] ?? 'py'}`}
                   value={filenameInput}
                   autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
+                  {...technicalInputProps}
                   data-lpignore="true"
                   data-form-type="other"
                   data-1p-ignore="true"

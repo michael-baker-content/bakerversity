@@ -1,10 +1,10 @@
 'use client'
+import { recoveryOptions } from '@/lib/authoring/recovery'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
-import { downloadRecovery } from '@/lib/authoring/recovery'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import CoursePageContentEditor from '@/components/CoursePageContentEditor'
 
@@ -46,8 +46,10 @@ export default function NewCoursePage() {
       .finally(() => setResolving(false))
   }, [slug])
 
+  const [editorKey,setEditorKey]=useState(0)
   const creationFields = {title,page_type:pageType,introduction,content,module_id:null}
-  useUnsavedChanges(!!title.trim() || createUncertain)
+  useUnsavedChanges(!!title.trim() || Object.keys(content).length>0 || createUncertain)
+  const recovery=recoveryOptions('page',{title,introduction,content,page_type:pageType},v=>{if(v.title!==undefined)setTitle(v.title);if(v.content!==undefined)setContent(v.content);if(v.introduction!==undefined)setIntroduction(v.introduction);if(v.page_type!==undefined)setPageType(v.page_type);setEditorKey(k=>k+1)},courseId,loading||!courseId)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!courseId || loading || createUncertain) return
@@ -78,7 +80,6 @@ export default function NewCoursePage() {
         Course pages appear in the Introduction or Conclusion sections — not inside modules.
       </p>
 
-      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         {/* Page type */}
@@ -123,7 +124,7 @@ export default function NewCoursePage() {
           </div>
         )}
 
-        <CoursePageContentEditor courseId={courseId} content={content} onChange={setContent} />
+        <CoursePageContentEditor resetKey={editorKey} recovery={recovery} metadataFields={['title','introduction']} onImportMetadata={values=>{if(values.title!==undefined)setTitle(values.title);if(values.introduction!==undefined)setIntroduction(values.introduction);}} exportMetadata={{title,kind:'page',course_slug:slug,page_type:pageType,introduction}} courseId={courseId} content={content} onChange={setContent} />
 
         {error && <p style={{ color: 'var(--danger)', fontSize: 14, margin: 0 }}>{error}</p>}
 

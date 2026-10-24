@@ -16,9 +16,9 @@ Localization engineering is the current teaching use case. Programming foundatio
 
 ### Content formats and boundaries
 
-The visual editor stores structured **Tiptap JSON in PostgreSQL**. Markdown, MDX, and plain-text files can be imported; Markdown is converted into editor nodes through a custom remark-based parser. Accepting an MDX file does not execute its JSX or provide an MDX component runtime. Course and module metadata are managed in the application, rather than through frontmatter or Git-backed lesson files.
+The visual editor stores structured **Tiptap JSON in PostgreSQL**. Markdown, MDX, and plain-text files can be imported; Markdown is converted into editor nodes through a custom remark-based parser. Accepting an MDX file does not execute its JSX or provide an MDX component runtime. Frontmatter import fills supported fields on the current editing page; course identity and module assignment remain unchanged. A compact import status includes an information icon when details are available. The details modal explains intentional exclusions collectively and lists unavailable fields or invalid values separately, while supported content still imports. Imports remain unsaved until the author saves.
 
-Authors can download HTML, Markdown, and plain text. Interactive components have sequential/static export representations; exports are not a complete course/database backup. Code and terminal blocks display examples; live code sandboxes, Jupyter notebook rendering, and Asciinema playback are not implemented.
+Authors can download HTML, Markdown, and plain text, or a [recovery copy](docs/recovery-files.md) that can restore structured content and supported fields into unsaved edits. Markdown downloads include [YAML frontmatter](docs/markdown-exports.md) with current editor metadata. Interactive components have sequential/static export representations; exports are not a complete course/database backup. Code and terminal blocks display examples; live code sandboxes, Jupyter notebook rendering, and Asciinema playback are not implemented.
 
 ## Architecture and stack
 
@@ -38,11 +38,12 @@ The application is deployed on Vercel. A production Node deployment uses `npm ru
 ## Authoring
 
 - Organize lessons, course pages, and assessments into modules and a shared course sequence.
-- Save drafts separately from published content. Version checks protect against stale saves; recovery downloads help preserve work after uncertain responses.
+- Save drafts separately from published content. Version checks protect against stale saves. Use **Download → Recovery copy (.json)** to preserve current edits and **Import from file → Restore recovery copy (.json)** to restore them after confirming replacement. Restoration validates the file and leaves changes unsaved; it does not publish or bypass save-conflict protections.
+- Recovery is available for lessons, course pages, assessments, and individual question forms. Assessment copies include their introduction and settings; questions have separate recovery copies. Linked images and files remain storage references. See [recovery files](docs/recovery-files.md) for compatibility and scope.
 - Load earlier revisions into the editor for review before saving or publishing.
 - Preview a lesson's **saved draft**, including attached resources, without publishing. The preview is restricted to its instructor and admins. Its draft notice appears when the saved content/resources differ from publication, or the lesson is unpublished. Unsaved editor changes are not included.
 - Use course-enabled mathematics, interactive graphs, code blocks, terminal blocks, callouts, and inline practice quizzes. Writing tools include search/replace, highlighting, language annotations, and optional invisible characters. Authored links open in a new tab in reader views and HTML downloads; footnote references and return links navigate within the page.
-- Paste editable [directory trees](docs/directory-trees.md), with collapsible folders, file paths, notes, and highlighted entries.
+- Paste editable [directory trees](docs/directory-trees.md), with optional collapsible folders, file paths, notes, and highlighted entries. Empty folders display their names without placeholder text.
 - Highlight localization formats including YAML, XML, TOML, XLIFF, TMX, TBX, Java properties, and INI, alongside Python, JavaScript/TypeScript, shell languages, SQL, Markdown, and other offered formats.
 
 Course-page and assessment preview links still use their existing published views. Published assessment questions must be unpublished before editing; question sets do not yet have independent draft versions.
@@ -119,7 +120,7 @@ npm run db:check
 npm run build
 ```
 
-`npm test` uses an isolated PGlite database and local fixtures; it does not modify Supabase. It covers migrations, authoring state, draft/resource isolation, grading, course assets, navigation, image rendering, and other editor helpers. `db:check` checks generated schema/type consistency. The build checks production compilation.
+`npm test` uses an isolated PGlite database and local fixtures; it does not modify Supabase. It covers migrations, authoring state, draft/resource isolation, grading, course assets, navigation, image rendering, Markdown frontmatter, recovery-file validation, and other editor helpers. `db:check` checks generated schema/type consistency. The build checks production compilation.
 
 GitHub Actions runs dependency installation, type checks, regression tests, schema consistency, and the authoring browser smoke test. The smoke test is also available explicitly:
 
@@ -168,6 +169,8 @@ Footnotes can be enabled per course, with automatic numbering, shared references
 - [Migration procedures](supabase/MIGRATIONS.md)
 - [Foundation and data model](docs/foundation.md)
 - [Authoring reliability](docs/authoring-reliability.md)
+- [Markdown import and export metadata](docs/markdown-exports.md)
+- [Recovery files](docs/recovery-files.md)
 - [Course asset library](docs/course-asset-library.md)
 - [Asset names and downloads](docs/asset-names.md)
 - [Image delivery](docs/image-delivery.md)

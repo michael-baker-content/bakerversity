@@ -60,3 +60,16 @@ for(const definition of CALLOUT_TYPES){
 assert.equal(calloutDefinition('unknown').value,'tip')
 assert.equal(calloutDefinition('warning').border,'var(--amber)')
 console.log('PASS: shared authored-link policy and callout definitions')
+
+const {technicalHtmlAttributes}=await import('../src/lib/technicalInput.mjs')
+const {default:CodeBlockLowlight}=await import('@tiptap/extension-code-block-lowlight')
+const {createLowlight}=await import('lowlight')
+const technicalSchema=getSchema([StarterKit.configure({codeBlock:false,code:{HTMLAttributes:technicalHtmlAttributes}}),CodeBlockLowlight.configure({lowlight:createLowlight(),HTMLAttributes:technicalHtmlAttributes})])
+const technicalDoc=technicalSchema.nodeFromJSON({type:'doc',content:[{type:'codeBlock',content:[{type:'text',text:'日本語 żółć'}]},{type:'paragraph',content:[{type:'text',text:'filename',marks:[{type:'code'}]}]}]})
+technicalDoc.check()
+for(const spec of [technicalSchema.nodes.codeBlock.spec.toDOM(technicalDoc.child(0)),technicalSchema.marks.code.spec.toDOM(technicalSchema.marks.code.create(),true)]){
+ assert.equal(spec[1].spellcheck,'false');assert.equal(spec[1].autocorrect,'off');assert.equal(spec[1].autocapitalize,'off')
+}
+assert.equal(technicalDoc.child(0).textContent,'日本語 żółć')
+assert.ok(!JSON.stringify(technicalSchema.nodes.paragraph.spec.toDOM(technicalDoc.child(1))).includes('spellcheck'))
+console.log('PASS: code spellchecking disabled without changing Unicode content or prose settings')

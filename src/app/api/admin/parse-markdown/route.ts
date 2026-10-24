@@ -1,3 +1,4 @@
+import {parseMarkdownImport,importableFields} from '@/lib/markdownImport.mjs'
 import { currentUser } from '@clerk/nextjs/server'
 import { authorAccessFor } from '@/lib/adminAccess'
 import { NextResponse } from 'next/server'
@@ -53,10 +54,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const tiptapJson = markdownToTipTap(text)
-    return NextResponse.json({ content: tiptapJson })
+    const requested=String(formData.get('metadata_fields')??'').split(',').filter(field=>importableFields.includes(field))
+    const parsed=parseMarkdownImport(text,requested)
+    const tiptapJson = markdownToTipTap(parsed.body)
+    return NextResponse.json({ content: tiptapJson,metadata:parsed.metadata,warnings:parsed.warnings,skippedByDesign:parsed.skippedByDesign })
   } catch (err) {
     console.error('Markdown parse error:', err)
-    return NextResponse.json({ error: 'Failed to parse markdown file.' }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to parse markdown file.' }, { status: 400 })
   }
 }

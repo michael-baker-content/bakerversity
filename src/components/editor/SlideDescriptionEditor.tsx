@@ -1,4 +1,5 @@
 'use client'
+import {technicalHtmlAttributes} from '../../lib/technicalInput.mjs'
 import { editorLinkOptions, editorLink, isEditorLink } from '../../lib/editorLinks.mjs'
 import {useState,useId} from 'react'
 import {EditorContent,useEditor,useEditorState,type JSONContent} from '@tiptap/react'
@@ -11,7 +12,7 @@ import {InlineMath,BlockMath} from './nodes'
 export default function SlideDescriptionEditor({content,onChange,disabled,basicOnly=false,label='Slide description'}:{content:JSONContent;onChange:(value:JSONContent)=>void;disabled:boolean;basicOnly?:boolean;label?:string}){
  const linkPanelId=useId()
  const [linkOpen,setLinkOpen]=useState(false),[href,setHref]=useState('')
- const editor=useEditor({immediatelyRender:false,extensions:[StarterKit.configure({heading:basicOnly?false:undefined,codeBlock:false,blockquote:false,horizontalRule:false,link:editorLinkOptions,trailingNode:false}),...(basicOnly?[]:[Highlight,TextLanguage,InlineMath,BlockMath])],content,onUpdate:({editor})=>onChange(editor.getJSON()),editorProps:{handleDoubleClick:(view,_pos,event)=>{
+ const editor=useEditor({immediatelyRender:false,extensions:[StarterKit.configure({ code: {HTMLAttributes:technicalHtmlAttributes},heading:basicOnly?false:undefined,codeBlock:false,blockquote:false,horizontalRule:false,link:editorLinkOptions,trailingNode:false}),...(basicOnly?[]:[Highlight,TextLanguage,InlineMath,BlockMath])],content,onUpdate:({editor})=>onChange(editor.getJSON()),editorProps:{handleDoubleClick:(view,_pos,event)=>{
   if(disabled)return false
   const anchor=(event.target as HTMLElement).closest('a')
   if(!anchor||!view.dom.contains(anchor))return false

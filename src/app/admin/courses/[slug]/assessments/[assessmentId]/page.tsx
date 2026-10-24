@@ -1,4 +1,8 @@
 'use client'
+import { recoveryOptions } from '@/lib/authoring/recovery'
+import EditorDownload from '@/components/EditorDownload'
+import MarkdownImport from '@/components/MarkdownImport'
+import {importedLearningSettings} from '@/lib/authoring/importMetadata'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -8,7 +12,6 @@ import AssetLibrary from '@/components/AssetLibrary'
 import { resourceSelection, type ResourceSelection } from '@/lib/authoring/resources'
 import { compactAnswerOptions, removeAnswerOption, hasQuestionContent } from '@/lib/authoring/questions'
 import { useUnsavedChanges, discardMessage } from '@/lib/authoring/useUnsavedChanges'
-import { downloadRecovery } from '@/lib/authoring/recovery'
 import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
 import { useDraft } from '@/lib/authoring/useDraft'
 import DraftStatus from '@/components/DraftStatus'
@@ -110,6 +113,7 @@ function QuestionForm({
   saving: boolean
   editorPacks: string[]
 }) {
+  const [recoveryKey,setRecoveryKey]=useState(0)
   const [form, setForm] = useState<QuestionFormState>(initial)
   useUnsavedChanges(saving || JSON.stringify(form) !== JSON.stringify(initial))
   const [showLatexModal, setShowLatexModal] = useState(false)
@@ -154,11 +158,12 @@ function QuestionForm({
     form.question_type === 'multiple_choice' ? form.options.filter(o => o.trim()).length >= 2 && form.correct_answer !== '' && !!form.options[Number(form.correct_answer)]?.trim() : form.question_type !== 'short_answer' || form.accepted_answers.some(a => a.trim())
   )
 
+  const recovery=recoveryOptions('question',form,v=>{setForm(current=>({...current,...v}));setRecoveryKey(k=>k+1)},courseId,saving)
   const hasMath = editorPacks.includes('math')
 
   return (
     <>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => downloadRecovery('question', form)}>Download question recovery copy</button>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><MarkdownImport recovery={recovery} recoveryOnly /><EditorDownload recovery={recovery} /></div>
       {showLatexModal && hasMath && (
         <LatexModal
           onInsert={(latex, displayMode) => {
@@ -212,7 +217,7 @@ function QuestionForm({
           </div>
           <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
             <TipTapEditor courseId={courseId ?? undefined}
-              key={`q-body-${initial.question_type}`}
+              key={`q-body-${initial.question_type}-${recoveryKey}`}
               packs={hasMath ? ['math'] : []}
               content={docIsEmpty(form.content) ? undefined : form.content}
               onChange={(doc) => set('content', doc)}
@@ -355,7 +360,7 @@ function QuestionForm({
             </div>
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               <TipTapEditor courseId={courseId ?? undefined}
-                key={`q-explanation-${initial.question_type}`}
+                key={`q-explanation-${initial.question_type}-${recoveryKey}`}
                 packs={hasMath ? ['math'] : []}
                 content={docIsEmpty(form.explanation_content) ? undefined : form.explanation_content}
                 onChange={(doc) => set('explanation_content', doc)}
@@ -565,6 +570,8 @@ export default function EditAssessmentPage() {
   const [introContent, setIntroContent] = useState<Record<string, unknown>>(emptyDoc())
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const ready = loadedId === assessmentId
+  const introExportRef=useRef<((format:'html'|'markdown'|'txt')=>void)|null>(null)
+  const importIntroRef=useRef<((doc:Record<string,unknown>)=>void)|null>(null)
   const insertLatexIntroRef = useRef<((latex: string, display: boolean) => void) | null>(null)
   const [showLatexIntro, setShowLatexIntro] = useState(false)
 
@@ -572,6 +579,16 @@ export default function EditAssessmentPage() {
   const draft = useDraft(JSON.stringify(draftFields), assessmentId, version, ready)
   const saving = draft.state.status === 'saving'
 
+  const recovery=recoveryOptions('assessment',draftFields,v=>{
+    if(v.title!==undefined)setTitle(v.title);
+    if(v.assessment_type!==undefined)setAssessmentType(v.assessment_type);
+    if(v.is_graded!==undefined)setIsGraded(v.is_graded);
+    if(v.passing_score!==undefined)setPassingScore(v.passing_score);
+    if(v.intro_content!==undefined)setIntroContent(v.intro_content);
+    if(v.resources!==undefined)setResources(v.resources);
+    setMetadata(current=>({...current,...(v.estimated_minutes!==undefined?{estimated_minutes:v.estimated_minutes}:{}),...(v.is_required!==undefined?{is_required:v.is_required}:{}),...(v.activity_type!==undefined?{activity_type:v.activity_type}:{}),...(v.placement!==undefined?{placement:v.placement}:{})}));
+    setSaveAction('draft');setEditorKey(k=>k+1)
+  },courseId,!ready||saving)
   const loadQuestions = useCallback(async (cId: string) => {
     const data = await requestJson<Question[]>(`/api/admin/courses/${cId}/assessments/${assessmentId}/questions`)
     if (!Array.isArray(data)) throw new Error('Unable to load questions: unexpected response.')
@@ -799,13 +816,15 @@ export default function EditAssessmentPage() {
             <label style={{ ...labelStyle, marginBottom: 0 }}>
               Introduction <span style={optStyle}>(shown before questions, optional)</span>
             </label>
+            <MarkdownImport recovery={recovery} hasExistingContent={!docIsEmpty(introContent)} metadataFields={['title','estimated_minutes','activity_type','is_required']} onInsert={doc=>importIntroRef.current?.(doc)} onMetadata={values=>{if(values.title!==undefined)setTitle(values.title);setMetadata(current=>({...current,...importedLearningSettings(values)}))}} />
+            <EditorDownload recovery={recovery} onDownload={format=>introExportRef.current?.(format)} />
             {editorPacks.includes('math') && (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowLatexIntro(true)}>∑ Math</button>
             )}
           </div>
           {ready && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-              <TipTapEditor courseId={courseId ?? undefined}
+              <TipTapEditor onExportReady={fn=>{introExportRef.current=fn}} onEditorReady={fn=>{importIntroRef.current=fn}} exportMetadata={{title,kind:'assessment',section:'introduction',course_slug:courseSlug,item_id:assessmentId,module_id:moduleId,assessment_type:assessmentType,is_graded:isGraded,passing_score:passingScore,...metadata}} courseId={courseId ?? undefined}
                 key={`assessment-intro-${editorKey}`}
                 packs={editorPacks.includes('math') ? ['math'] : []}
                 content={docIsEmpty(introContent) ? undefined : introContent}

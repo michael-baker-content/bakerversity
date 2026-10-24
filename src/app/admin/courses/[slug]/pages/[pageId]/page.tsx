@@ -1,4 +1,6 @@
 'use client'
+import { recoveryOptions } from '@/lib/authoring/recovery'
+import {importedLearningSettings} from '@/lib/authoring/importMetadata'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -83,6 +85,15 @@ export default function EditCoursePage() {
     return () => {active=false}
   }, [slug, pageId])
 
+  const recovery=recoveryOptions('page',draftFields,v=>{
+    if(v.title!==undefined)setTitle(v.title);
+    if(v.introduction!==undefined)setIntroduction(v.introduction??'');
+    if(v.content!==undefined)setContent(v.content);
+    if(v.page_type!==undefined)setPageType(v.page_type);
+    if(v.resources!==undefined)setResources(v.resources);
+    setMetadata(current=>({...current,...(v.estimated_minutes!==undefined?{estimated_minutes:v.estimated_minutes}:{}),...(v.is_required!==undefined?{is_required:v.is_required}:{}),...(v.activity_type!==undefined?{activity_type:v.activity_type}:{}),...(v.placement!==undefined?{placement:v.placement}:{})}));
+    setSaveAction('draft');setEditorKey(k=>k+1)
+  },courseId,!ready||saving||deleting)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!courseId || !ready || saving || deleting) return
@@ -160,7 +171,7 @@ export default function EditCoursePage() {
           </div>
         )}
 
-        <CoursePageContentEditor key={editorKey} courseId={courseId} content={content} onChange={setContent} />
+        <CoursePageContentEditor recovery={recovery} metadataFields={['title','introduction','estimated_minutes','activity_type','is_required']} onImportMetadata={values=>{if(values.title!==undefined)setTitle(values.title);if(values.introduction!==undefined)setIntroduction(values.introduction);setMetadata(current=>({...current,...importedLearningSettings(values)}));}} exportMetadata={{title,kind:'page',course_slug:slug,item_id:pageId,page_type:pageType,introduction,...metadata}} resetKey={editorKey} courseId={courseId} content={content} onChange={setContent} />
 
         {/* Published */}
         {pageId && <RevisionHistory itemId={pageId} onRestore={v => { if(saving || deleting)return; setEditorKey(k => k+1); setTitle(String(v.title ?? '')); setIntroduction(String(v.introduction ?? '')); setContent((v.content ?? {}) as Record<string, unknown>); setPageType(String(v.page_type ?? 'custom')); if (Array.isArray(v.resources)) setResources(resourceSelection(v.resources)); setMetadata(itemMetadata(v, 'page')); setSaveAction('draft'); }} />}

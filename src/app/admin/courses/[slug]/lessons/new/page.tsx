@@ -1,12 +1,13 @@
 'use client'
+import { recoveryOptions } from '@/lib/authoring/recovery'
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { requestJson, AuthoringRequestError } from '@/lib/authoring/request'
-import { downloadRecovery } from '@/lib/authoring/recovery'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
 import dynamic from 'next/dynamic'
+import EditorDownload from '@/components/EditorDownload'
 import MarkdownImport from '@/components/MarkdownImport'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
@@ -16,6 +17,7 @@ export default function NewLessonPage() {
   const params = useParams()
   const slug = params.slug as string
 
+  const exportRef=useRef<((format:'html'|'markdown'|'txt')=>void)|null>(null)
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
   const [modules, setModules] = useState<{ id: string; title: string }[]>([])
@@ -43,8 +45,10 @@ export default function NewLessonPage() {
       .catch(error=>setError(error instanceof Error ? error.message : 'Unable to load course.'))
   }, [slug])
 
+  const [editorKey,setEditorKey]=useState(0)
   const creationFields = {title,content,module_id:moduleId}
-  useUnsavedChanges(!!title.trim() || createUncertain)
+  useUnsavedChanges(!!title.trim() || Object.keys(content).length>0 || createUncertain)
+  const recovery=recoveryOptions('lesson',{title,content},v=>{if(v.title!==undefined)setTitle(v.title);if(v.content!==undefined)setContent(v.content);setEditorKey(k=>k+1)},courseId,loading||!courseId)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!courseId || loading || createUncertain) return
@@ -70,7 +74,6 @@ export default function NewLessonPage() {
 
       <h1 style={{ margin: '0 0 2rem' }}>New lesson</h1>
 
-      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>downloadRecovery('new-item',creationFields)}>Download recovery copy</button>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div>
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -103,15 +106,15 @@ export default function NewLessonPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label style={labelStyle}>Content</label>
-            <MarkdownImport
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><MarkdownImport recovery={recovery} metadataFields={['title']} onMetadata={values=>{if(values.title!==undefined)setTitle(values.title);}}
               hasExistingContent={Object.keys(content).length > 0}
               onInsert={(doc) => insertFnRef.current?.(doc)}
-            />
+            /><EditorDownload recovery={recovery} onDownload={format=>exportRef.current?.(format)} /></div>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>
             Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
           </p>
-          <TipTapEditor courseId={courseId ?? undefined}
+          <TipTapEditor key={editorKey} content={content} onExportReady={fn=>{exportRef.current=fn}} exportMetadata={{title,kind:'lesson',course_slug:slug,module_id:moduleId}} courseId={courseId ?? undefined}
             onChange={setContent}
             onEditorReady={(fn) => { insertFnRef.current = fn }}
           />
