@@ -315,7 +315,20 @@ export async function authoringSmoke(page,origin,fixtureOrigin) {
  await mode('conflict');await page.getByRole('button',{name:'Save',exact:true}).click()
  await page.getByRole('alert').filter({hasText:'another session'}).waitFor()
  assert.ok(await page.getByRole('button',{name:'Save',exact:true}).isDisabled())
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download recovery copy',exact:true}).click();await download
+ await page.getByRole('button',{name:'Download',exact:true}).click()
+ const recoveryDialog=page.getByRole('dialog',{name:'Download content',exact:true})
+ const [download]=await Promise.all([
+  page.waitForEvent('download'),
+  recoveryDialog.getByRole('button',{name:'Recovery copy (.json)',exact:true}).click(),
+ ])
+ assert.equal(download.suggestedFilename(),'assessment-recovery.json')
+ const assessmentRecoveryChunks=[]
+ for await(const chunk of await download.createReadStream())assessmentRecoveryChunks.push(chunk)
+ const assessmentRecovery=JSON.parse(Buffer.concat(assessmentRecoveryChunks).toString('utf8'))
+ assert.equal(assessmentRecovery.format,'bakerversity-assessment-recovery')
+ assert.equal(assessmentRecovery.fields.title,'Unsaved settings')
+ assert.ok(await page.getByRole('button',{name:'Save',exact:true}).isDisabled())
+
  await mode('normal');await page.reload()
  await page.locator('form input[type=text]').first().fill('Ambiguous settings')
  await mode('commit-lost');await page.getByRole('button',{name:'Save',exact:true}).click()

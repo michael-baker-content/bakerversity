@@ -42,9 +42,12 @@ async page => {
   await save.click()
   await page.getByRole('alert').filter({ hasText: 'This item changed in another session' }).waitFor()
   ensure(await title.inputValue() === 'Typed while saving' && await save.isDisabled(), 'Conflict did not preserve and protect local work')
-  const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Download recovery copy' }).click()
-  ensure((await downloadPromise).suggestedFilename() === 'lesson-recovery.json', 'Recovery file missing')
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  const [recoveryDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('dialog', { name: 'Download content', exact: true }).getByRole('button', { name: 'Recovery copy (.json)', exact: true }).click(),
+  ])
+  ensure(recoveryDownload.suggestedFilename() === 'lesson-recovery.json', 'Recovery file missing')
   page.once('dialog', dialog => dialog.dismiss())
   await page.getByRole('link', { name: 'test', exact: true }).click()
   ensure(page.url().includes('/lessons/'), 'Canceling navigation discarded editor')
