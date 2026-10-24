@@ -10,6 +10,7 @@ export async function authoringSmoke(page,origin,fixtureOrigin) {
  await page.getByRole('link',{name:'Smoke lesson',exact:true}).click()
  const title=page.locator('input[type=text]').first()
  await title.fill('Saved lesson draft')
+ await page.locator('.tiptap[contenteditable="true"]').first().waitFor({state:'visible'})
  // Downloads use the current title, including edits that have not been saved.
  await page.getByRole('button',{name:'Download',exact:true}).first().click()
  const downloadEvent=page.waitForEvent('download')

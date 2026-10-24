@@ -17,6 +17,7 @@ export default function NewLessonPage() {
   const params = useParams()
   const slug = params.slug as string
 
+  const [exportReady,setExportReady]=useState(false)
   const exportRef=useRef<((format:'html'|'markdown'|'txt')=>void)|null>(null)
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
@@ -109,12 +110,12 @@ export default function NewLessonPage() {
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><MarkdownImport recovery={recovery} metadataFields={['title']} onMetadata={values=>{if(values.title!==undefined)setTitle(values.title);}}
               hasExistingContent={Object.keys(content).length > 0}
               onInsert={(doc) => insertFnRef.current?.(doc)}
-            /><EditorDownload recovery={recovery} onDownload={format=>exportRef.current?.(format)} /></div>
+            /><EditorDownload ready={exportReady} recovery={recovery} onDownload={format=>exportRef.current?.(format)} /></div>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>
             Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
           </p>
-          <TipTapEditor key={editorKey} content={content} onExportReady={fn=>{exportRef.current=fn}} exportMetadata={{title,kind:'lesson',course_slug:slug,module_id:moduleId}} courseId={courseId ?? undefined}
+          <TipTapEditor key={editorKey} content={content} onExportReady={fn=>{exportRef.current=fn;setExportReady(!!fn)}} exportMetadata={{title,kind:'lesson',course_slug:slug,module_id:moduleId}} courseId={courseId ?? undefined}
             onChange={setContent}
             onEditorReady={(fn) => { insertFnRef.current = fn }}
           />

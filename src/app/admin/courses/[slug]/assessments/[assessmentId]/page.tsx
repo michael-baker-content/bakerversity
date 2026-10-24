@@ -570,6 +570,7 @@ export default function EditAssessmentPage() {
   const [introContent, setIntroContent] = useState<Record<string, unknown>>(emptyDoc())
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const ready = loadedId === assessmentId
+  const [exportReady,setExportReady]=useState(false)
   const introExportRef=useRef<((format:'html'|'markdown'|'txt')=>void)|null>(null)
   const importIntroRef=useRef<((doc:Record<string,unknown>)=>void)|null>(null)
   const insertLatexIntroRef = useRef<((latex: string, display: boolean) => void) | null>(null)
@@ -817,14 +818,14 @@ export default function EditAssessmentPage() {
               Introduction <span style={optStyle}>(shown before questions, optional)</span>
             </label>
             <MarkdownImport recovery={recovery} hasExistingContent={!docIsEmpty(introContent)} metadataFields={['title','estimated_minutes','activity_type','is_required']} onInsert={doc=>importIntroRef.current?.(doc)} onMetadata={values=>{if(values.title!==undefined)setTitle(values.title);setMetadata(current=>({...current,...importedLearningSettings(values)}))}} />
-            <EditorDownload recovery={recovery} onDownload={format=>introExportRef.current?.(format)} />
+            <EditorDownload ready={exportReady} recovery={recovery} onDownload={format=>introExportRef.current?.(format)} />
             {editorPacks.includes('math') && (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowLatexIntro(true)}>∑ Math</button>
             )}
           </div>
           {ready && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-              <TipTapEditor onExportReady={fn=>{introExportRef.current=fn}} onEditorReady={fn=>{importIntroRef.current=fn}} exportMetadata={{title,kind:'assessment',section:'introduction',course_slug:courseSlug,item_id:assessmentId,module_id:moduleId,assessment_type:assessmentType,is_graded:isGraded,passing_score:passingScore,...metadata}} courseId={courseId ?? undefined}
+              <TipTapEditor onExportReady={fn=>{introExportRef.current=fn;setExportReady(!!fn)}} onEditorReady={fn=>{importIntroRef.current=fn}} exportMetadata={{title,kind:'assessment',section:'introduction',course_slug:courseSlug,item_id:assessmentId,module_id:moduleId,assessment_type:assessmentType,is_graded:isGraded,passing_score:passingScore,...metadata}} courseId={courseId ?? undefined}
                 key={`assessment-intro-${editorKey}`}
                 packs={editorPacks.includes('math') ? ['math'] : []}
                 content={docIsEmpty(introContent) ? undefined : introContent}

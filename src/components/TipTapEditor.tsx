@@ -78,7 +78,7 @@ interface TipTapEditorProps {
   editable?: boolean
   packs?: EditorPack[]
   onEditorReady?: (insert: (doc: Record<string, unknown>) => void) => void
-  onExportReady?: (exportFn: (format: 'html' | 'markdown' | 'txt') => void) => void
+  onExportReady?: (exportFn: ((format: 'html' | 'markdown' | 'txt') => void) | null) => void
   onGraphButtonClick?: () => void
   onInsertGraph?: (insert: (attrs: MafsGraphAttrs) => void) => void
   onLatexButtonClick?: () => void
@@ -411,11 +411,13 @@ export default function TipTapEditor({
     const a = document.createElement('a')
     a.href = url
     a.download = format === 'html' ? 'lesson.html' : format === 'txt' ? 'lesson.txt' : 'lesson.md'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }, [editor,exportMetadata,courseId])
 
-  useEffect(() => { onExportReady?.(exportAs) }, [exportAs, onExportReady])
+  useEffect(() => { onExportReady?.(editor && !componentLoadError ? exportAs : null) }, [editor, componentLoadError, exportAs, onExportReady])
 
   if(componentLoadError)return <div role="alert"><p>{componentLoadError} The original document has not been changed.</p><button type="button" className="btn btn-secondary" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='content-recovery.json';a.click();URL.revokeObjectURL(url)}}>Download original content</button></div>
 

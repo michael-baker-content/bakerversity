@@ -52,6 +52,7 @@ export default function EditLessonPage() {
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const insertGraphRef = useRef<((attrs: MafsGraphAttrs) => void) | null>(null)
   const insertLatexRef = useRef<((latex: string, displayMode: boolean) => void) | null>(null)
+  const [exportReady,setExportReady]=useState(false)
   const exportRef = useRef<((format: 'html' | 'markdown' | 'txt') => void) | null>(null)
   const [showGraphEditor, setShowGraphEditor] = useState(false)
   const [showLatexModal, setShowLatexModal] = useState(false)
@@ -239,7 +240,7 @@ export default function EditLessonPage() {
                 hasExistingContent={Object.keys(content).length > 0}
                 onInsert={(doc) => insertFnRef.current?.(doc)}
               />
-              <EditorDownload recovery={recovery} onDownload={format => exportRef.current?.(format)} />
+              <EditorDownload ready={exportReady} recovery={recovery} onDownload={format => exportRef.current?.(format)} />
             </div>
           </div>
           {ready && (
@@ -249,7 +250,7 @@ export default function EditLessonPage() {
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
               onEditorReady={(fn) => { insertFnRef.current = fn }}
-              onExportReady={(fn) => { exportRef.current = fn }}
+              onExportReady={(fn) => { exportRef.current = fn;setExportReady(!!fn) }}
               onGraphButtonClick={() => setShowGraphEditor(true)}
               onInsertGraph={(fn) => { insertGraphRef.current = fn }}
               onLatexButtonClick={() => setShowLatexModal(true)}

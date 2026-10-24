@@ -30,6 +30,7 @@ export default function CoursePageContentEditor({courseId,content,onChange,expor
   const [showMath,setShowMath]=useState(false)
   const [showGraph,setShowGraph]=useState(false)
   const insert=useRef<((doc:Record<string,unknown>)=>void)|null>(null)
+  const [exportReady,setExportReady]=useState(false)
   const exportContent=useRef<((format:'html'|'markdown'|'txt')=>void)|null>(null)
   const insertMath=useRef<((latex:string,display:boolean)=>void)|null>(null)
   const insertGraph=useRef<((attrs:MafsGraphAttrs)=>void)|null>(null)
@@ -49,11 +50,11 @@ export default function CoursePageContentEditor({courseId,content,onChange,expor
       <span style={{fontSize:13,fontWeight:600}}>Content</span>
       <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6}}>
         <MarkdownImport recovery={recovery} metadataFields={metadataFields} onMetadata={onImportMetadata} hasExistingContent={Object.keys(content).length>0} onInsert={doc=>insert.current?.(doc)} />
-        <EditorDownload recovery={recovery} onDownload={format => exportContent.current?.(format)} />
+        <EditorDownload ready={exportReady} recovery={recovery} onDownload={format => exportContent.current?.(format)} />
       </div>
     </div>
     <TipTapEditor key={resetKey} exportMetadata={exportMetadata} courseId={courseId??undefined} packs={config.packs} content={Object.keys(content).length?content:undefined} onChange={onChange}
-      onEditorReady={fn=>{insert.current=fn}} onExportReady={fn=>{exportContent.current=fn}}
+      onEditorReady={fn=>{insert.current=fn}} onExportReady={fn=>{exportContent.current=fn;setExportReady(!!fn)}}
       onLatexButtonClick={()=>setShowMath(true)} onInsertLatex={fn=>{insertMath.current=fn}}
       onGraphButtonClick={()=>setShowGraph(true)} onInsertGraph={fn=>{insertGraph.current=fn}} />
     {showMath && config.packs.includes('math') && <LatexModal showDisplayToggle onInsert={(latex,display)=>insertMath.current?.(latex,display)} onClose={()=>setShowMath(false)} />}
