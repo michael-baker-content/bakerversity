@@ -13,11 +13,13 @@ export async function GET(req: Request) {
   // Fetch membership in batches so filters cover the entire course, not just its first page.
   const rows=[]
   for(let offset=0;;offset+=500){
-    const {data,error}=await ctx.db.from('course_assets').select('asset_id,display_name,tags,default_alt_text,default_caption,assets!inner(*)').eq('course_id',courseId).order('asset_id').range(offset,offset+499)
+    let libraryQuery=ctx.db.from('course_assets').select('asset_id,display_name,tags,removed_at,default_alt_text,default_caption,assets!inner(*)').eq('course_id',courseId)
+    libraryQuery=params.get('library')==='removed'?libraryQuery.not('removed_at','is',null):libraryQuery.is('removed_at',null)
+    const {data,error}=await libraryQuery.order('asset_id').range(offset,offset+499)
     if(error)return NextResponse.json({error:'Unable to load course library. Check that its database migration has been applied.'},{status:500})
     rows.push(...(data??[]));if(!data||data.length<500)break
   }
-  const assets=rows.map(row=>({...row.assets!,title:row.display_name??row.assets!.title,original_title:row.assets!.title,alt_text:row.default_alt_text,caption:row.default_caption,tags:row.tags}))
+  const assets=rows.map(row=>({...row.assets!,title:row.display_name??row.assets!.title,original_title:row.assets!.title,alt_text:row.default_alt_text,caption:row.default_caption,tags:row.tags,removed_at:row.removed_at}))
   const filtered=filterCourseAssets(assets,{q:(params.get('q')??'').slice(0,200),type:params.get('type')??'all',sort:params.get('sort')??'newest'})
   const items=filtered.slice(page*50,page*50+50).map(a=>({...a,item_assets:[],download_url:a.bucket&&a.object_path&&!a.external_url?assetDownloadHref(courseId,a.id):null,url:a.external_url??(a.bucket&&a.object_path?ctx.db.storage.from(a.bucket).getPublicUrl(a.object_path).data.publicUrl:'')}))
   return NextResponse.json(params.get('summary')==='1'?{items,total:filtered.length,courseTotal:assets.length}:items)

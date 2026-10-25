@@ -32,6 +32,7 @@ export default async function AdminCoursesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Link href="/dashboard" style={{ fontSize: 14, color: 'var(--text-3)', textDecoration: 'none' }}>← Dashboard</Link>
+          {canManageSite(user) && <Link href="/admin/assets/removed" className="btn btn-ghost btn-sm">Removed assets</Link>}
           <h1 style={{ margin: '0.25rem 0 0' }}>My courses</h1>
         </div>
         <Link href="/admin/courses/new">

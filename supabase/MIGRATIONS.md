@@ -50,3 +50,11 @@ Apply only migrations/202610200001_course_asset_names.sql after the six existing
 ## Optional course asset tags
 
 Apply only `migrations/202610230001_course_asset_tags.sql` for this update, after the earlier course-asset migrations. It adds an empty-default tags array and validation, preserving files, names, captions and accounts. Apply before deploying the matching application. The generated schema.sql remains for fresh installations only.
+
+## Asset usage and library removal (pending owner application)
+
+Apply `migrations/202610240001_asset_library_removal.sql` after the earlier migrations and before deploying this release. It adds `course_assets.removed_at` and service-only usage/removal functions, and restores library membership when published references rediscover an asset. Existing content, accounts, files, URLs, and metadata are retained. This migration has been tested locally but has not been applied to your Supabase project by the assistant.
+
+## Administrator permanent deletion (pending owner application)
+
+Apply only `migrations/202610240002_permanent_asset_deletion.sql` after the already-applied library-removal migration and before deploying this release. It adds service-only review/reservation/finalization functions, a deletion audit table, and guards against reusing files reserved for deletion. It does not delete existing files or content on installation. No live database changes have been made by the assistant.

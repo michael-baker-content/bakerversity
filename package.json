@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "db:generate": "node scripts/generate-database.mjs",
     "db:check": "node scripts/generate-database.mjs --check",
-    "test": "node tests/recovery.mjs && node tests/markdown-import.mjs && node tests/markdown-frontmatter.mjs && node tests/authoring-assets.mjs && node tests/access-policy.mjs && node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs && node tests/writing-tools.mjs && node tests/images.mjs && node tests/slides-upload.mjs && node tests/latex-activation.mjs && node tests/questions.mjs && node tests/course-assets.mjs && node tests/asset-search.mjs && node tests/asset-tags.mjs && node tests/directory-tree.mjs && node tests/asset-names.mjs && node tests/element-catalog.mjs && node tests/nested-renderer.mjs && node tests/text-image.mjs && node tests/draft-status.mjs && node tests/slideshow.mjs && node tests/footnotes.mjs",
+    "test": "node tests/permanent-assets.mjs && node tests/asset-removal.mjs && node tests/recovery.mjs && node tests/markdown-import.mjs && node tests/markdown-frontmatter.mjs && node tests/authoring-assets.mjs && node tests/access-policy.mjs && node tests/database.mjs && node tests/sequence.mjs && node tests/authoring.mjs && node tests/writing-tools.mjs && node tests/images.mjs && node tests/slides-upload.mjs && node tests/latex-activation.mjs && node tests/questions.mjs && node tests/course-assets.mjs && node tests/asset-search.mjs && node tests/asset-tags.mjs && node tests/directory-tree.mjs && node tests/asset-names.mjs && node tests/element-catalog.mjs && node tests/nested-renderer.mjs && node tests/text-image.mjs && node tests/draft-status.mjs && node tests/slideshow.mjs && node tests/footnotes.mjs",
     "test:authoring:harness": "node scripts/authoring-harness.cjs",
     "test:smoke": "node scripts/authoring-smoke.mjs"
   },
@@ -28,7 +28,7 @@
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
-    "js-yaml": "4.1.1",
+    "js-yaml": "4.3.2",
     "katex": "^0.16.11",
     "lowlight": "^3.1.0",
     "mafs": "^0.21.0",
@@ -53,5 +53,10 @@
     "eslint-config-next": "^15.3.0",
     "playwright": "1.64.1",
     "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.31"
+    }
   }
 }

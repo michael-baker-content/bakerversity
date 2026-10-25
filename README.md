@@ -61,7 +61,7 @@ The course overview includes a standalone expandable **Course asset library**. I
 
 The library organizes assets through database relationships, not separate physical storage buckets for each course. Existing storage URLs remain public, even for draft assets. JPEG, PNG, WebP, and GIF image uploads are supported; SVG upload support is not implemented.
 
-Usage inspection, unassigned-upload management, granular upload retries, and safe archive/deletion are planned. See [course asset library](docs/course-asset-library.md).
+Use **Usage & removal** on an expanded asset to see saved references and remove unused files from that course library. Choose **Removed files** to restore them. Stored files and revision history are retained. Administrators can open **Removed assets** from My courses, filter by course, and permanently delete files removed from every library for 30 days. Current references block deletion; historical revisions and archived content require explicit override confirmation. Unassigned-upload management and granular upload retries remain future work. See [course asset library](docs/course-asset-library.md).
 
 ## Assessments and learning records
 
@@ -131,7 +131,7 @@ npm run test:smoke
 
 **The smoke test starts a temporary local server.** Run it locally only when desired; otherwise rely on GitHub Actions. It uses isolated data and selected real UI components, with substitute authentication/API routing. It does not verify live Clerk, Supabase Storage, or Vercel configuration. See [authoring reliability](docs/authoring-reliability.md) for coverage and limitations.
 
-Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610230001_course_asset_tags.sql`, which adds optional course-specific asset tags. Consult the migration guide and your database migration history before applying anything.
+Before deploying, apply any new migration required by that release. Do not repeat successful migrations. The latest included migration is `202610240002_permanent_asset_deletion.sql`, which adds the administrator deletion queue and guarded permanent deletion. Consult the migration guide and your database migration history before applying anything.
 
 The legacy `npm run lint` script invokes interactive ESLint setup when no configuration is present. It is not part of the current CI checks; use the commands above. A standalone lint configuration remains separate work.
 
@@ -172,6 +172,7 @@ Footnotes can be enabled per course, with automatic numbering, shared references
 - [Markdown import and export metadata](docs/markdown-exports.md)
 - [Recovery files](docs/recovery-files.md)
 - [Course asset library](docs/course-asset-library.md)
+- [Dependency review](docs/dependency-review.md)
 - [Asset names and downloads](docs/asset-names.md)
 - [Image delivery](docs/image-delivery.md)
 - [Assessment authoring](docs/assessment-authoring.md)

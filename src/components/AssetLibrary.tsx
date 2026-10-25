@@ -1,4 +1,5 @@
 'use client'
+import AssetUsage from './AssetUsage'
 import {parseAssetTags} from '@/lib/assetTags.mjs'
 import { useEffect, useState, useRef, useId } from 'react'
 import { useUnsavedChanges } from '@/lib/authoring/useUnsavedChanges'
@@ -6,7 +7,7 @@ import {uploadCourseAsset,saveAssetMetadata} from '@/lib/authoring/assets'
 import { requestJson } from '@/lib/authoring/request'
 import { resourcePurposes, resourceSelection, type ResourcePurpose, type ResourceSelection } from '@/lib/authoring/resources'
 
-export type Asset = { tags?:string[]; id: string; title: string; download_url?: string | null; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
+export type Asset = { removed_at?:string|null; tags?:string[]; id: string; title: string; download_url?: string | null; original_filename?: string | null; url: string; alt_text: string | null; caption?: string | null; mime_type?: string | null; byte_size: number; item_assets: { item_id: string }[] }
 type DescriptionDraft = {name:string;alt:string;caption:string;tags:string}
 type LibraryResults = Asset[] | {items:Asset[];total:number;courseTotal:number}
 function unpackResults(result:LibraryResults) {
@@ -26,6 +27,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
   const [search,setSearch]=useState('')
   const [query,setQuery]=useState('')
   const [fileType,setFileType]=useState(pickImmediately?'images':'all')
+  const [library,setLibrary]=useState('active')
   const [sort,setSort]=useState('newest')
   const [loading,setLoading]=useState(false)
   const [loadError,setLoadError]=useState('')
@@ -47,7 +49,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
   const [page,setPage]=useState(0)
   const [hasMore,setHasMore]=useState(false)
   const endpoint=courseId ? '/api/admin/assets?course_id='+encodeURIComponent(courseId) : '/api/admin/assets'
-  const listEndpoint=endpoint+(courseId?'&':'?')+new URLSearchParams({q:query,type:fileType,sort,summary:'1'}).toString()
+  const listEndpoint=endpoint+(courseId?'&':'?')+new URLSearchParams({q:query,type:fileType,sort,summary:'1',...(library==='removed'?{library}:{})}).toString()
   const currentEndpoint=useRef(listEndpoint);currentEndpoint.current=listEndpoint
   function remember(rows:Asset[]){for(const row of rows)knownNames.current[row.id]=row.title}
   async function load(next=0) {
@@ -87,7 +89,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
   }
   return <details open={initiallyOpen || undefined} style={{ margin: '16px 0', padding: 16, border: '1px solid var(--border)', borderRadius: 8 }}><summary>Course asset library</summary>
     <p>Manage images and files for this course. Uploaded files have public URLs. Attaching a file to an item follows that item’s draft and publication settings.</p>
-    {!pickImmediately && <input aria-label="Upload course resource" type="file" multiple disabled={busy || disabled || !courseId} onChange={e => { void upload(Array.from(e.target.files ?? [])); e.target.value = '' }} />}
+    {!pickImmediately && <input aria-label="Upload course resource" type="file" multiple disabled={busy || disabled || !courseId || library==='removed'} onChange={e => { void upload(Array.from(e.target.files ?? [])); e.target.value = '' }} />}
     {onChange && <>
       <p>Resource selections are saved with this item. Uploading or copying a link does not publish an attachment.</p>
       <label><span id={labelId+'-purpose'}>Resource purpose</span><select aria-labelledby={labelId+'-purpose'} className="input" value={purpose} disabled={disabled} onChange={e => setPurpose(e.target.value as ResourcePurpose)}>{resourcePurposes.map(p => <option key={p}>{p}</option>)}</select></label>
@@ -102,6 +104,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
     </>}
     <p role="status">{message}</p>
     {courseId && <div className="asset-search-controls">
+      {!onPickImage&&<label>Library<select className="input" value={library} disabled={busy} onChange={e=>setLibrary(e.target.value)}><option value="active">Active files</option><option value="removed">Removed files</option></select></label>}
       <label>Search files<input className="input" type="search" maxLength={200} placeholder="Name, filename or tag" value={search} disabled={busy} onChange={e=>{setSearch(e.target.value);if(!e.target.value)setQuery('')}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setQuery(search.trim())}}} /></label>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setQuery(search.trim())}>Search</button>
       <label><span id={labelId+'-type'}>File type</span><select aria-labelledby={labelId+'-type'} className="input" value={fileType} disabled={busy} onChange={e=>setFileType(e.target.value)}><option value="all">All files</option><option value="images">Images</option><option value="pdf">PDFs</option><option value="other">Other files</option></select></label>
@@ -111,7 +114,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
     {loading && <p role="status">Loading files…</p>}
     {loadError && <p role="alert">{loadError} <button type="button" onClick={()=>setReload(n=>n+1)}>Retry</button></p>}
     {!loading&&!loadError&&total!==null&&<p role="status" style={{fontSize:12,color:'var(--text-2)'}}>{assets.length} of {total} matching {total===1?'file':'files'}{courseTotal!==total?' · '+courseTotal+' in course':''}</p>}
-    {!loading&&!loadError&&!assets.length&&<p>{query||fileType!=='all'?'No files match these filters.':'No files in this course library yet.'} {(query||fileType!=='all')&&<button type="button" className="btn btn-ghost btn-sm" onClick={()=>{setSearch('');setQuery('');setFileType('all')}}>Clear filters</button>}</p>}
+    {!loading&&!loadError&&!assets.length&&<p>{query||fileType!=='all'?'No files match these filters.':library==='removed'?'No removed files.':'No files in this course library yet.'} {(query||fileType!=='all')&&<button type="button" className="btn btn-ghost btn-sm" onClick={()=>{setSearch('');setQuery('');setFileType('all')}}>Clear filters</button>}</p>}
     <div role="group" aria-label="Library view" style={{display:'flex',gap:6,margin:'12px 0'}}>
       <button type="button" className={'btn btn-sm '+(view==='tiles'?'btn-secondary':'btn-ghost')} aria-pressed={view==='tiles'} onClick={()=>chooseView('tiles')}>Tiles</button>
       <button type="button" className={'btn btn-sm '+(view==='list'?'btn-secondary':'btn-ghost')} aria-pressed={view==='list'} onClick={()=>chooseView('list')}>Text list</button>
@@ -134,7 +137,8 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
           </summary>
           <div className="asset-browser-options">
             <div className="asset-file-meta"><span>{extension === 'FILE' && isImage ? 'Image' : extension}</span><span>{a.byte_size < 1048576 ? Math.max(1,Math.ceil(a.byte_size/1024))+' KB' : (a.byte_size/1048576).toFixed(1)+' MB'}</span></div>
-            {courseId && <AssetDetails asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(name,alt,caption,tags)=>{knownNames.current[a.id]=name;setAssets(rows=>rows.map(row=>row.id===a.id?{...row,title:name,alt_text:alt,caption,tags}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
+            {courseId && !a.removed_at && <AssetDetails asset={a} draft={descriptionDrafts[draftKey]} onDraft={draft=>setDescriptionDrafts(current=>{const next={...current};if(draft)next[draftKey]=draft;else delete next[draftKey];return next})} endpoint={endpoint} disabled={disabled||busy} onSaved={(name,alt,caption,tags)=>{knownNames.current[a.id]=name;setAssets(rows=>rows.map(row=>row.id===a.id?{...row,title:name,alt_text:alt,caption,tags}:row));setDescriptionDrafts(current=>{const next={...current};delete next[draftKey];return next})}} />}
+            {courseId&&<div style={{margin:'8px 0'}}><AssetUsage id={a.id} title={a.title} courseId={courseId} removed={!!a.removed_at} disabled={disabled||busy||hasDescriptionEdits} locallySelected={value.some(row=>row.asset_id===a.id)} onChanged={()=>{setMessage(a.removed_at?'File restored to library.':'File removed from active library.');setReload(n=>n+1)}} /></div>}
             <div className="asset-file-actions">
               {a.download_url&&<a className="btn btn-ghost btn-sm" href={a.download_url}>Download</a>}
         {onPickImage && isImage && <button type="button" className="btn btn-primary btn-sm asset-browser-use" disabled={disabled||busy||!!descriptionDrafts[draftKey]} title={descriptionDrafts[draftKey]?'Save or discard the asset details before using this image':undefined} onClick={()=>onPickImage(a)}>Use image</button>}
@@ -143,7 +147,7 @@ export default function AssetLibrary({ pickImmediately = false, onPendingChanges
                 try{await navigator.clipboard.writeText(a.url);setMessage('Resource link copied.')}
                 catch{setMessage('Unable to copy automatically. Use Open file instead.')}
               }}>Copy link</button>
-            {onChange && <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || value.some(r=>r.asset_id===a.id && r.purpose===purpose)} onClick={()=>attach(a)}>{value.some(r=>r.asset_id===a.id && r.purpose===purpose)?'Selected':'Select resource'}</button>}
+            {onChange && !a.removed_at && <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || value.some(r=>r.asset_id===a.id && r.purpose===purpose)} onClick={()=>attach(a)}>{value.some(r=>r.asset_id===a.id && r.purpose===purpose)?'Selected':'Select resource'}</button>}
             </div>
           </div>
         </details>

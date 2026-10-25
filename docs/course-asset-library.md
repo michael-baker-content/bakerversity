@@ -24,7 +24,7 @@ Course-aware Tiptap editors now associate direct image uploads immediately. The 
 
 - An unassigned-files review/import screen and refinements to search/filter options.
 - Per-file retry controls, drag-and-drop, and a persistent upload queue. Current failures are reported by filename; retry by selecting those files again after checking for completed uploads.
-- Usage inspection covering published content, drafts, and revisions; deliberate archive/deletion rules.
+- Queue/search scalability refinements and deliberate revision-retention tooling.
 - Private-asset access, if required. No SVG support or format conversion is introduced here.
 
 ## Validation
@@ -54,3 +54,25 @@ Asset details include comma-separated tags for images and other files. Tags belo
 The slideshow image modal also edits tags. Tags save independently of the checkbox for default alt text and captions. Uploads start untagged unless tags are supplied through the modal. Existing libraries start with no tags.
 
 Apply migrations/202610230001_course_asset_tags.sql in Supabase before deploying the matching application.
+
+## Usage and reversible removal
+
+Apply `202610240001_asset_library_removal.sql` before deploying this update. Expanded assets offer **Usage & removal**, with links to saved content using the file. Drafts, published content, saved assessment questions, resource links, and revision history are checked. Active saved references prevent removal. References in archived content and revision history are retained without blocking library removal.
+
+**Removed files** lists files removed from this course and offers restoration. Removal preserves the storage object, URLs, course metadata, other course libraries, and history. It does not reclaim storage or revoke public access. Publishing a resource association restores its library entry automatically.
+
+Usage matching conservatively checks asset IDs, storage paths, and external URLs in saved JSON, so a literal mention can count as usage. Unsaved changes in other editors cannot be inspected. Current resource selections and pending asset metadata edits block removal in the open library.
+
+The isolated asset-removal tests cover permissions, draft and published references, assessment explanations, history retention, restoration, and API authorization.
+
+## Administrator permanent-deletion queue
+
+Apply `202610240002_permanent_asset_deletion.sql` before deployment. Administrators open **My courses → Removed assets** for a global queue with a course filter. The queue includes files removed from at least one course; eligibility requires removal from every linked course for at least 30 days (the most recent removal starts the clock). Restoring a membership cancels eligibility; removing it again starts a fresh waiting period. The queue never automatically deletes files.
+
+Current drafts, published content, course metadata, assessment questions, resource associations, and stored learner assessment records block deletion. Scans include courses without a library membership. Older revisions and archived content can be overridden by an administrator after acknowledging broken images/downloads and typing the file name. Historical snapshots are preserved; they do not preserve separate copies of files.
+
+Deletion removes the stored upload, all course-library memberships, resource associations in archived content, and the asset record. External images are not deleted from the external host. A minimal service-only tombstone retains identifiers, the requesting administrator, override acknowledgment, and timestamps for audit and retry safety. Public caches or previously downloaded copies cannot be recalled.
+
+A database reservation prevents restoration/reuse while storage deletion runs. Failed or interrupted deletion remains reserved in the queue; retry completes storage removal and database cleanup. A lost response should be followed by refreshing the queue. Reserved deletion is not reversible because storage may already be gone. Save guards reject stale file references, including a previously deleted external URL; replace such references before saving. Matching is conservative and can include literal URL/path mentions.
+
+Tests cover administrator enforcement, all-course waiting periods, current-reference protection, archived/history overrides, stale saves, cleanup, and retry ordering. No live storage is touched by tests. Browser smoke verification remains in GitHub Actions.
